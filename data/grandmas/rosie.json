@@ -1,0 +1,137 @@
+{
+  "id": "rosie",
+  "version": 1,
+  "seed": null,
+  "source": "hand-written",
+  "profile": {
+    "name": "Rosemary Kowalczyk",
+    "nickname": "Rosie",
+    "birth_year": 1940,
+    "hometown": "Erie, Pennsylvania",
+    "personality": {
+      "talkativeness": 4,
+      "teasing": 4,
+      "nostalgia": 5,
+      "suspicion_of_kids_these_days": 2
+    },
+    "humor_style": "dry, affectionate teasing; loves a punchline about Grandpa",
+    "verbal_tics": [
+      "Oh, for heaven's sake",
+      "Now where was I",
+      "Sweetheart",
+      "Don't tell your grandfather I said that"
+    ]
+  },
+  "entities": [
+    { "id": "rosie", "type": "person", "name": "Rosemary Kowalczyk", "aliases": ["Rosie", "Grandma"] },
+    { "id": "walt", "type": "person", "name": "Walter Kowalczyk", "aliases": ["Walt", "Grandpa"], "relation_to_player": "your grandpa" },
+    { "id": "linda", "type": "person", "name": "Linda", "relation_to_player": "your mom" },
+    { "id": "michael", "type": "person", "name": "Michael", "aliases": ["Mikey"], "relation_to_player": "your uncle" },
+    { "id": "dot", "type": "person", "name": "Dorothy", "aliases": ["Dot"], "relation_to_player": "your great-aunt" },
+    { "id": "stan", "type": "person", "name": "Stanley Kowalczyk", "aliases": ["Uncle Stan"], "relation_to_player": "your great-uncle" },
+    { "id": "marge", "type": "person", "name": "Marge Novak", "relation_to_player": "Grandma's best friend" },
+    { "id": "biscuit", "type": "pet", "name": "Biscuit" },
+    { "id": "buttons", "type": "pet", "name": "Buttons" },
+    { "id": "pickles", "type": "pet", "name": "Pickles" },
+    { "id": "cherry_st", "type": "place", "name": "Cherry Street" },
+    { "id": "maple_ave", "type": "place", "name": "Maple Avenue" },
+    { "id": "erie", "type": "place", "name": "Erie" },
+    { "id": "niagara", "type": "place", "name": "Niagara Falls" },
+    { "id": "presque_isle", "type": "place", "name": "Presque Isle" },
+    { "id": "county_fair", "type": "event", "name": "the Erie County Fair" },
+    { "id": "bel_air", "type": "object", "name": "1957 Chevy Bel Air" },
+    { "id": "phone_co", "type": "organization", "name": "the telephone exchange" },
+    { "id": "lincoln_elem", "type": "organization", "name": "Lincoln Elementary" },
+    { "id": "bowling", "type": "organization", "name": "the Tuesday bowling league" }
+  ],
+  "facts": [
+    { "id": "f_birth", "subject": "rosie", "predicate": "born_in", "object": "erie", "year": 1940, "text": "I was born in Erie in 1940, the year my father bought his first radio.", "tags": ["childhood"], "salience": 2 },
+    { "id": "f_sister", "subject": "rosie", "predicate": "sister", "object": "dot", "text": "My little sister Dorothy, we all call her Dot, is three years younger than me.", "tags": ["family"], "salience": 3 },
+    { "id": "f_dog1", "subject": "rosie", "predicate": "first_dog", "object": "biscuit", "year": 1949, "text": "My very first dog was Biscuit, a beagle my father brought home when I was nine.", "tags": ["pets", "childhood"], "confusable_with": ["f_dog2"], "disambiguator": "first / when Grandma was a girl", "salience": 3 },
+    { "id": "f_dog1_breed", "subject": "biscuit", "predicate": "breed", "object": "beagle", "text": "Biscuit was a beagle with one floppy ear.", "tags": ["pets"], "salience": 2 },
+    { "id": "f_dog1_habit", "subject": "biscuit", "predicate": "habit", "object": "stole socks", "text": "Biscuit stole every sock in the house and buried them in the garden.", "tags": ["pets", "funny"], "salience": 3 },
+    { "id": "f_dog2", "subject": "rosie", "predicate": "second_dog", "object": "buttons", "year": 1968, "text": "Buttons, our cocker spaniel, came along in 1968. Oh, she was my favorite.", "tags": ["pets"], "confusable_with": ["f_dog1"], "disambiguator": "favorite / after the kids were born", "salience": 5 },
+    { "id": "f_cat", "subject": "rosie", "predicate": "cat", "object": "pickles", "year": 1985, "text": "We had a grumpy orange cat named Pickles in the eighties.", "tags": ["pets"], "salience": 2 },
+    { "id": "f_met_walt", "subject": "rosie", "predicate": "met_spouse_at", "object": "county_fair", "year": 1958, "text": "I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear.", "tags": ["romance"], "salience": 5 },
+    { "id": "f_engaged", "subject": "rosie", "predicate": "engaged_year", "object": "walt", "year": 1960, "text": "Walt proposed on Christmas Eve, 1960, with a ring hidden in a pierogi.", "tags": ["romance"], "confusable_with": ["f_wedding"], "disambiguator": "married vs. proposed", "salience": 4 },
+    { "id": "f_wedding", "subject": "rosie", "predicate": "wedding_year", "object": "walt", "year": 1961, "text": "We got married in June of 1961 at St. Stanislaus church.", "tags": ["romance", "milestone"], "confusable_with": ["f_engaged"], "disambiguator": "married / wedding", "salience": 4 },
+    { "id": "f_honeymoon", "subject": "rosie", "predicate": "honeymoon", "object": "niagara", "year": 1961, "text": "Our honeymoon was at Niagara Falls. Walt got soaked on the boat and sulked for an hour.", "tags": ["romance", "funny"], "salience": 3 },
+    { "id": "f_nickname", "subject": "walt", "predicate": "nickname_for_rosie", "object": "Sparrow", "text": "Your grandpa has called me 'Sparrow' since the day we met, because I never stop chirping.", "tags": ["romance"], "salience": 3 },
+    { "id": "f_car", "subject": "walt", "predicate": "car", "object": "bel_air", "text": "Walt drove a green 1957 Chevy Bel Air. He washed it more than he washed himself.", "tags": ["grandpa", "funny"], "salience": 3 },
+    { "id": "f_job1", "subject": "rosie", "predicate": "job", "object": "phone_co", "year": 1958, "text": "My first job was a switchboard operator at the telephone exchange, starting in 1958.", "tags": ["work"], "salience": 3 },
+    { "id": "f_job2", "subject": "rosie", "predicate": "job", "object": "lincoln_elem", "year": 1970, "text": "From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.", "tags": ["work"], "salience": 3 },
+    { "id": "f_apt", "subject": "rosie", "predicate": "first_home_street", "object": "cherry_st", "year": 1961, "text": "Our first home after the wedding was a little apartment on Cherry Street.", "tags": ["home"], "confusable_with": ["f_house"], "disambiguator": "first home / when your mom was born", "salience": 3 },
+    { "id": "f_apt_number", "subject": "cherry_st", "predicate": "house_number", "object": 27, "text": "The Cherry Street apartment was number 27, up a flight of stairs that squeaked.", "tags": ["home"], "confusable_with": ["f_house_number"], "disambiguator": "Cherry Street vs. Maple Avenue", "salience": 2 },
+    { "id": "f_house", "subject": "rosie", "predicate": "second_home_street", "object": "maple_ave", "year": 1964, "text": "In 1964 we bought the house on Maple Avenue, and we've been there ever since.", "tags": ["home"], "confusable_with": ["f_apt"], "disambiguator": "the house you live in now", "salience": 4 },
+    { "id": "f_house_number", "subject": "maple_ave", "predicate": "house_number", "object": 412, "text": "It's 412 Maple Avenue. Your grandpa painted the number on the mailbox crooked.", "tags": ["home", "funny"], "confusable_with": ["f_apt_number"], "disambiguator": "Maple Avenue vs. Cherry Street", "salience": 4 },
+    { "id": "f_linda_born", "subject": "linda", "predicate": "born", "object": "cherry_st", "year": 1963, "text": "Your mom Linda was born in 1963, when we were still in the Cherry Street apartment.", "tags": ["family", "milestone"], "salience": 4 },
+    { "id": "f_michael_born", "subject": "michael", "predicate": "born", "object": "maple_ave", "year": 1966, "text": "Your uncle Michael came along in 1966, the first baby in the Maple Avenue house.", "tags": ["family", "milestone"], "salience": 4 },
+    { "id": "f_michael_arm", "subject": "michael", "predicate": "broke_arm", "object": "sledding", "year": 1977, "text": "Michael broke his arm sledding the winter he was eleven, and he still blames the dog.", "tags": ["family", "funny"], "salience": 3 },
+    { "id": "f_snowstorm", "subject": "erie", "predicate": "big_snowstorm", "object": "the big snowstorm", "year": 1977, "text": "The big snowstorm was the same winter Michael broke his arm. Uncle Stan got stuck in the outhouse at the fishing cabin.", "tags": ["weather", "funny"], "salience": 3 },
+    { "id": "f_stan", "subject": "stan", "predicate": "brother_of", "object": "walt", "text": "Uncle Stan is your grandpa's older brother. Loud as a foghorn.", "tags": ["family"], "salience": 2 },
+    { "id": "f_stan_cabin", "subject": "stan", "predicate": "owns", "object": "fishing cabin near Presque Isle", "text": "Stan had a fishing cabin near Presque Isle with an outhouse that leaned left.", "tags": ["family", "funny"], "salience": 2 },
+    { "id": "f_marge", "subject": "rosie", "predicate": "best_friend", "object": "marge", "text": "Marge Novak has been my best friend since the switchboard days. She cheats at cards.", "tags": ["friends", "funny"], "salience": 3 },
+    { "id": "f_bowling", "subject": "rosie", "predicate": "hobby", "object": "bowling", "text": "Every Tuesday is bowling league with Marge. My best score was 212.", "tags": ["hobbies"], "salience": 3 },
+    { "id": "f_bowling_score", "subject": "rosie", "predicate": "best_bowling_score", "object": 212, "text": "My best bowling score ever was 212, and I have the pin to prove it.", "tags": ["hobbies"], "salience": 2 },
+    { "id": "f_pie", "subject": "rosie", "predicate": "won", "object": "blue ribbon for cherry pie", "year": 1972, "text": "I won the blue ribbon for my cherry pie at the county fair in 1972.", "tags": ["cooking", "milestone"], "salience": 4 },
+    { "id": "f_cookie", "subject": "rosie", "predicate": "favorite_cookie", "object": "kolaczki", "text": "My favorite cookies are kolaczki with apricot filling, my mother's recipe.", "tags": ["cooking"], "salience": 4 },
+    { "id": "f_moon", "subject": "rosie", "predicate": "watched", "object": "moon landing", "year": 1969, "text": "We watched the moon landing in 1969 on our brand-new color TV. Walt cried, don't tell him I told you.", "tags": ["history", "funny"], "salience": 3 },
+    { "id": "f_tv", "subject": "rosie", "predicate": "bought", "object": "color TV", "year": 1969, "text": "We bought our first color TV just in time for the moon landing.", "tags": ["home"], "salience": 2 },
+    { "id": "f_walt_hobby", "subject": "walt", "predicate": "hobby", "object": "fishing", "text": "Your grandpa fishes on Lake Erie every Saturday and has never once caught anything worth bragging about.", "tags": ["grandpa", "funny"], "salience": 4 },
+    { "id": "f_dot_married", "subject": "dot", "predicate": "married_year", "object": "Frank", "year": 1965, "text": "Dot married Frank in 1965. I was the maid of honor and I tripped on the aisle.", "tags": ["family", "funny"], "salience": 2 },
+    { "id": "f_song", "subject": "rosie", "predicate": "wedding_song", "object": "Moon River", "text": "Our wedding song was 'Moon River'. Walt stepped on my feet the whole time.", "tags": ["romance"], "salience": 3 },
+    { "id": "f_router", "subject": "rosie", "predicate": "wifi_setup", "object": "Michael set it up", "text": "Michael set up the Wi-Fi box and wrote the hint on that sticky note. I never could remember these things.", "tags": ["meta"], "salience": 2 },
+    { "id": "f_garden", "subject": "rosie", "predicate": "garden", "object": "tomatoes", "text": "I grow tomatoes in the backyard and the squirrels eat half of them.", "tags": ["hobbies", "funny"], "salience": 3 },
+    { "id": "f_polish", "subject": "rosie", "predicate": "heritage", "object": "Polish", "text": "My mother's family came from Kraków. I still say my prayers in Polish.", "tags": ["family", "heritage"], "salience": 2 }
+  ],
+  "anchors": [
+    { "id": "a_snowstorm", "phrase": "the winter Michael broke his arm sledding", "resolves_to_year": 1977, "via_fact_ids": ["f_michael_born", "f_michael_arm"], "source": "family" },
+    { "id": "a_moon", "phrase": "the summer we watched the men walk on the moon", "resolves_to_year": 1969, "via_fact_ids": ["f_moon"], "source": "public" },
+    { "id": "a_mom_born", "phrase": "the year your mom was born", "resolves_to_year": 1963, "via_fact_ids": ["f_linda_born"], "source": "family" }
+  ],
+  "stories": [
+    { "id": "s_fair", "title": "The bear Walt never won", "fact_ids": ["f_met_walt", "f_nickname"], "text": "At the 1958 county fair Walt spent three dollars on the ring toss for a stuffed bear, lost every throw, and bought me a candy apple instead. I talked the whole way home, and that's when he started calling me Sparrow." },
+    { "id": "s_pierogi", "title": "The pierogi proposal", "fact_ids": ["f_engaged", "f_wedding"], "text": "Christmas Eve 1960, I nearly swallowed the ring in my pierogi. We were married that next June." },
+    { "id": "s_snow", "title": "Stan and the outhouse", "fact_ids": ["f_snowstorm", "f_stan_cabin", "f_michael_arm"], "text": "The winter of the big snowstorm, Stan was stuck in his outhouse for two hours and Michael broke his arm on the sled hill, all in the same week." }
+  ],
+  "recipes": [
+    {
+      "id": "r_easy",
+      "difficulty": "easy",
+      "note_text": "first dog's name + year I married Grandpa",
+      "slots": [
+        { "fact_id": "f_dog1", "field": "object", "transform": "capitalize" },
+        { "fact_id": "f_wedding", "field": "year", "transform": "none" }
+      ],
+      "format": { "join": "", "rules_shown_on_note": ["no spaces", "first letter capital"] },
+      "password": "Biscuit1961",
+      "par": null
+    },
+    {
+      "id": "r_medium",
+      "difficulty": "medium",
+      "note_text": "street we lived on when your mom was born + the number on the door",
+      "smudged_text": "street we lived on when your m█m was born + the number on the door",
+      "slots": [
+        { "fact_id": "f_apt", "field": "object", "transform": "first_word" },
+        { "fact_id": "f_apt_number", "field": "object", "transform": "none" }
+      ],
+      "format": { "join": "", "rules_shown_on_note": ["one word, no 'Street'", "first letter capital"] },
+      "password": "Cherry27",
+      "par": null
+    },
+    {
+      "id": "r_hard",
+      "difficulty": "hard",
+      "note_text": "what Grandpa calls me + year of the big snowstorm + !",
+      "slots": [
+        { "fact_id": "f_nickname", "field": "object", "transform": "capitalize" },
+        { "fact_id": "f_snowstorm", "field": "year", "transform": "none", "requires_anchor": "a_snowstorm" }
+      ],
+      "literal_suffix": "!",
+      "format": { "join": "", "rules_shown_on_note": ["no spaces", "first letter capital"] },
+      "password": "Sparrow1977!",
+      "par": null
+    }
+  ]
+}

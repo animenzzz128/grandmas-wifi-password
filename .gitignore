@@ -1,0 +1,25 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# deps / builds
+node_modules/
+dist/
+build/
+.turbo/
+.vite/
+*.tsbuildinfo
+__pycache__/
+.venv/
+
+# eval outputs that may contain playtester data
+eval/runs/
+eval/logs/
+playtest-data/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
