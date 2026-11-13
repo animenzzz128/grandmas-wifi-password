@@ -1,0 +1,263 @@
+{
+  "title": "Scene manifest",
+  "description": "Generated from packages/engine/src/scene.ts by `npm run schema`.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "world_id": {
+      "type": "string"
+    },
+    "room": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number"
+        },
+        "depth": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "wall_color": {
+          "type": "string"
+        },
+        "floor_color": {
+          "type": "string"
+        },
+        "ceiling_color": {
+          "type": "string"
+        },
+        "fog_color": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "width",
+        "depth",
+        "height",
+        "wall_color",
+        "floor_color",
+        "ceiling_color",
+        "fog_color"
+      ],
+      "additionalProperties": false
+    },
+    "spawn": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "yaw": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "position",
+        "yaw"
+      ],
+      "additionalProperties": false
+    },
+    "props": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "node": {
+            "type": "string"
+          },
+          "shape": {
+            "type": "string",
+            "enum": [
+              "box",
+              "cylinder",
+              "figure"
+            ]
+          },
+          "size": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "items": false,
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "position": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "items": false,
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "rotation_y": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string"
+          },
+          "collide": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "node",
+          "shape",
+          "size",
+          "position",
+          "color"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "interactables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "node": {
+            "type": "string"
+          },
+          "shape": {
+            "type": "string",
+            "enum": [
+              "box",
+              "cylinder",
+              "figure"
+            ]
+          },
+          "size": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "items": false,
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "position": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "items": false,
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "rotation_y": {
+            "type": "number"
+          },
+          "color": {
+            "type": "string"
+          },
+          "collide": {
+            "default": true,
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "grandma",
+              "clue",
+              "note",
+              "router",
+              "cookie_jar"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "inspect_text": {
+            "type": "string"
+          },
+          "fact_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "node",
+          "shape",
+          "size",
+          "position",
+          "color",
+          "kind",
+          "label"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "id",
+    "world_id",
+    "room",
+    "spawn",
+    "props",
+    "interactables"
+  ],
+  "additionalProperties": false
+}

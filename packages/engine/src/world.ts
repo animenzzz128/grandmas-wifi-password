@@ -1,0 +1,285 @@
+/**
+ * The Grandma world: zod mirror of data/schema/grandma.schema.json, plus helpers.
+ * Keep this file and the JSON Schema in sync (test/world.test.ts checks rosie.json against both).
+ */
+import { z } from "zod";
+
+export const Difficulty = z.enum(["easy", "medium", "hard", "expert"]);
+export type Difficulty = z.infer<typeof Difficulty>;
+
+export const Transform = z.enum(["none", "capitalize", "lowercase", "uppercase", "first_word"]);
+
+const Profile = z.strictObject({
+  name: z.string(),
+  nickname: z.string().optional(),
+  birth_year: z.number().int().min(1925).max(1960),
+  hometown: z.string(),
+  personality: z.strictObject({
+    talkativeness: z.number().int().min(1).max(5),
+    teasing: z.number().int().min(1).max(5),
+    nostalgia: z.number().int().min(1).max(5),
+    suspicion_of_kids_these_days: z.number().int().min(1).max(5),
+  }),
+  humor_style: z.string().optional(),
+  verbal_tics: z.array(z.string()).min(1),
+});
+
+const Entity = z.strictObject({
+  id: z.string(),
+  type: z.enum(["person", "pet", "place", "object", "organization", "event"]),
+  name: z.string(),
+  aliases: z.array(z.string()).optional(),
+  relation_to_player: z.string().optional(),
+});
+
+const Fact = z.strictObject({
+  id: z.string(),
+  subject: z.string(),
+  predicate: z.string(),
+  object: z.union([z.string(), z.number().int()]),
+  year: z.number().int().optional(),
+  text: z.string(),
+  tags: z.array(z.string()).optional(),
+  confusable_with: z.array(z.string()).optional(),
+  disambiguator: z.string().optional(),
+  salience: z.number().int().min(1).max(5),
+});
+
+const Anchor = z.strictObject({
+  id: z.string(),
+  phrase: z.string(),
+  resolves_to_year: z.number().int(),
+  via_fact_ids: z.array(z.string()).optional(),
+  source: z.enum(["family", "public"]),
+});
+
+const Story = z.strictObject({
+  id: z.string(),
+  title: z.string(),
+  fact_ids: z.array(z.string()).min(1),
+  text: z.string(),
+});
+
+const Slot = z.strictObject({
+  fact_id: z.string(),
+  field: z.enum(["object", "year"]),
+  transform: Transform.optional(),
+  requires_anchor: z.string().optional(),
+});
+
+const Recipe = z.strictObject({
+  id: z.string(),
+  difficulty: Difficulty,
+  note_text: z.string(),
+  smudged_text: z.string().optional(),
+  slots: z.array(Slot).min(1),
+  literal_suffix: z.string().optional(),
+  /**
+   * Groups of facts that form consecutive links of this recipe's inference chain. A single reply
+   * may use at most one fact from each group, so one question can't jump a whole hop.
+   */
+  separate: z.array(z.array(z.string()).min(2)).optional(),
+  /**
+   * In-character lines Grandma says when the player is stuck (several turns that touch none of this
+   * recipe's chain facts). Each points at the first hop: an object or a memory to ask about.
+   */
+  nudges: z.array(z.string()).optional(),
+  format: z.strictObject({
+    join: z.string(),
+    rules_shown_on_note: z.array(z.string()).optional(),
+  }),
+  password: z.string(),
+  par: z.number().int().nullable().optional(),
+});
+
+export const GrandmaWorld = z.strictObject({
+  $schema: z.string().optional(),
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  version: z.number().int().min(1),
+  seed: z.number().int().nullable().optional(),
+  source: z.enum(["hand-written", "generated"]).optional(),
+  profile: Profile,
+  entities: z.array(Entity),
+  facts: z.array(Fact).min(10),
+  anchors: z.array(Anchor).optional(),
+  stories: z.array(Story).optional(),
+  recipes: z.array(Recipe).min(1),
+});
+
+export type GrandmaWorld = z.infer<typeof GrandmaWorld>;
+export type Fact = z.infer<typeof Fact>;
+export type Entity = z.infer<typeof Entity>;
+export type Recipe = z.infer<typeof Recipe>;
+export type Anchor = z.infer<typeof Anchor>;
+
+export function factById(world: GrandmaWorld, id: string): Fact | undefined {
+  return world.facts.find((f) => f.id === id);
+}
+
+export function entityById(world: GrandmaWorld, id: string): Entity | undefined {
+  return world.entities.find((e) => e.id === id);
+}
+
+export function recipeById(world: GrandmaWorld, id: string): Recipe | undefined {
+  return world.recipes.find((r) => r.id === id);
+}
+
+/** Resolve a fact's object to a display string: an entity's name, or the literal value. */
+export function objectValue(world: GrandmaWorld, fact: Fact): string {
+  if (typeof fact.object === "number") return String(fact.object);
+  return entityById(world, fact.object)?.name ?? fact.object;
+}
+
+function applyTransform(value: string, transform: z.infer<typeof Transform> = "none"): string {
+  switch (transform) {
+    case "capitalize":
+      return value.charAt(0).toUpperCase() + value.slice(1);
+    case "lowercase":
+      return value.toLowerCase();
+    case "uppercase":
+      return value.toUpperCase();
+    case "first_word":
+      return value.split(/\s+/)[0] ?? value;
+    case "none":
+      return value;
+  }
+}
+
+/** Compute the password a recipe describes, from the facts alone. */
+export function computePassword(world: GrandmaWorld, recipe: Recipe): string {
+  return slotParts(world, recipe).join(recipe.format.join) + (recipe.literal_suffix ?? "");
+}
+
+/** The value of each slot after its transform, e.g. ["Maple", "412"]. */
+export function slotParts(world: GrandmaWorld, recipe: Recipe): string[] {
+  return recipe.slots.map((slot) => {
+    const fact = factById(world, slot.fact_id);
+    if (!fact) throw new Error(`recipe ${recipe.id}: unknown fact ${slot.fact_id}`);
+    let raw: string;
+    if (slot.field === "year") {
+      if (fact.year === undefined) throw new Error(`recipe ${recipe.id}: fact ${fact.id} has no year`);
+      raw = String(fact.year);
+    } else {
+      raw = objectValue(world, fact);
+    }
+    return applyTransform(raw, slot.transform);
+  });
+}
+
+/** Every fact on this recipe's inference chains: slot facts, separate groups, anchor facts. */
+export function chainFacts(world: GrandmaWorld, recipe: Recipe): Set<string> {
+  const ids = new Set<string>(recipe.slots.map((s) => s.fact_id));
+  for (const g of recipe.separate ?? []) for (const id of g) ids.add(id);
+  for (const slot of recipe.slots) {
+    const anchor = slot.requires_anchor ? world.anchors?.find((a) => a.id === slot.requires_anchor) : undefined;
+    for (const id of anchor?.via_fact_ids ?? []) ids.add(id);
+  }
+  return ids;
+}
+
+/** Does `text` contain every slot value of the recipe as a whole word? (Then one memory hands over the answer.) */
+export function containsAllSlots(world: GrandmaWorld, recipe: Recipe, text: string): boolean {
+  const parts = slotParts(world, recipe);
+  const lower = text.toLowerCase();
+  return parts.length > 1 && parts.every((p) => new RegExp(`\\b${p.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(lower));
+}
+
+/**
+ * Years the model must not see for this recipe: the year behind any anchor the recipe requires.
+ * In hard mode the player has to work the year out from the anchor phrase.
+ */
+export function hiddenYears(world: GrandmaWorld, recipe: Recipe): Set<number> {
+  const years = new Set<number>();
+  for (const slot of recipe.slots) {
+    if (!slot.requires_anchor) continue;
+    const anchor = world.anchors?.find((a) => a.id === slot.requires_anchor);
+    if (anchor) years.add(anchor.resolves_to_year);
+  }
+  return years;
+}
+
+/** Cross-reference checks the JSON Schema can't express. Returns a list of problems (empty = valid). */
+export function checkWorld(world: GrandmaWorld): string[] {
+  const problems: string[] = [];
+  const ids = new Set<string>();
+  const dup = (kind: string, id: string) => {
+    if (ids.has(id)) problems.push(`duplicate id ${id} (${kind})`);
+    ids.add(id);
+  };
+  world.entities.forEach((e) => dup("entity", e.id));
+  world.facts.forEach((f) => dup("fact", f.id));
+  world.anchors?.forEach((a) => dup("anchor", a.id));
+  world.stories?.forEach((s) => dup("story", s.id));
+  world.recipes.forEach((r) => dup("recipe", r.id));
+
+  const entityIds = new Set(world.entities.map((e) => e.id));
+  const factIds = new Set(world.facts.map((f) => f.id));
+  for (const f of world.facts) {
+    if (!entityIds.has(f.subject)) problems.push(`fact ${f.id}: unknown subject ${f.subject}`);
+    for (const c of f.confusable_with ?? []) {
+      if (!factIds.has(c)) problems.push(`fact ${f.id}: unknown confusable ${c}`);
+    }
+  }
+  // Years must be plausible: not before Grandma was born, not in the future.
+  const thisYear = new Date().getFullYear();
+  for (const f of world.facts) {
+    if (f.year === undefined) continue;
+    if (f.year < world.profile.birth_year || f.year > thisYear) problems.push(`fact ${f.id}: year ${f.year} is outside ${world.profile.birth_year}–${thisYear}`);
+  }
+  for (const a of world.anchors ?? []) {
+    for (const id of a.via_fact_ids ?? []) {
+      if (!factIds.has(id)) problems.push(`anchor ${a.id}: unknown fact ${id}`);
+    }
+  }
+  for (const s of world.stories ?? []) {
+    for (const id of s.fact_ids) if (!factIds.has(id)) problems.push(`story ${s.id}: unknown fact ${id}`);
+  }
+  for (const r of world.recipes) {
+    try {
+      const computed = computePassword(world, r);
+      if (computed !== r.password) problems.push(`recipe ${r.id}: password ${r.password} != computed ${computed}`);
+    } catch (e) {
+      problems.push((e as Error).message);
+    }
+    for (const slot of r.slots) {
+      if (slot.requires_anchor && !world.anchors?.some((a) => a.id === slot.requires_anchor)) {
+        problems.push(`recipe ${r.id}: unknown anchor ${slot.requires_anchor}`);
+      }
+    }
+  }
+  for (const r of world.recipes) {
+    for (const group of r.separate ?? []) {
+      for (const id of group) {
+        if (!world.facts.some((f) => f.id === id)) problems.push(`recipe ${r.id}: separate group has unknown fact ${id}`);
+      }
+    }
+    // An anchor must resolve to the year of the slot fact that uses it.
+    for (const slot of r.slots) {
+      if (!slot.requires_anchor) continue;
+      const anchor = world.anchors?.find((a) => a.id === slot.requires_anchor);
+      const fact = world.facts.find((f) => f.id === slot.fact_id);
+      if (anchor && fact?.year !== undefined && anchor.resolves_to_year !== fact.year) {
+        problems.push(`recipe ${r.id}: anchor ${anchor.id} resolves to ${anchor.resolves_to_year} but ${fact.id} is ${fact.year}`);
+      }
+    }
+    // No single memory may contain the whole answer: Grandma would hand it over in one reply.
+    try {
+      for (const f of world.facts) {
+        if (containsAllSlots(world, r, f.text)) problems.push(`recipe ${r.id}: fact ${f.id} alone contains every slot value`);
+      }
+      for (const s of world.stories ?? []) {
+        if (containsAllSlots(world, r, s.text)) problems.push(`recipe ${r.id}: story ${s.id} alone contains every slot value`);
+      }
+    } catch {
+      /* unknown slot facts are reported above */
+    }
+  }
+  return problems;
+}
+
+export function parseWorld(json: unknown): GrandmaWorld {
+  const world = GrandmaWorld.parse(json);
+  const problems = checkWorld(world);
+  if (problems.length) throw new Error(`world ${world.id} is invalid:\n- ${problems.join("\n- ")}`);
+  return world;
+}

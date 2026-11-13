@@ -1,0 +1,17 @@
+{
+  "name": "@gwp/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --import tsx src/main.ts",
+    "start": "node --import tsx src/main.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@gwp/engine": "*",
+    "@hono/node-server": "^2.1.0",
+    "hono": "^4.13.0",
+    "zod": "^4.1.0"
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "lang": "en",
+  "ui": {
+    "title": "Grandma's Wi-Fi Password",
+    "tagline": "The password is on a sticky note. The answers are in Grandma.",
+    "start": "Visit Grandma",
+    "difficulty": "Difficulty",
+    "difficulty.easy": "Easy",
+    "difficulty.medium": "Medium",
+    "difficulty.hard": "Hard",
+    "clickToLook": "Click the room to look around with the mouse",
+    "controls": "WASD walk · Shift hurry · E interact · Q put back · Tab notebook · Enter talk · Esc back · M sound · O settings · F3 FPS",
+    "prompt.grandma": "E · Talk to Grandma",
+    "prompt.clue": "E · Look at the {label}",
+    "prompt.note": "E · Read the sticky note",
+    "prompt.router": "E · Type the Wi-Fi password",
+    "prompt.cookie_jar": "E · Take a cookie",
+    "ask.placeholder": "Ask Grandma something…",
+    "ask.send": "Ask",
+    "ask.thinking": "Grandma is thinking…",
+    "ask.cost": "−{cost} tea",
+    "close": "Close",
+    "note.title": "Sticky note above the router",
+    "note.length": "{n} characters",
+    "router.title": "WI-FI NETWORK: {ssid}",
+    "router.connect": "Connect",
+    "router.attempts": "Attempts left: {n}",
+    "hud.tea": "Tea",
+    "hud.naps": "Naps {n}/{max}",
+    "hud.cookies": "Cookies {n}",
+    "hud.questions": "Questions {n}",
+    "cookie.none": "The jar is empty. Grandma counted them.",
+    "result.solved": "Connected!",
+    "result.failed": "No internet today.",
+    "result.bedtime": "Grandma's off to bed.",
+    "result.password": "The password was {password}",
+    "result.copy": "Copy result",
+    "result.copied": "Copied!",
+    "result.again": "Visit again",
+    "result.card": "👵 {name} · {difficulty}\n🔑 {outcome}\n{cups} 😴×{naps} 🍪×{cookies}\n{stars}",
+    "result.cardSolved": "Solved in {n} questions",
+    "result.cardFailed": "Gave up after {n} questions",
+    "mode.mock": "Mock Grandma (no API key)",
+    "mode.llm": "Grandma: {model}",
+    "error.network": "Grandma can't hear you (server not reachable).",
+    "hud.fps": "{fps} fps · worst frame {worst} ms",
+    "inspect.take": "Take it to Grandma",
+    "inspect.holding": "You're carrying this",
+    "cookie.take": "Take a cookie",
+    "cookie.holding": "You're holding a cookie",
+    "carry.clue": "Carrying the {label} · E on Grandma to show her · Q to put it back",
+    "carry.cookie": "Carrying a cookie · E on Grandma to give it · Q to put it back",
+    "carry.cookieLabel": "cookie",
+    "prompt.grandmaShow": "E · Show Grandma the {label}",
+    "prompt.grandmaCookie": "E · Give Grandma the cookie",
+    "prompt.grandmaCloser": "Get closer to give Grandma the {label}",
+    "talk.mode": "Talking to Grandma · Esc or click the room to walk",
+    "talk.tooFar": "Grandma can't hear you from over here. Walk over to her.",
+    "ask.placeholderFar": "Walk over to Grandma to talk",
+    "router.slot": "part {n}",
+    "router.partial": "Not quite. {n} of {total} parts are right.",
+    "router.formatted": "Capitals and spaces are fixed for you",
+    "premise": "Grandma's Wi-Fi password is a riddle on a sticky note, made of her memories. Ask her about the old days, look around the living room for proof, and type the answer into the router before her tea runs out.",
+    "difficulty.help": "Easy: one step per clue · Medium: two steps and a decoy · Hard: three steps, and she won't say the year",
+    "goal.note": "Read the sticky note in the kitchen",
+    "goal.ask": "Ask Grandma about it",
+    "goal.proof": "Find proof in the room",
+    "goal.router": "Try the password at the router",
+    "notebook.title": "Notebook",
+    "notebook.empty": "Nothing yet. Talk to Grandma and look around; names and years you hear are written down here.",
+    "notebook.name": "names",
+    "notebook.year": "years",
+    "notebook.place": "places",
+    "notebook.number": "numbers",
+    "cost.long": "+{n} long",
+    "cost.rude": "+{n} rude",
+    "cost.followUp": "−{n} follow-up",
+    "audio.muted": "Sound off (M to turn it back on)",
+    "audio.on": "Sound on",
+    "settings.title": "Settings",
+    "settings.sensitivity": "Mouse sensitivity",
+    "settings.fov": "Field of view",
+    "settings.invertY": "Invert mouse up/down",
+    "settings.relaxed": "Relaxed mode: Grandma's tea never runs out",
+    "settings.relaxedHint": "Applies from your next visit. Relaxed visits are marked on the result card.",
+    "result.relaxed": "Relaxed visit (tea didn't run out)",
+    "grandma.dozing": "z z z",
+    "settings.retro": "Retro filter (palette and dither)"
+  },
+  "grandma": {
+    "greeting": [
+      "Oh, sweetheart, you made it! Sit down, sit down. The Wi-Fi? Your uncle Michael set that up. He left a hint on the sticky note by the box in the kitchen.",
+      "There's my favorite grandchild. Don't tell your cousins. The internet thing again? Michael wrote something on a sticky note by the router."
+    ],
+    "password_deflect": [
+      "Sweetheart, if I knew the password I wouldn't need a sticky note.",
+      "Password? Honey, I can barely remember where I put my glasses. Ask me about the old days, I'm good at those.",
+      "Michael set it up. I just know it's something about the family. Read the note, dear."
+    ],
+    "wrong_guess": [
+      "Did you try turning it off and on again? That's what your cousin always says.",
+      "The little light is blinking red. Is red good? Red's never good.",
+      "Oh, that's not it? Well, don't look at me, I just make the pierogi."
+    ],
+    "solved": [
+      "It works? Oh, you're a genius. Now show me how to see the grandkids on the computer.",
+      "Look at that, the little light's green! I knew you'd figure it out, you were always the clever one."
+    ],
+    "out_of_guesses": [
+      "Oh, the box is sulking now. We'll ask Michael at Christmas.",
+      "Never mind the internet, sweetheart. We have the TV and each other."
+    ],
+    "nap": [
+      "Mmm, let me just rest my eyes for a minute…",
+      "Oh, I'm fading, sweetheart. Five minutes…"
+    ],
+    "bedtime": [
+      "That's it for me, dear. Grandma's off to bed. Lock the door on your way out.",
+      "I'm all talked out. Goodnight, sweetheart. Try again tomorrow."
+    ],
+    "cookie": [
+      "A kolaczki! You remembered. Oh, I feel ten years younger.",
+      "Ooh, my favorite. Don't tell your grandfather I had two."
+    ],
+    "no_cookie": [
+      "You're out of cookies, sweetheart. I counted."
+    ],
+    "fallback": [
+      "Hold on, my hearing aid is whistling again. Say that one more time?",
+      "Now where was I? Ask me again, dear, slower this time."
+    ],
+    "run_over": [
+      "We're done for today, sweetheart. Come back tomorrow."
+    ],
+    "crisis": [
+      "Oh, sweetheart. I'm only a grandma in a game, but you matter to real people. If you're thinking about hurting yourself, please reach out right now: in the US you can call or text 988, or contact your local emergency number. You don't have to carry this alone."
+    ],
+    "pardon": [
+      "Oh, sweetheart, I only speak English and a little Polish. Say it again for your old grandma?",
+      "Pardon, dear? My English is fine but that went right over my head."
+    ]
+  }
+}

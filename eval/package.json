@@ -1,0 +1,12 @@
+{
+  "name": "@gwp/eval",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "run": "tsx src/run.ts"
+  },
+  "dependencies": {
+    "@gwp/engine": "*"
+  }
+}
