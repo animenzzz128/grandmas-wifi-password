@@ -85,3 +85,20 @@ describe("LLM brain request flow (fake client)", () => {
     expect(data.strings.grandma.fallback).toContain(r.output.reply);
   });
 });
+
+describe("running summary (TDD §5④)", () => {
+  it("a long visit sends the last 6 exchanges plus a summary of the memories told before them, without touching the cached blocks", async () => {
+    const r = run();
+    r.history.push({ role: "player", text: "first dog?" }, { role: "grandma", text: "Biscuit, a beagle.", factIds: ["f_dog1"] });
+    for (let i = 0; i < 7; i++) r.history.push({ role: "player", text: `garden ${i}?` }, { role: "grandma", text: "Tomatoes.", factIds: ["f_garden"] });
+    const f = fake([good]);
+    await new LlmBrain("claude-haiku-5-5", { client: f.client }).reply({ world, recipe: easy, run: r, input: ask("And your wedding?"), lines: data.strings.grandma });
+    const sent = f.calls[0]!;
+    const last = sent.messages.at(-1)!.content as string;
+    expect(last).toMatch(/^And your wedding\?/);
+    expect(last).toMatch(/Earlier in this visit.*f_dog1, f_garden/);
+    expect(sent.messages.filter((m) => m.role === "assistant")).toHaveLength(6);
+    // The summary rides in the new user turn; the cached system blocks are unchanged.
+    expect(sent.system.map((s) => s.text).join()).not.toContain("Earlier in this visit");
+  });
+});

@@ -273,6 +273,7 @@
       "predicate": "wedding_year",
       "object": "walt",
       "year": 1961,
+      "misremembers": 1962,
       "text": "We got married in June of 1961 at St. Stanislaus church.",
       "tags": [
         "romance",
@@ -559,6 +560,7 @@
       "predicate": "bought",
       "object": "color TV",
       "year": 1969,
+      "misremembers": 1970,
       "text": "We bought our first color TV just in time for the moon landing.",
       "tags": [
         "home"
@@ -723,6 +725,12 @@
       },
       "password": "Biscuit1961",
       "par": null,
+      "separate": [
+        [
+          "f_dog1",
+          "f_wedding"
+        ]
+      ],
       "nudges": [
         "You know, I keep meaning to put names under those dog pictures in my album. It's on the coffee table, dear.",
         "Did I ever show you my wedding picture on the sideboard? Turn it over sometime."
@@ -812,7 +820,7 @@
       ],
       "nudges": [
         "Michael's old sled is still by the door. That boy and that sled, I tell you.",
-        "Ask me how your grandpa and I met. It's a good story, with a bird in it."
+        "Ask me what your grandpa calls me, dear. He's had a pet name for me since the day we met."
       ]
     }
   ]

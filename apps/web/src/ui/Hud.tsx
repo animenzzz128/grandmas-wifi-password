@@ -1,10 +1,16 @@
 /** HTML overlay on top of the 3D canvas. Text comes from data/i18n via t(). */
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useProgress } from "@react-three/drei";
 import { useGame } from "../store.ts";
 import type { Carrying } from "../store.ts";
 import { t } from "../strings.ts";
-import { babble, chime, toggleMute } from "../audio.ts";
+import { babble, chime, snore, startClock, stopClock, toggleMute } from "../audio.ts";
+import { canListen, listen, speak, stopSpeaking } from "../voice.ts";
+import { useSettings } from "../settings.ts";
 import { SettingsCard } from "./Settings.tsx";
+import { saveDailyRecord } from "../daily.ts";
+import { revealPlan, typedLength } from "../typeout.ts";
 
 function Teacup() {
   const run = useGame((s) => s.run)!;
@@ -105,8 +111,8 @@ function Objectives() {
   const steps = [
     { done: noteSeen, label: t("goal.note") },
     { done: run.questionCount > 0, label: t("goal.ask") },
-    { done: inspected.some((id) => id !== "cookie_jar"), label: t("goal.proof") },
-    { done: run.attemptsLeft < run.maxNaps || run.status === "solved", label: t("goal.router") },
+    { done: inspected.length > 0, label: t("goal.proof") },
+    { done: run.attemptsLeft < run.maxAttempts || run.status === "solved", label: t("goal.router") },
   ];
   if (steps.every((s) => s.done)) return null;
   return (
@@ -124,13 +130,29 @@ function Objectives() {
 function NotebookCard() {
   const run = useGame((s) => s.run)!;
   const notebook = useGame((s) => s.notebook);
+  const pins = useGame((s) => s.pins);
+  const unpin = useGame((s) => s.unpin);
   const openPanel = useGame((s) => s.openPanel);
   const groups = (["name", "year", "place", "number"] as const).map((kind) => ({ kind, items: notebook.filter((n) => n.kind === kind) }));
   return (
     <div className="card notebook-card">
       <h3>{t("notebook.title")}</h3>
       <p className="riddle">{run.note.text}</p>
-      {notebook.length === 0 && <p>{t("notebook.empty")}</p>}
+      {pins.length > 0 && (
+        <div className="group pins">
+          <h4>{t("notebook.pinned")}</h4>
+          {pins.map((p, i) => (
+            <div key={p} className="entry pin">
+              📌 <span>{p}</span>
+              <button className="ghost unpin" title={t("notebook.unpin")} aria-label={t("notebook.unpin")} onClick={() => unpin(i)}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {notebook.length === 0 && pins.length === 0 && <p>{t("notebook.empty")}</p>}
+      {pins.length === 0 && <p className="hint">{t("notebook.pinHint")}</p>}
       {groups.map(
         (g) =>
           g.items.length > 0 && (
@@ -151,18 +173,89 @@ function NotebookCard() {
   );
 }
 
+/** Room ambience and Grandma's snoring (GDD §8.2–8.3). Text carries the same information (the "z z z" bubble). */
+function Ambience() {
+  const playing = useGame((s) => s.run?.status === "playing");
+  const roomSound = useSettings((s) => s.roomSound);
+  const stamina = useGame((s) => s.run?.stamina ?? 100);
+  const status = useGame((s) => s.run?.status);
+  const busy = useGame((s) => s.busy);
+  const speaking = useGame((s) => s.grandmaSpeaking);
+  const dozing = (stamina <= 20 || status === "bedtime") && !busy && !speaking;
+  useEffect(() => {
+    if (!playing || !roomSound) return;
+    startClock();
+    return stopClock;
+  }, [playing, roomSound]);
+  useEffect(() => {
+    if (!dozing) return;
+    const first = setTimeout(snore, 1200);
+    const every = setInterval(snore, 4200);
+    return () => {
+      clearTimeout(first);
+      clearInterval(every);
+    };
+  }, [dozing]);
+  return null;
+}
+
+/** Router confetti on a solve (GDD §8.3). Decoration only; skipped when the player prefers reduced motion. */
+const CONFETTI_COLORS = ["#e8b04a", "#c0563b", "#6fa8a0", "#f3e2c0", "#8c6bb1"];
+function Confetti() {
+  const solved = useGame((s) => s.run?.status === "solved");
+  const [pieces] = useState(() =>
+    Array.from({ length: 90 }, (_, i) => ({
+      left: Math.random() * 100,
+      delay: Math.random() * 0.6,
+      duration: 2.2 + Math.random() * 1.6,
+      drift: (Math.random() - 0.5) * 160,
+      spin: (Math.random() - 0.5) * 1440,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length]!,
+      wide: Math.random() < 0.5,
+    })),
+  );
+  if (!solved || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return null;
+  return (
+    <div className="confetti" aria-hidden="true">
+      {pieces.map((p, i) => (
+        <span
+          key={i}
+          style={{
+            left: `${p.left}%`,
+            background: p.color,
+            width: p.wide ? 10 : 6,
+            height: p.wide ? 6 : 12,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+            ["--drift" as string]: `${p.drift}px`,
+            ["--spin" as string]: `${p.spin}deg`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 /** Plays sounds for game events: Grandma's lines, notebook entries, router results. M toggles sound. */
 function AudioDirector() {
   const lastSeq = useGame((s) => s.log.at(-1)?.seq ?? 0);
   const notes = useGame((s) => s.notebook.length);
   const status = useGame((s) => s.run?.status);
   const attempts = useGame((s) => s.run?.attemptsLeft ?? 0);
-  const prev = useRef({ seq: lastSeq, notes, status, attempts });
+  // Starts at 0 so the greeting (already in the log when the HUD mounts) is voiced too.
+  const prev = useRef({ seq: 0, notes, status, attempts });
   useEffect(() => {
     const p = prev.current;
     if (lastSeq !== p.seq) {
-      const line = useGame.getState().log.at(-1);
-      if (line?.who === "grandma") babble(line.text, line.mood);
+      // Every Grandma line since last time (a reply can come with a nap line or a nudge), as one utterance.
+      const fresh = useGame.getState().log.filter((l) => l.who === "grandma" && (l.seq ?? 0) > p.seq);
+      if (fresh.length) {
+        const text = fresh.map((l) => l.text).join(" ");
+        const mood = fresh[0]!.mood;
+        const mode = useSettings.getState().voice;
+        if (mode === "spoken") speak(text, mood);
+        else if (mode === "blips") babble(text, mood);
+      }
     }
     if (notes > p.notes) chime("note");
     if (status === "solved" && p.status !== "solved") chime("success");
@@ -173,7 +266,9 @@ function AudioDirector() {
     const key = (e: KeyboardEvent) => {
       const el = document.activeElement;
       if (e.code !== "KeyM" || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
-      useGame.getState().showHint(toggleMute() ? t("audio.muted") : t("audio.on"));
+      const muted = toggleMute();
+      if (muted) stopSpeaking();
+      useGame.getState().showHint(muted ? t("audio.muted") : t("audio.on"));
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
@@ -182,6 +277,34 @@ function AudioDirector() {
 }
 
 /** A short message that fades after a few seconds. */
+/** While furniture and Grandma are still downloading, say so (placeholder boxes stand in meanwhile). */
+function LoadingPill() {
+  const { active, progress } = useProgress();
+  if (!active) return null;
+  return (
+    <div className="loading-pill" role="status">
+      {t("loading.room", { pct: Math.round(progress) })}
+    </div>
+  );
+}
+
+/** Voice mode: what Grandma misheard, big, for a moment (game design §8.3: "Pass the SWORD?!"). */
+function MishearBanner() {
+  const mishear = useGame((s) => s.mishear);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!mishear) return;
+    setVisible(true);
+    const id = setTimeout(() => setVisible(false), 2800);
+    return () => clearTimeout(id);
+  }, [mishear]);
+  return visible && mishear ? (
+    <div className="mishear" role="status">
+      {t("mishear.big", { as: mishear.as.toUpperCase() })}
+    </div>
+  ) : null;
+}
+
 function HintToast() {
   const hint = useGame((s) => s.hint);
   const [visible, setVisible] = useState(false);
@@ -241,23 +364,85 @@ function FpsMeter() {
   return on ? <div className="fps" ref={ref} /> : null;
 }
 
+/** One of Grandma's lines appearing word by word. A timer, not animation frames, so it also finishes in a background tab. */
+function TypingText({ text, onDone, onGrow }: { text: string; onDone: () => void; onGrow: () => void }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const start = performance.now();
+    const id = setInterval(() => {
+      const k = typedLength(text, performance.now() - start);
+      setN(k);
+      onGrow();
+      if (k >= text.length) {
+        clearInterval(id);
+        onDone();
+      }
+    }, 30);
+    return () => clearInterval(id);
+  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <>
+      {text.slice(0, n)}
+      <span className="caret" aria-hidden="true" />
+    </>
+  );
+}
+
+const prefersReducedMotion = () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+
 function ChatLog() {
   const log = useGame((s) => s.log);
   const busy = useGame((s) => s.busy);
   const ref = useRef<HTMLDivElement>(null);
+  const typeOut = useSettings((s) => s.typeOut) && !prefersReducedMotion();
+  /** Grandma's lines up to this seq are fully shown; newer ones type out in turn. */
+  const [revealed, setRevealed] = useState(() => useGame.getState().log.reduce((m, l) => Math.max(m, l.seq ?? 0), 0));
+  const plan = typeOut ? revealPlan(log, revealed) : log.map(() => "full" as const);
+  const showAll = () => setRevealed(log.reduce((m, l) => Math.max(m, l.seq ?? 0), 0));
+  const toBottom = () => ref.current?.scrollTo({ top: ref.current.scrollHeight });
+  /** A highlighted bit of Grandma's words, and where to show the pin button for it. */
+  const [picked, setPicked] = useState<{ text: string; x: number; y: number } | null>(null);
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight });
   }, [log, busy]);
+  const pinIt = (text: string) => {
+    const ok = useGame.getState().pin(text);
+    useGame.getState().showHint(ok ? t("notebook.pinnedHint") : t("notebook.pinSkipped"));
+    window.getSelection()?.removeAllRanges();
+    setPicked(null);
+  };
+  /** Highlighting text inside one of Grandma's lines offers a pin (game design §5). */
+  const onSelect = () => {
+    const sel = window.getSelection();
+    const text = sel?.toString().trim() ?? "";
+    const line = sel?.anchorNode?.parentElement?.closest(".line.grandma");
+    if (!sel || sel.rangeCount === 0 || text.length < 3 || !line || !ref.current?.contains(line)) return setPicked(null);
+    const r = sel.getRangeAt(0).getBoundingClientRect();
+    setPicked({ text, x: r.left + r.width / 2, y: r.top });
+  };
   return (
-    <div className="chat-log" ref={ref}>
-      {log.map((l, i) => (
+    <div className="chat-log" ref={ref} onMouseUp={onSelect} onKeyUp={onSelect} onClick={() => plan.includes("typing") && showAll()} title={plan.includes("typing") ? t("chat.skipTyping") : undefined}>
+      {log.map((l, i) => plan[i] === "hidden" ? null : (
         <div key={i} className={`line ${l.who}`}>
           {l.who === "grandma" ? "👵 " : l.who === "player" ? "🧑 " : ""}
-          {l.text}
+          {plan[i] === "typing" ? <TypingText text={l.text} onGrow={toBottom} onDone={() => setRevealed((r) => Math.max(r, l.seq ?? 0))} /> : l.text}
           {l.cost ? <span className="cost">{t("ask.cost", { cost: l.cost })}{l.costWhy ? ` (${l.costWhy})` : ""}</span> : null}
+          {l.who === "grandma" && (
+            <button className="pin-line" title={t("notebook.pinLine")} aria-label={t("notebook.pinLine")} onClick={() => pinIt(l.text)}>
+              📌
+            </button>
+          )}
         </div>
       ))}
       {busy && <div className="line system">{t("ask.thinking")}</div>}
+      {/* In a portal: the chat panel is transformed, which would anchor a fixed button to it. */}
+      {picked &&
+        createPortal(
+          <button className="pin-pick" style={{ left: picked.x, top: picked.y }} onMouseDown={(e) => e.preventDefault()} onClick={() => pinIt(picked.text)}>
+            📌 {t("notebook.pinIt")}
+          </button>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -271,7 +456,29 @@ function AskBar() {
   const setTalking = useGame((s) => s.setTalking);
   const playing = useGame((s) => s.run?.status === "playing");
   const inEarshot = useGame((s) => s.inEarshot);
+  const listening = useGame((s) => s.listening);
+  const voiceTick = useGame((s) => s.voiceTick);
   const input = useRef<HTMLInputElement>(null);
+  /** Ask by voice: interim words fill the box; the final words are sent. */
+  const startListening = () => {
+    if (!useGame.getState().inEarshot) return useGame.getState().showHint(t("talk.tooFar"));
+    listen({
+      onInterim: (words) => setText(words),
+      onFinal: (words, confidence) => {
+        setText("");
+        void ask(words, { confidence }).then((ok) => !ok && setText(words));
+      },
+      onError: (code) => useGame.getState().showHint(code === "not-allowed" ? t("talk.micDenied") : code === "unsupported" ? t("talk.micUnsupported") : t("talk.micError")),
+    });
+  };
+  const seenVoice = useRef(voiceTick);
+  useEffect(() => {
+    if (voiceTick !== seenVoice.current) {
+      seenVoice.current = voiceTick;
+      startListening();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceTick]);
   // Take focus only when asked *after* mounting (E on Grandma, Enter). On a new visit the tick is
   // already non-zero, and grabbing focus then would make WASD type into the box.
   const seenTick = useRef(tick);
@@ -284,9 +491,9 @@ function AskBar() {
   useEffect(() => () => setTalking(false), [setTalking]);
   const submit = async () => {
     const q = text.trim();
-    if (!q || busy) return;
+    if (!q || useGame.getState().busy) return; // live state: two quick Enters in one tick send once
     setText("");
-    await ask(q);
+    if (!(await ask(q))) setText(q); // didn't reach her: keep the question so Enter retries it
     input.current?.focus();
   };
   return (
@@ -302,11 +509,16 @@ function AskBar() {
         value={text}
         maxLength={280}
         disabled={!playing || (!inEarshot && !talking)}
-        placeholder={inEarshot || talking ? t("ask.placeholder") : t("ask.placeholderFar")}
+        placeholder={listening ? t("ask.listening") : inEarshot || talking ? t("ask.placeholder") : t("ask.placeholderFar")}
         onChange={(e) => setText(e.target.value)}
         onFocus={() => setTalking(true)}
         onBlur={() => setTalking(false)}
       />
+      {canListen() && (
+        <button type="button" className={`mic ${listening ? "on" : ""}`} title={t("ask.mic")} disabled={!playing} onClick={startListening}>
+          {listening ? "●" : "🎤"}
+        </button>
+      )}
       <button disabled={busy || !text.trim() || !playing}>{t("ask.send")}</button>
       {talking && <div className="talk-mode">{t("talk.mode")}</div>}
     </form>
@@ -326,7 +538,11 @@ function InspectCard({ objectId }: { objectId: string }) {
     <div className="card">
       <h3 className="cap">{it.label}</h3>
       <p>{it.inspect_text}</p>
-      {it.kind === "cookie_jar" ? (
+      {it.kind === "glasses" ? (
+        <button disabled={run.glasses || !run.note.smudged} onClick={() => void useGame.getState().putOnGlasses()}>
+          {run.glasses ? t("glasses.wearing") : run.note.smudged ? t("glasses.putOn") : t("glasses.notNeeded")}
+        </button>
+      ) : it.kind === "cookie_jar" ? (
         <button disabled={run.cookies <= 0 || holdingCookie} onClick={() => take({ kind: "cookie" })}>
           {run.cookies <= 0 ? t("cookie.none") : holdingCookie ? t("cookie.holding") : t("cookie.take")}
         </button>
@@ -354,6 +570,8 @@ function NoteCard() {
           {run.note.rules.join(" · ")} · {t("note.length", { n: run.passwordLength })}
         </small>
       </div>
+      {run.note.smudged && <p className="hint">{t("note.smudgedHint")}</p>}
+      {run.glasses && <p className="hint">{t("note.glassesHint")}</p>}
       <button className="ghost" onClick={() => openPanel(null)}>
         {t("close")}
       </button>
@@ -418,11 +636,21 @@ function ResultCard() {
   const leave = useGame((s) => s.leave);
   const [copied, setCopied] = useState(false);
   const r = run.result;
+  // The first finished visit of a daily is the one that counts; later ones are practice.
+  // (`prev ?? saved`: React's dev double-run of effects must not turn the first save into "practice".)
+  const [firstDaily, setFirstDaily] = useState<boolean | null>(null);
+  const finished = Boolean(r);
+  useEffect(() => {
+    if (!run.daily || !run.result) return;
+    const res = run.result;
+    const saved = saveDailyRecord({ number: run.daily, solved: res.solved, stars: res.stars, questions: res.questions });
+    setFirstDaily((prev) => prev ?? saved);
+  }, [run.runId, finished]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!r) return null;
   const title = r.solved ? t("result.solved") : run.status === "bedtime" ? t("result.bedtime") : t("result.failed");
   const stars = "⭐".repeat(r.stars) || "—";
   const card = t("result.card", {
-    name: run.grandma.nickname ?? run.grandma.name,
+    name: run.daily ? t("daily.cardName", { n: run.daily }) : (run.grandma.nickname ?? run.grandma.name),
     difficulty: t(`difficulty.${run.difficulty}`),
     outcome: r.solved ? t("result.cardSolved", { n: r.questions }) : t("result.cardFailed", { n: r.questions }),
     cups: "☕".repeat(Math.min(r.questions, 12)),
@@ -436,6 +664,7 @@ function ResultCard() {
         <h2>{title}</h2>
         <div className="stars">{stars}</div>
         {run.relaxed && <p className="hint">{t("result.relaxed")}</p>}
+        {run.daily !== undefined && firstDaily === false && <p className="hint">{t("daily.practice")}</p>}
         <p>{t("result.password", { password: r.password })}</p>
         <pre>{card}</pre>
         <button
@@ -472,6 +701,8 @@ export function Hud() {
       <Crosshair />
       <CarryHint />
       <HintToast />
+      <MishearBanner />
+      <LoadingPill />
       <AudioDirector />
       <FpsMeter />
       {panel && (
@@ -488,6 +719,8 @@ export function Hud() {
         <ChatLog />
         <AskBar />
       </div>
+      <Ambience />
+      <Confetti />
       {run.status !== "playing" && <ResultCard />}
     </div>
   );

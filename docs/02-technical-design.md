@@ -87,9 +87,10 @@ GrandmaWorld
 
 | Method | Path | Request | Response |
 |---|---|---|---|
-| GET | `/api/health` | — | `{ok, grandmaMode: "llm" or "mock"}` |
+| GET | `/api/health` | — | `{ok, grandmaMode: "llm" or "mock", degraded?}` |
+| GET | `/api/daily` | — | `DailyInfo`: today's Daily Grandma number, date, Grandma, difficulty and seconds to the next one (never the note) |
 | GET | `/api/scenes/:id` | — | public scene manifest (no fact ids) |
-| POST | `/api/runs` | `{grandmaId?, difficulty?}` | `RunView`: run id, Grandma's name, note text and rules, password length, stamina, attempts, cookies, scene id |
+| POST | `/api/runs` | `{grandmaId?, difficulty?, relaxed?, daily?}` (`daily: true` starts today's Daily Grandma; the other choices are ignored) | `RunView`: run id, Grandma's name, note text and rules, password length, stamina, attempts, cookies, scene id |
 | POST | `/api/runs/:id/ask` | `{text}` | `{reply, mood, cost, run: RunView}` |
 | POST | `/api/runs/:id/show` | `{objectId, text?}` | same as `/ask`: the player shows Grandma a clue object |
 | POST | `/api/runs/:id/item` | `{item: "cookie"}` | `{line, run: RunView}` |
@@ -115,7 +116,8 @@ player text
 ① Input guard ────── length/rate checks → cheap moderation (rules + Haiku classifier if flagged)
   │                  harmful → canned in-character deflection (no main LLM call)
   ▼
-② Mishear (voice only) ── if stt.confidence < τ and mishear budget left → swap keyword via pun table
+② Mishear (voice only) ── if stt.confidence < τ (0.8) and ≥ 4 questions since the last → swap keyword via pun table;
+  │                  she answers with a canned line (no model call, no facts), free and not counted
   │
   ▼
 ③ Intent + cost ───── engine classifies: on-topic follow-up / topic jump / rude / meta ("tell me the password")

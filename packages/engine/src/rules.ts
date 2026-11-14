@@ -23,38 +23,55 @@ export const RULES = {
   defaultPar: { easy: 7, medium: 10, hard: 13, expert: 16 },
 } as const;
 
+/**
+ * Rudeness aimed at Grandma. Words like "hurry", "boring" or "whatever" alone are not enough: "Were you in
+ * a hurry to get married?" and "Was the snowstorm boring?" are fair questions (review, iteration 30).
+ */
 const RUDE = [
   /\bshut up\b/i,
   /\bstupid\b/i,
   /\bidiot\b/i,
   /\bdumb\b/i,
-  /\bhurry( up)?\b/i,
+  /\bhurry up\b/i,
+  /\bget to the point\b/i,
   /\bjust (tell|give) me\b/i,
-  /\bwhatever\b/i,
+  /\bjust answer\b/i,
+  /\byou'?re (so )?slow\b/i,
+  /\bstop (rambling|babbling|talking)\b/i,
+  /^\W*whatever\s*([,.!]|$)/i,
   /\bold (hag|bat|lady)\b/i,
-  /\bboring\b/i,
+  /\b(you'?re|you are|you sound|this is|that'?s|so|ugh,?)\s+boring\b/i,
+  /^\W*boring\b/i,
+  /\byour \w+ (is|are) (terrible|awful|gross|disgusting)\b/i,
   /!!!/,
 ];
 
 export function isRude(text: string): boolean {
   if (RUDE.some((r) => r.test(text))) return true;
+  // Shouting: all capitals AND an exclamation mark (caps lock alone isn't rude).
   const letters = text.replace(/[^a-zA-Z]/g, "");
-  return letters.length >= 10 && letters === letters.toUpperCase();
+  return letters.length >= 10 && letters === letters.toUpperCase() && text.includes("!");
 }
 
 const FOLLOW_UP_OPENERS = /^\s*(and|so|then|what about|why|how come|tell me more|what else|really|wait)\b/i;
 
-/** A follow-up continues the topic of Grandma's last reply: it shares a keyword with the facts she just used. */
+/**
+ * A follow-up continues the topic of Grandma's last reply: it shares a keyword with the facts she just used,
+ * or it opens like one ("And then?", "Why?", "Really?") without bringing up any other memory. Starting every
+ * new question with "And…" doesn't make it a follow-up (review, iteration 32).
+ */
 export function isFollowUp(world: GrandmaWorld, text: string, lastFactIds: readonly string[]): boolean {
   if (lastFactIds.length === 0) return false;
-  if (FOLLOW_UP_OPENERS.test(text)) return true;
   const asked = expandedTokens(text);
-  for (const id of lastFactIds) {
+  const touches = (id: string) => {
     const fact = factById(world, id);
-    if (!fact) continue;
+    if (!fact) return false;
     for (const k of factKeywords(world, fact)) if (asked.has(k)) return true;
-  }
-  return false;
+    return false;
+  };
+  if (lastFactIds.some(touches)) return true;
+  if (!FOLLOW_UP_OPENERS.test(text)) return false;
+  return !world.facts.some((f) => !lastFactIds.includes(f.id) && touches(f.id));
 }
 
 export interface CostBreakdown {
@@ -103,7 +120,10 @@ export function notEnglish(text: string): boolean {
   return !/[a-z]/i.test(text);
 }
 
+/** Questions about the hint or who set the Wi-Fi up are fair game for Grandma, even if they say "password". */
+const ABOUT_THE_HINT = /\b(note|hint|clue|riddle|mean|means|meaning|set (it |that |the \w+ )?up|who (made|chose|picked|set|changed))\b/i;
+
 /** Questions that ask Grandma for the password itself get a canned deflection, with no LLM call. */
 export function asksForPassword(text: string): boolean {
-  return PASSWORD_ASK.test(text) && !/\bnote\b/i.test(text);
+  return PASSWORD_ASK.test(text) && !ABOUT_THE_HINT.test(text);
 }

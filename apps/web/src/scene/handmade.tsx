@@ -394,12 +394,45 @@ function MoonPlate({ size: [w, h] }: { size: Vec3 }) {
   );
 }
 
+/** Grandma's reading glasses, folded on the coffee table: two round lenses, a bridge, folded arms. */
+function ReadingGlasses({ size }: { size: Vec3 }) {
+  const [w, , d] = size;
+  const r = w * 0.22;
+  return (
+    <group>
+      {[-1, 1].map((s) => (
+        <group key={s} position={[s * w * 0.25, r * 0.15, 0]} rotation={[-Math.PI / 2 + 0.25, 0, 0]}>
+          <mesh>
+            <torusGeometry args={[r, r * 0.12, 6, 16]} />
+            <Mat color="#b08a3a" />
+          </mesh>
+          <mesh>
+            <circleGeometry args={[r * 0.92, 16]} />
+            <meshStandardMaterial color="#cfe3ea" transparent opacity={0.35} roughness={0.05} />
+          </mesh>
+        </group>
+      ))}
+      <mesh position={[0, r * 0.3, 0]}>
+        <boxGeometry args={[w * 0.12, r * 0.12, r * 0.12]} />
+        <Mat color="#b08a3a" />
+      </mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * w * 0.05, r * 0.12, -d * 0.35]} rotation={[0, s * 0.15, 0]}>
+          <boxGeometry args={[w * 0.6, r * 0.1, r * 0.1]} />
+          <Mat color="#b08a3a" />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 const MAKERS: Record<HandmadeName, (props: { size: Vec3 }) => React.ReactNode> = {
   trophy: Trophy,
   ribbon: Ribbon,
   sled: Sled,
   fishingRod: FishingRod,
   cookieJar: CookieJar,
+  readingGlasses: ReadingGlasses,
   router: Router,
   stickyNote: StickyNote,
   houseNumber: HouseNumber,

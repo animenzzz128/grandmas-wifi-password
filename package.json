@@ -22,7 +22,9 @@
     "eval": "tsx eval/src/run.ts",
     "eval:judge": "tsx eval/src/judge.ts",
     "eval:player": "tsx eval/src/player.ts",
-    "eval:qgen": "tsx eval/src/qgen.ts"
+    "eval:qgen": "tsx eval/src/qgen.ts",
+    "eval:golden": "tsx eval/src/golden.ts",
+    "stats": "tsx eval/src/playstats.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

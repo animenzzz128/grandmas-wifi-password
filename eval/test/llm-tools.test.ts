@@ -77,7 +77,7 @@ describe("AI player", () => {
     const r = await playOnce({ app: newApp(), client, model: "claude-sonnet-5-5", difficulty: "easy" });
     expect(r).toMatchObject({ solved: true, questions: 2, guesses: 1 });
     expect(client.calls[1]!.user).toContain("You looked at the photo album: Two dog photos");
-    expect(client.calls[3]!.user).toMatch(/Grandma: .*1961/);
+    expect(client.calls[3]!.user).toMatch(/Grandma: .*(1961|'61)/); // she may slip first: "1962… no, '61"
   });
 
   it("gives up after three wrong guesses", async () => {

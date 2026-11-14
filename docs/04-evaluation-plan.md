@@ -95,6 +95,7 @@ Each config runs on the same Q-bank for 3 Grandmas. We report 95% bootstrap conf
   8. The funniest moment (free text).
   9. The most frustrating moment (free text).
 - **Targets:** ≥ 70% "would replay," a median "fair" score ≥ 4, and ≥ 1 laugh per run (observed).
+- **After the sessions:** `npm run stats -- --since <first session day> --out eval/reports/playtest-<n>.md` turns the server logs into the solve rates, questions-to-solve (against par), latency and cost tables for the report. Start from an empty `var/logs` (move old logs aside) so test runs don't mix in.
 
 ---
 

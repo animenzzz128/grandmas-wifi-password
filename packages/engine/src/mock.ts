@@ -4,7 +4,7 @@
  * ("how much does the LLM add over a keyword matcher?").
  */
 import type { Fact, GrandmaWorld, Recipe } from "./world.ts";
-import { factById, hiddenYears } from "./world.ts";
+import { containsAllSlots, factById, hiddenYears } from "./world.ts";
 import type { TurnInput } from "./prompt.ts";
 import type { GrandmaOutput } from "./validator.ts";
 import { expandedTokens, factKeywords, hashString, pick, rng } from "./text.ts";
@@ -65,17 +65,23 @@ export function mockGrandmaReply(args: {
   }
 
   // One tangent: prefer a fact sharing a tag, never the confusable partner (that would be too helpful),
-  // and never the next link of the recipe's chain (Recipe.separate).
+  // never the next link of the recipe's chain (Recipe.separate), and never one that, together with the
+  // main memory, spells out every part of the password (the validator would reject the reply).
   const chained = (args.recipe.separate ?? []).filter((g) => g.includes(main!.id)).flat();
   const avoid = new Set([main.id, ...(main.confusable_with ?? []), ...args.recentFactIds, ...chained]);
   const tags = new Set(main.tags ?? []);
-  const pool = world.facts.filter((f) => !avoid.has(f.id) && f.salience >= 2);
+  const pool = world.facts.filter((f) => !avoid.has(f.id) && f.salience >= 2 && !containsAllSlots(world, args.recipe, `${main!.text} ${f.text}`));
   const related = pool.filter((f) => (f.tags ?? []).some((t) => tags.has(t)));
   const tangent = related.length && rand() < 0.7 ? pick(related, rand) : pool.length ? pick(pool, rand) : undefined;
 
+  // Self-corrections (GDD §3.2) use their own random stream, so the rest of the reply stays the same.
+  const slip = rng(hashString(`${args.seed}:slip`));
   const say = (f: Fact) => {
     let t = f.text;
     for (const y of hidden) t = t.replaceAll(String(y), "that year");
+    if (f === main && f.misremembers !== undefined && f.year !== undefined && !hidden.has(f.year) && slip() < 0.5) {
+      t = t.replace(String(f.year), `${f.misremembers}… no, '${String(f.year).slice(2)}`);
+    }
     return t;
   };
   const opener = rand() < 0.5 ? `${tic}. ` : "";

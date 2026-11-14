@@ -417,7 +417,6 @@
         1.075,
         -1.95
       ],
-      "rotation_y": 0.35,
       "color": "#b7a2c9"
     },
     {
@@ -638,7 +637,7 @@
       ],
       "color": "#d98c5f",
       "collide": false,
-      "inspect_text": "A ceramic jar full of apricot kolaczki.",
+      "inspect_text": "A ceramic jar with one last apricot kolaczki in it. Grandma counts them.",
       "fact_ids": [
         "f_cookie"
       ]
@@ -680,6 +679,26 @@
       ],
       "color": "#f7e463",
       "collide": false
+    },
+    {
+      "id": "reading_glasses",
+      "node": "ReadingGlasses",
+      "kind": "glasses",
+      "label": "reading glasses",
+      "shape": "box",
+      "size": [
+        0.16,
+        0.04,
+        0.1
+      ],
+      "position": [
+        -0.78,
+        0.47,
+        -0.92
+      ],
+      "color": "#b08a3a",
+      "collide": false,
+      "inspect_text": "Grandma's spare reading glasses, folded on the coffee table. The lenses are thick enough to read the fine print on anything."
     }
   ]
 }

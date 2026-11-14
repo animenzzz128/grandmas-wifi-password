@@ -9,6 +9,11 @@
 }
 
 * { box-sizing: border-box; }
+/* Text size (Settings): every panel scales together, the 3D view doesn't. Zoom also scales vh/vw, so panel heights divide by it. */
+.card, .chat-log, .ask-bar, .top-left, .top-right, .prompt, .look-hint, .hint-toast, .loading-pill, .title-screen > :not(.panel-wrap) { zoom: var(--text-scale, 1); }
+/* Readable font (Settings): plain sans-serif with extra spacing, also for the handwritten note and router. */
+.readable, .readable * { font-family: Verdana, Tahoma, "Segoe UI", sans-serif !important; letter-spacing: 0.02em; word-spacing: 0.08em; }
+.readable .chat-log, .readable .card { line-height: 1.5; }
 html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #1b140f; }
 
 /* The rough 3D look: render small, upscale without smoothing. */
@@ -62,10 +67,19 @@ input {
 .prompt { position: absolute; left: 50%; top: calc(50% + 22px); transform: translateX(-50%); background: var(--panel); padding: 4px 10px; border-radius: 6px; font-size: 15px; }
 .look-hint { position: absolute; left: 50%; top: 72px; transform: translateX(-50%); text-align: center; background: var(--panel); padding: 8px 14px; border-radius: 8px; font-size: 14px; }
 .look-hint small { opacity: 0.75; }
+.mishear { position: absolute; left: 50%; top: 22%; transform: translateX(-50%) rotate(-3deg); font-size: clamp(28px, 5vw, 56px); font-weight: 800; color: #ffe7b8; text-shadow: 0 3px 0 #7a2020, 0 0 18px rgba(0,0,0,0.6); white-space: nowrap; animation: mishear-pop 0.35s ease-out; }
+@keyframes mishear-pop { from { transform: translateX(-50%) rotate(-3deg) scale(0.4); opacity: 0; } }
+.loading-pill { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); background: var(--panel); padding: 6px 14px; border-radius: 999px; font-size: 14px; opacity: 0.9; }
+.title-screen .device-note { background: #7a4a20; padding: 8px 12px; border-radius: 8px; max-width: 520px; text-align: center; font-size: 14px; }
+@media (max-width: 760px) {
+  .look-hint { top: auto; bottom: 160px; max-width: 86vw; }
+  .look-hint small { display: none; }
+  .top-left { max-width: 70vw; }
+}
 .fps { position: absolute; right: 12px; bottom: 12px; background: rgba(0, 0, 0, 0.6); padding: 4px 8px; border-radius: 6px; font: 12px Consolas, monospace; }
 
 .bottom { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(720px, 94vw); display: flex; flex-direction: column; gap: 6px; }
-.chat-log { max-height: 30vh; overflow-y: auto; background: var(--panel); border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; line-height: 1.35; }
+.chat-log { max-height: calc(30vh / var(--text-scale, 1)); overflow-y: auto; background: var(--panel); border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; line-height: 1.35; }
 .line.player { color: #bfe0ff; }
 .line.system { opacity: 0.7; font-style: italic; }
 .cost { margin-left: 8px; font-size: 12px; color: #e0a46a; }
@@ -80,27 +94,38 @@ input {
 .router-card .partial { color: #ffd27a; }
 .objectives { margin-top: 6px; font-size: 13px; line-height: 1.5; }
 .objectives .done { opacity: 0.55; text-decoration: line-through; }
-.notebook-card { max-height: 70vh; overflow-y: auto; width: min(640px, 92vw); }
+.notebook-card { max-height: calc(70vh / var(--text-scale, 1)); overflow-y: auto; width: min(640px, 92vw); }
 .notebook-card .riddle { font-style: italic; opacity: 0.85; }
 .notebook-card h4 { margin: 10px 0 4px; text-transform: capitalize; }
 .notebook-card .entry { font-size: 14px; margin: 3px 0; }
 .notebook-card .entry span { opacity: 0.75; }
+.notebook-card .entry.pin { display: flex; gap: 6px; align-items: baseline; }
+.notebook-card .entry.pin span { opacity: 1; flex: 1; }
+.notebook-card .unpin { padding: 0 6px; min-width: 0; }
+.chat-log .line.grandma { position: relative; padding-right: 26px; }
+.chat-log .pin-line { position: absolute; right: 0; top: 0; padding: 0 4px; background: none; border: none; opacity: 0; cursor: pointer; font-size: 13px; }
+.chat-log .line.grandma:hover .pin-line, .chat-log .pin-line:focus-visible { opacity: 0.8; }
+.pin-pick { position: fixed; transform: translate(-50%, -110%); z-index: 30; padding: 4px 10px; border-radius: 6px; }
 .title-screen .premise { max-width: 640px; text-align: center; opacity: 0.9; }
 .title-screen .difficulty-help { font-size: 13px; opacity: 0.75; max-width: 640px; text-align: center; }
 /* Talking: the conversation moves to the right so Grandma, in the middle of the screen, stays visible. */
 .bottom.side { left: auto; right: 12px; transform: none; width: min(420px, 40vw); }
-.bottom.side .chat-log { max-height: 60vh; }
-.bottom:not(.side) .chat-log { max-height: 18vh; }
+.bottom.side .chat-log { max-height: calc(60vh / var(--text-scale, 1)); }
+.bottom:not(.side) .chat-log { max-height: calc(18vh / var(--text-scale, 1)); }
 .settings-card label { display: block; margin: 10px 0; }
 .settings-card input[type="range"] { width: 100%; }
 .settings-card .check input { margin-right: 6px; }
 .hint { font-size: 13px; opacity: 0.75; }
+.ask-bar .mic { min-width: 2.6em; }
+.ask-bar .mic.on { background: #c0392b; color: #fff; animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: 0.6; } }
+.settings-card select { margin-left: 8px; }
 .carry { position: absolute; left: 50%; top: calc(50% + 56px); transform: translateX(-50%); background: rgba(240, 192, 96, 0.92); color: #2a1d10; padding: 4px 12px; border-radius: 6px; font-size: 14px; }
 .ask-bar input { flex: 1; }
 .error { background: #7a2020; padding: 6px 10px; border-radius: 6px; font-size: 14px; }
 
 .panel-wrap { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 12px 12px 20vh; background: rgba(0, 0, 0, 0.25); }
-.panel-wrap .card { max-height: calc(100vh - 20vh - 24px); overflow-y: auto; }
+.panel-wrap .card { max-height: calc((80vh - 24px) / var(--text-scale, 1)); max-width: calc(92vw / var(--text-scale, 1)); overflow-y: auto; }
 .card {
   background: var(--paper); color: var(--ink); border-radius: 10px; padding: 16px 20px; width: min(440px, 92vw);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; gap: 10px;
@@ -120,3 +145,22 @@ input {
 .result pre { background: #fff; padding: 10px; border-radius: 6px; text-align: left; font-size: 14px; }
 
 .bubble { background: white; color: #222; padding: 2px 10px; border-radius: 12px; font-size: 22px; font-weight: bold; white-space: nowrap; }
+
+/* Daily Grandma on the title screen */
+.daily-box { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 4px 0 10px; }
+.daily-box button { font-size: 1.1em; padding: 10px 18px; background: #c98a3e; }
+.daily-status { margin: 0; font-size: 14px; opacity: 0.85; }
+
+/* Confetti on a solve (GDD §8.3) */
+.confetti { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
+.confetti span { position: absolute; top: -20px; border-radius: 2px; opacity: 0; animation-name: confetti-fall; animation-timing-function: cubic-bezier(.25,.6,.45,1); animation-fill-mode: forwards; }
+@keyframes confetti-fall { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--drift), 105vh) rotate(var(--spin)); } }
+
+/* Players who ask for less motion get none of the decorative animation. */
+@media (prefers-reduced-motion: reduce) {
+  .mishear, .loading-pill, .confetti span { animation: none !important; }
+}
+
+/* Type-out caret on Grandma's newest line (GDD §8.1) */
+.caret { display: inline-block; width: 0.45em; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: currentColor; opacity: 0.5; animation: caret-blink 0.8s steps(1) infinite; }
+@keyframes caret-blink { 50% { opacity: 0; } }

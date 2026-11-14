@@ -16,7 +16,7 @@ The license text of each pack is in its download (`License.txt` / `License_Stand
 
 ## Changes we made
 
-- **Grandma** (`apps/web/src/scene/Grandma.tsx`): built at load time from the Quaternius female base and its parted hairstyle. We changed them in code: a seated pose, painted clothes (blouse, skirt, stockings, shoes), a softened chest, a puffed-out buttoned cardigan, grey hair with a bun, glasses and a crocheted lap blanket. Normal and roughness maps were dropped and the light skin texture is used.
+- **Grandma** (`apps/web/src/scene/Grandma.tsx`): built at load time from the Quaternius female base and its parted hairstyle. We changed them in code: a seated pose, painted clothes (blouse, skirt, stockings, shoes), a softened chest, a puffed-out buttoned cardigan, grey hair with a bun, glasses and a crocheted lap blanket. Normal and roughness maps were dropped and the light skin texture is used. The base-color textures were resized from 2048 px PNG to 1024 px JPEG for the web (`tools/shrink-textures.py`).
 - **Furniture:** scaled to fit the collider boxes in `data/scenes/rosie-living-room.json`; some are re-tinted.
 
 ## Made by us
@@ -24,7 +24,8 @@ The license text of each pack is in its download (`License.txt` / `License_Stand
 These are built in code, so there is no third-party license to track:
 - Props: bowling trophy, blue ribbon, sled, fishing rod and tackle box, cookie jar, router, sticky note, house number sign, front door, window and curtains (`apps/web/src/scene/handmade.tsx`).
 - Surface textures: wood floor, wallpaper with wainscot, ceiling (`apps/web/src/scene/textures.ts`).
-- Sounds: Grandma's babble voice and the UI chimes are synthesised at runtime with WebAudio (`apps/web/src/audio.ts`); there are no audio files.
+- Sounds: Grandma's babble voice and the UI chimes are synthesised at runtime with WebAudio (`apps/web/src/audio.ts`); there are no audio files. Her spoken voice is the browser's own speech-synthesis voice (`apps/web/src/voice.ts`), so nothing is bundled.
+- Grandma's lap blanket (draped cloth, `apps/web/src/scene/blanket.ts`), glasses and teacup; the spare reading glasses on the coffee table (`handmade.tsx`).
 
 ## Updating the art
 

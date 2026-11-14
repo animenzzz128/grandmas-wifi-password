@@ -111,6 +111,9 @@ export class MockBrain implements GrandmaBrain {
   }
 }
 
+/** Per-request time limit for the model call (ms). A Haiku reply usually takes 1–3 s. */
+export const LLM_TIMEOUT_MS = 12_000;
+
 export class LlmBrain implements GrandmaBrain {
   mode = "llm" as const;
   private client: Anthropic;
@@ -121,7 +124,9 @@ export class LlmBrain implements GrandmaBrain {
     private options: BrainOptions = {},
   ) {
     // Explicit key and base URL: only the project's key from .env, never other credentials in the environment.
-    this.client = "client" in opts ? opts.client : new Anthropic({ apiKey: opts.apiKey, authToken: null, baseURL: opts.baseURL });
+    // A player is waiting: give up on a slow call after LLM_TIMEOUT_MS (the validation loop already tries twice) and let the free fallback line answer,
+    // instead of the SDK default of 10 minutes with two retries.
+    this.client = "client" in opts ? opts.client : new Anthropic({ apiKey: opts.apiKey, authToken: null, baseURL: opts.baseURL, timeout: LLM_TIMEOUT_MS, maxRetries: 0 });
   }
 
   reply(args: ReplyArgs): Promise<BrainResult> {

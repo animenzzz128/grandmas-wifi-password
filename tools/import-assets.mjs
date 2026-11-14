@@ -6,6 +6,9 @@
  *   kaykit-dir      the unzipped "KayKit_Furniture_Bits_1.0_FREE" folder
  *   kenney-dir      the unzipped Kenney "Furniture Kit" folder (has Models/ and License.txt)
  *   quaternius-dir  the unzipped "Universal Base Characters[Standard]" folder
+ *
+ * Then shrink the character textures for the web (2048 px PNG -> 1024 px JPEG, ~4.6 MB -> ~0.2 MB):
+ *   python tools/shrink-textures.py apps/web/public/models/quaternius
  */
 import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -23,7 +26,7 @@ const kk = join(kaykitDir, "Assets/gltf");
 const kkOut = join(out, "kaykit");
 mkdirSync(kkOut, { recursive: true });
 const kayKit = [
-  "armchair_pillows", "couch_pillows", "table_low", "cabinet_medium", "lamp_standing", "lamp_table",
+  "armchair", "armchair_pillows", "couch_pillows", "table_low", "cabinet_medium", "lamp_standing", "lamp_table",
   "rug_rectangle_stripes_A", "book_single", "book_set", "pictureframe_standing_A", "pictureframe_large_A",
   "pictureframe_small_B", "pillow_A", "cactus_small_A", "shelf_B_small",
 ];

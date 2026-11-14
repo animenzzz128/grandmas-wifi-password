@@ -40,6 +40,12 @@ export interface RunState {
   stall?: number;
   /** How many nudges Grandma has given (which line comes next). */
   nudges?: number;
+  /** Questions since Grandma last misheard a spoken question (voice mode, see mishear.ts). */
+  sinceMishear?: number;
+  /** The player put on Grandma's reading glasses (once per visit): the smudged note is readable. */
+  glassesOn?: boolean;
+  /** Daily Grandma number (game design §5) when this visit is the daily puzzle. */
+  daily?: number;
   status: RunStatus;
   createdAt: string;
   endedAt?: string;
@@ -52,6 +58,7 @@ export function createRunState(args: {
   sceneId: string;
   greeting: string;
   relaxed?: boolean;
+  daily?: number;
   now?: Date;
 }): RunState {
   return {
@@ -71,6 +78,7 @@ export function createRunState(args: {
     guesses: [],
     status: "playing",
     relaxed: args.relaxed || undefined,
+    daily: args.daily,
     createdAt: (args.now ?? new Date()).toISOString(),
   };
 }
@@ -97,12 +105,40 @@ export function spendStamina(state: RunState, cost: number, now = new Date()): C
   return { napped: true, bedtime: false };
 }
 
+/**
+ * The visit ends at the question cap (RULES.maxQuestionsPerRun), even in relaxed mode where tea never
+ * runs out: Grandma goes to bed and the result card shows. Returns true if this turn ended it.
+ */
+export function endAtQuestionCap(state: RunState, now = new Date()): boolean {
+  if (state.status !== "playing" || state.questionCount < RULES.maxQuestionsPerRun) return false;
+  state.status = "bedtime";
+  state.endedAt = now.toISOString();
+  return true;
+}
+
 export function giveCookie(state: RunState): boolean {
   if (state.cookies <= 0) return false;
   state.cookies -= 1;
   state.cookiesUsed += 1;
   state.stamina = Math.min(RULES.maxStamina, state.stamina + RULES.cookieStamina);
   return true;
+}
+
+/**
+ * Put on Grandma's reading glasses (GDD §4). They only help when the note has a smudged part; they
+ * don't get used up if there is nothing to read.
+ */
+export function wearGlasses(state: RunState, recipe: Recipe): "on" | "already" | "not_needed" {
+  if (state.glassesOn) return "already";
+  if (!recipe.smudged_text) return "not_needed";
+  state.glassesOn = true;
+  return "on";
+}
+
+/** What the note shows right now: smudged until the glasses go on. */
+export function noteText(state: RunState, recipe: Recipe): { text: string; smudged: boolean } {
+  const smudged = Boolean(recipe.smudged_text) && !state.glassesOn;
+  return { text: smudged ? recipe.smudged_text! : recipe.note_text, smudged };
 }
 
 /** Exact match, as a real router would do. Leading/trailing spaces are forgiven. */

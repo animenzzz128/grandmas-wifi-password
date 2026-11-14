@@ -9,6 +9,10 @@ Rules in code that protect the chains:
 
 ## Easy: `the sock thief + the year we said 'I do'` → Biscuit1961
 
+Self-corrections (GDD §3.2): she sometimes says "1962… no, '61" for the wedding and "1970… no, '69" for the color TV (`misremembers` in rosie.json). She always ends on the true year; the walkthrough tests accept either form.
+
+Separate (`Recipe.separate`, added 11/13 after a review): the dog and the wedding are never told in one reply, so one answer can't hand over both parts.
+
 ```text
 Slot 1 "the sock thief" (1 hop)
   routes: photo album (a beagle chewing a sock, no names) → show it or ask about the beagle → Biscuit

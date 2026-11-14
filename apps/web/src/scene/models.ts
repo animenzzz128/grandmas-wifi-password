@@ -34,6 +34,7 @@ export type HandmadeName =
   | "sled"
   | "fishingRod"
   | "cookieJar"
+  | "readingGlasses"
   | "router"
   | "stickyNote"
   | "houseNumber"
@@ -51,7 +52,7 @@ export const ART: Record<string, ArtSpec> = {
   // furniture
   Rug: { kind: "model", url: kaykit("rug_rectangle_stripes_A"), fit: "stretch" },
   // The armchair is four colliders (seat, back, two arms); one model covers all of them.
-  Armchair: { kind: "model", url: kaykit("armchair_pillows"), fit: "stretch", tint: "#c9a6d6", box: { center: [-2.6, 0.575, -1.98], size: [1.0, 1.15, 1.06] } },
+  Armchair: { kind: "model", url: kaykit("armchair"), fit: "stretch", box: { center: [-2.6, 0.575, -1.98], size: [1.0, 1.15, 1.06] } },
   ArmchairBack: { kind: "none" },
   ArmchairArmL: { kind: "none" },
   ArmchairArmR: { kind: "none" },
@@ -76,6 +77,7 @@ export const ART: Record<string, ArtSpec> = {
   TV: { kind: "model", url: kenney("televisionVintage"), turn: -QUARTER },
   HouseNumberSign: { kind: "handmade", name: "houseNumber" },
   CookieJar: { kind: "handmade", name: "cookieJar" },
+  ReadingGlasses: { kind: "handmade", name: "readingGlasses" },
   Router: { kind: "handmade", name: "router" },
   StickyNote: { kind: "handmade", name: "stickyNote" },
 

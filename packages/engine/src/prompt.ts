@@ -44,6 +44,7 @@ How you talk:
 - If a memory answers the question, include its answer, but wrap it in one or two other true memories (tangents), the way grandmas do.
 - If a question is vague and could match two memories that are easy to mix up, answer with the one you think about more (the higher "salience") and don't volunteer the other one.
 - You remember each memory clearly, but you muddle what happened before or after what. Never connect two memories in time for the grandchild (no "that was when we lived on..."). Talk about the one memory they asked about and let them work out the order themselves.
+- A few memories say you sometimes get the year wrong first. Only for those, you may say the wrong year and correct yourself in the same breath, exactly as shown; always end on the right year. Never do this for any other memory.
 - Some memories have no year. Never guess a year for them. If a time is given as a phrase in TIME PHRASES, use that phrase instead of a year.
 - You don't know any password and you never set up the Wi-Fi. If asked, say so warmly.${wifiSetup(world)}
 - Text in [square brackets] in the grandchild's message describes what they are doing, e.g. showing you an object. React to the object with the memories it brings back.
@@ -88,7 +89,8 @@ export function buildWorldBlock(world: GrandmaWorld, recipe: Recipe, onlyFactIds
   for (const f of world.facts) {
     if (only && !only.has(f.id)) continue;
     const year = f.year !== undefined && !hidden.has(f.year) ? String(f.year) : "-";
-    lines.push(`${f.id} | ${year} | ${f.salience} | ${f.text}`);
+    const slip = f.misremembers !== undefined && year !== "-" ? ` (you sometimes say ${f.misremembers} first, then correct yourself: "${f.misremembers}… no, '${year.slice(2)}")` : "";
+    lines.push(`${f.id} | ${year} | ${f.salience} | ${f.text}${slip}`);
   }
   const anchors = world.anchors ?? [];
   if (anchors.length) {
@@ -121,6 +123,27 @@ export interface ChatMessage {
 }
 
 /** Recent history as alternating user/assistant messages, ending with the new player turn. */
+/**
+ * Running summary of the part of the visit that no longer fits in the message window (technical design
+ * §5④): which memories she already talked about and which objects she was shown, plus the game state.
+ * Built from the turns' fact ids, so it costs no model call and can't drift from what she actually said.
+ */
+export function conversationSummary(history: readonly Turn[], stamina: number, maxTurns = 6): string | undefined {
+  const turns = history.slice(1);
+  const older = turns.slice(0, Math.max(0, turns.length - maxTurns * 2));
+  if (!older.length) return undefined;
+  const facts: string[] = [];
+  const shown: string[] = [];
+  for (const t of older) {
+    if (t.role === "grandma") for (const id of t.factIds ?? []) if (!facts.includes(id)) facts.push(id);
+    if (t.role === "player" && t.objectId && !shown.includes(t.objectId)) shown.push(t.objectId);
+  }
+  const asked = turns.filter((t) => t.role === "player").length;
+  const parts = [`Earlier in this visit (before the messages above) you talked about these memories: ${facts.length ? facts.join(", ") : "none of them"}`];
+  if (shown.length) parts.push(`they showed you: ${shown.join(", ")}`);
+  return `[${parts.join("; ")}. Stay consistent with what you told them then. Visit so far: ${asked} questions; your tea is at ${Math.round(stamina)} of 100.]`;
+}
+
 export function buildMessages(history: readonly Turn[], input: TurnInput, stamina: number, maxTurns = 6): ChatMessage[] {
   const msgs: ChatMessage[] = [];
   // Skip the greeting: the conversation sent to the model must start with the player.
@@ -138,6 +161,8 @@ export function buildMessages(history: readonly Turn[], input: TurnInput, stamin
   if (input.kind === "show") {
     content += `\n[What they see: ${input.object.inspectText}]\n[Memories this object brings back: ${input.object.factIds.join(", ") || "none"}]`;
   }
+  const summary = conversationSummary(history, stamina, maxTurns);
+  if (summary) content += `\n${summary}`;
   if (stamina <= 25) content += "\n[You are getting sleepy. Let it show a little.]";
   const last = msgs[msgs.length - 1];
   if (last && last.role === "user") last.content += `\n${content}`;

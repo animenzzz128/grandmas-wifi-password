@@ -18,7 +18,7 @@ This is the final project for **CPSC 1710: Introduction to AI Applications** (Ya
 | Procedural world generation (seeded code + LLM enrichment with structured outputs) | `packages/worldgen` |
 | Grounded NPC dialogue over a fact graph (full-context vs. retrieval, compared) | `packages/engine`, `apps/server` |
 | Guardrails: information hiding (Grandma doesn't know the password), reply validation, moderation | `packages/engine` |
-| Speech input with a "hard of hearing" mechanic | `apps/web` |
+| Voice conversation: she speaks her lines (browser speech synthesis, prosody by mood) and the player can ask out loud (browser speech recognition); and when the recognizer is unsure, Grandma may mishear one word from a pun table (a capped, fair rule in code) | `apps/web/src/voice.ts`, `packages/engine/src/mishear.ts` |
 | LLM-as-judge (calibrated against human labels) and an AI player agent | `eval/` |
 
 ## Docs
@@ -83,6 +83,8 @@ Open http://localhost:5173. Click to look around, WASD to walk, E to interact, E
 | `npm run build` then `npm start` | Production: the server also serves the built client on :8787 |
 
 **Deploying (Fly.io, not done yet):** `Dockerfile` and `fly.toml` are ready. The steps are at the top of `fly.toml`: create the app and a volume, set `ANTHROPIC_API_KEY` and `GRANDMA_MODE=llm` as Fly secrets, then `fly deploy`. The key never goes into the image.
+
+**Cost guard:** the real Grandma stops for the day once today's model spend reaches `GRANDMA_DAILY_BUDGET_USD` (default $5, UTC day, counted from the turn logs so restarts don't reset it). Creating the file `var/KILL` (`/data/KILL` on Fly) switches her off at once, without a redeploy. Either way players keep playing with the offline Grandma, and the title screen says why. The server prints today's spend at startup; per-turn cost is in `var/logs/turns-*.jsonl`, and `npm run stats` sums it up with latency, retries and solve rates (aggregates only).
 
 Notes: the server reads `data/` at startup, so restart `npm run dev` after editing a world or scene. Runs and turn logs go to `var/` (git-ignored).
 

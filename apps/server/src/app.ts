@@ -10,6 +10,9 @@ import {
   CreateRunRequest,
   GuessRequest,
   ItemRequest,
+  fill,
+  maybeMishear,
+  wearGlasses,
   RULES,
   ShowRequest,
   asksForPassword,
@@ -20,6 +23,10 @@ import {
   stallNudge,
   checkGuess,
   createRunState,
+  endAtQuestionCap,
+  DAILY_STATS_MIN,
+  dailyPick,
+  secondsToNextDaily,
   giveCookie,
   hashString,
   pick,
@@ -45,6 +52,8 @@ export interface AppDeps {
   asksPerDay?: number;
   /** Per-IP new visits per minute (default 10). */
   runsPerMinute?: number;
+  /** Clock for the Daily Grandma (tests). */
+  now?: () => Date;
 }
 
 class HttpError extends Error {
@@ -136,7 +145,10 @@ export function createApp(deps: AppDeps) {
     return c.json({ error: "Something went wrong." }, 500);
   });
 
-  app.get("/api/health", (c) => c.json({ ok: true, grandmaMode: brain.mode, model: brain.model }));
+  app.get("/api/health", (c) => {
+    const degraded = (brain as { degraded?: "budget" | "kill" }).degraded;
+    return c.json({ ok: true, grandmaMode: brain.mode, model: brain.model, ...(degraded ? { degraded } : {}) });
+  });
 
   app.get("/api/scenes/:id", (c) => {
     const scene = data.scenes.get(c.req.param("id"));
@@ -144,22 +156,53 @@ export function createApp(deps: AppDeps) {
     return c.json(toPublicScene(scene));
   });
 
+  const now = () => (deps.now ? deps.now() : new Date());
+  const today = () => {
+    const d = dailyPick(data.worlds.values(), now());
+    if (!d) throw new HttpError(404, "No Grandmas available.");
+    const world = data.worlds.get(d.worldId)!;
+    return { d, world, recipe: recipeById(world, d.recipeId)! };
+  };
+
+  app.get("/api/daily", (c) => {
+    const { d, world } = today();
+    const stats = store.dailyStats(d.number);
+    return c.json({
+      number: d.number,
+      date: d.date,
+      grandma: { name: world.profile.name, nickname: world.profile.nickname },
+      difficulty: d.difficulty,
+      resetsInSeconds: secondsToNextDaily(now()),
+      ...(stats.finished >= DAILY_STATS_MIN ? { stats } : {}),
+    });
+  });
+
   app.post("/api/runs", async (c) => {
     limitRuns(clientIp(c));
     const req = await body(c, CreateRunRequest);
-    const world = data.worlds.get(req.grandmaId ?? "rosie") ?? [...data.worlds.values()][0];
-    if (!world) throw new HttpError(404, "No Grandmas available.");
-    const recipe = world.recipes.find((r) => r.difficulty === (req.difficulty ?? "easy")) ?? world.recipes[0]!;
+    let world: GrandmaWorld | undefined;
+    let recipe: Recipe;
+    let daily: number | undefined;
+    if (req.daily) {
+      const t = today();
+      ({ world, recipe } = t);
+      daily = t.d.number;
+    } else {
+      world = data.worlds.get(req.grandmaId ?? "rosie") ?? [...data.worlds.values()][0];
+      if (!world) throw new HttpError(404, "No Grandmas available.");
+      recipe = world.recipes.find((r) => r.difficulty === (req.difficulty ?? "easy")) ?? world.recipes[0]!;
+    }
     const sceneId = data.sceneForWorld.get(world.id);
     if (!sceneId) throw new HttpError(404, `No room for ${world.id}.`);
     const id = randomUUID();
-    const greeting = pick(lines.greeting, rng(hashString(id)));
-    const run = createRunState({ id, world, recipe, sceneId, greeting, relaxed: req.relaxed });
+    // Everyone gets the same greeting on the same daily.
+    const greeting = pick(lines.greeting, rng(hashString(daily ? `daily:${daily}` : id)));
+    const run = createRunState({ id, world, recipe, sceneId, greeting, relaxed: req.relaxed, daily });
     store.save(run);
     return c.json(toRunView(run, world, recipe));
   });
 
-  async function talk(c: Context, runId: string, input: TurnInput): Promise<AskResponse> {
+  async function talk(c: Context, runId: string, input: TurnInput, voice?: { confidence: number }): Promise<AskResponse> {
     limit(clientIp(c));
     const { run, world, recipe } = loadRun(runId);
     requirePlaying(run);
@@ -172,6 +215,8 @@ export function createApp(deps: AppDeps) {
     let mood: AskResponse["mood"];
     let factIds: string[] = [];
     let meta: Partial<Parameters<RunStore["log"]>[0]> = {};
+    /** Turns that are Grandma's fault, not the player's, cost no tea and don't count: mishears and fallbacks. */
+    let free = false;
     if (input.kind === "ask" && mentionsSelfHarm(input.text)) {
       // Safety first, and free: no model call, no tea, no question counted.
       const reply = lines.crisis[0] ?? "";
@@ -185,11 +230,20 @@ export function createApp(deps: AppDeps) {
       store.save(run);
       return { reply, mood: "confused", cost: 0, napped: false, run: toRunView(run, world, recipe) };
     }
-    if (input.kind === "ask" && asksForPassword(input.text)) {
+    // Voice mode: she may mishear one word (a capped rule, after the safety checks above).
+    // She reacts to what she heard with a canned line: no model call and no facts, so the free turn gives nothing away.
+    const misheard = input.kind === "ask" ? maybeMishear(run, input.text, voice?.confidence, data.strings.mishears) : undefined;
+    if (misheard) {
+      const as = misheard.as;
+      reply = fill(lineFor(run, lines.misheard, "mishear"), { as, As: as.charAt(0).toUpperCase() + as.slice(1) });
+      mood = "confused";
+    } else if (input.kind === "ask" && asksForPassword(input.text)) {
       reply = lineFor(run, lines.password_deflect, "pw");
       mood = "suspicious";
     } else {
       const result = await brain.reply({ world, recipe, run, input, lines });
+      // She lost her train of thought (the model failed or every try was rejected): the player shouldn't pay for that.
+      if (result.fallback) free = true;
       reply = result.output.reply;
       mood = result.output.mood;
       factIds = result.output.fact_ids_used;
@@ -204,15 +258,22 @@ export function createApp(deps: AppDeps) {
     }
 
     run.history.push(
-      { role: "player", text: playerText, objectId: input.kind === "show" ? input.object.id : undefined },
+      { role: "player", text: misheard ? misheard.heard : playerText, objectId: input.kind === "show" ? input.object.id : undefined },
       { role: "grandma", text: reply, factIds, mood },
     );
     if (factIds.length) run.lastFactIds = factIds;
-    const { napped, bedtime } = spendStamina(run, cost.total);
+    // Her ears' (or her memory's) fault, not the player's: a misheard question or a fallback costs no tea.
+    if (misheard) free = true;
+    if (free) Object.assign(cost, { total: 0, base: 0, long: 0, rude: 0, followUp: 0 });
+    const spent = spendStamina(run, cost.total);
+    const napped = spent.napped;
+    if (free) run.questionCount -= 1; // nor does it count against her star rating
+    // The 40th question ends the visit (also in relaxed mode, where the tea never runs out).
+    const bedtime = spent.bedtime || endAtQuestionCap(run);
     const after = bedtime ? lineFor(run, lines.bedtime, "bed") : napped ? lineFor(run, lines.nap, "nap") : undefined;
     if (after) run.history.push({ role: "grandma", text: after, mood: "sleepy" });
     // Stuck for a few turns? Grandma brings up the first hop herself (not while she's dozing off).
-    const nudge = !after && run.status === "playing" ? stallNudge(run, world, recipe, factIds) : undefined;
+    const nudge = !after && !free && run.status === "playing" ? stallNudge(run, world, recipe, factIds) : undefined;
     if (nudge) run.history.push({ role: "grandma", text: nudge, mood: "nostalgic" });
     store.save(run);
     store.log({
@@ -228,15 +289,16 @@ export function createApp(deps: AppDeps) {
       stamina: run.stamina,
       status: run.status,
       grandmaMode: brain.mode,
+      ...(run.daily ? { daily: run.daily } : {}),
       ...meta,
     });
     const costParts = { base: cost.base, long: cost.long, rude: cost.rude, followUp: cost.followUp };
-    return { reply, mood: napped ? "sleepy" : mood, cost: cost.total, costParts, napped, after, nudge, run: toRunView(run, world, recipe) };
+    return { reply, mood: napped ? "sleepy" : mood, cost: cost.total, costParts: free ? undefined : costParts, napped, after, nudge, misheard, run: toRunView(run, world, recipe) };
   }
 
   app.post("/api/runs/:id/ask", async (c) => {
     const req = await body(c, AskRequest);
-    return c.json(await talk(c, c.req.param("id"), { kind: "ask", text: req.text }));
+    return c.json(await talk(c, c.req.param("id"), { kind: "ask", text: req.text }, req.voice));
   });
 
   app.post("/api/runs/:id/show", async (c) => {
@@ -255,14 +317,21 @@ export function createApp(deps: AppDeps) {
   });
 
   app.post("/api/runs/:id/item", async (c) => {
-    await body(c, ItemRequest);
+    const req = await body(c, ItemRequest);
     const { run, world, recipe } = loadRun(c.req.param("id"));
     requirePlaying(run);
-    const ok = giveCookie(run);
-    const line = lineFor(run, ok ? lines.cookie : lines.no_cookie, "cookie");
-    if (ok) run.history.push({ role: "grandma", text: line, mood: "happy" });
+    let line: string;
+    if (req.item === "glasses") {
+      const result = wearGlasses(run, recipe);
+      line = lineFor(run, result === "on" ? lines.glasses_on : lines.glasses_not_needed, "glasses");
+      if (result === "on") run.history.push({ role: "grandma", text: line, mood: "happy" });
+    } else {
+      const ok = giveCookie(run);
+      line = lineFor(run, ok ? lines.cookie : lines.no_cookie, "cookie");
+      if (ok) run.history.push({ role: "grandma", text: line, mood: "happy" });
+    }
     store.save(run);
-    store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "item", input: "cookie", reply: line, stamina: run.stamina, status: run.status });
+    store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "item", input: req.item, reply: line, stamina: run.stamina, status: run.status, ...(run.daily ? { daily: run.daily } : {}) });
     const res: ItemResponse = { line, run: toRunView(run, world, recipe) };
     return c.json(res);
   });
@@ -278,7 +347,7 @@ export function createApp(deps: AppDeps) {
     run.history.push({ role: "grandma", text: line, mood: correct ? "happy" : "confused" });
     store.save(run);
     // Log only whether the guess was right, not the text, so logs never hold the password.
-    store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "guess", input: correct ? "(correct)" : "(wrong)", reply: line, stamina: run.stamina, status: run.status });
+    store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "guess", input: correct ? "(correct)" : "(wrong)", reply: line, stamina: run.stamina, status: run.status, ...(run.daily ? { daily: run.daily } : {}) });
     const res: GuessResponse = { correct, line, partsCorrect: partial?.partsCorrect, partsTotal: partial?.partsTotal, run: toRunView(run, world, recipe) };
     return c.json(res);
   });

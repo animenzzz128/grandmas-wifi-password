@@ -66,6 +66,7 @@
           "text": { "type": "string", "description": "Canonical natural-language statement, in Grandma's first person." },
           "tags": { "type": "array", "items": { "type": "string" } },
           "confusable_with": { "type": "array", "items": { "type": "string" }, "description": "fact ids that a vague question could mix up with this one" },
+          "misremembers": { "type": "integer", "description": "a wrong year (within 3 of year) she sometimes says first and then corrects: \"1962… no, '61\" (GDD §3.2)" },
           "disambiguator": { "type": "string", "description": "The qualifier that resolves the confusion, e.g. 'first', 'when your mom was born'" },
           "salience": { "type": "integer", "minimum": 1, "maximum": 5, "description": "How readily Grandma brings it up unprompted" }
         }

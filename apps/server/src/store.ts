@@ -28,6 +28,8 @@ export interface TurnLog {
   usage?: { input: number; output: number; cacheRead: number; cacheWrite: number };
   /** Model cost of this turn in USD (list prices). */
   costUsd?: number;
+  /** Daily Grandma number, for visits to the daily puzzle. */
+  daily?: number;
 }
 
 export class RunStore {
@@ -64,6 +66,23 @@ export class RunStore {
     const state = JSON.parse(row.state) as RunState;
     this.live.set(id, state);
     return state;
+  }
+
+  /**
+   * How today's Daily Grandma is going for everyone: finished visits, how many were solved, and the
+   * median questions of the solved ones. Counts visits, not people (there are no accounts), so
+   * practice replays count too.
+   */
+  dailyStats(daily: number): { finished: number; solved: number; medianQuestions?: number } {
+    const rows = this.db
+      .prepare(
+        `SELECT status, json_extract(state, '$.questionCount') AS q FROM runs
+         WHERE json_extract(state, '$.daily') = ? AND status != 'playing'`,
+      )
+      .all(daily) as { status: string; q: number }[];
+    const solvedQs = rows.filter((r) => r.status === "solved").map((r) => r.q).sort((a, b) => a - b);
+    const median = solvedQs.length ? solvedQs[Math.floor((solvedQs.length - 1) / 2)] : undefined;
+    return { finished: rows.length, solved: solvedQs.length, ...(median !== undefined ? { medianQuestions: median } : {}) };
   }
 
   save(state: RunState): void {

@@ -1,10 +1,15 @@
 /** Contract tests: run the real HTTP app against the mock Grandma and an in-memory store. */
+import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { AskResponse, GuessResponse, ItemResponse, PublicScene, RunView } from "@gwp/engine";
+import type { AskResponse as AskResponseT } from "@gwp/engine";
+import { AskResponse, DailyInfo, GuessResponse, ItemResponse, PublicScene, RunView } from "@gwp/engine";
 import { createApp } from "../src/app.ts";
 import { readConfig } from "../src/config.ts";
 import { loadGameData } from "../src/data.ts";
 import { MockBrain } from "../src/grandma.ts";
+import type { GrandmaBrain } from "../src/grandma.ts";
 import { RunStore } from "../src/store.ts";
 
 const data = loadGameData(readConfig({}, {}).dataDir);
@@ -41,6 +46,62 @@ describe("API", () => {
     expect(last.naps).toBe(0);
     expect(last.questionCount).toBe(15);
     expect(last.status).toBe("playing");
+  });
+
+  it("voice mode: a low-confidence spoken question may be misheard, at most 1 in 5, and it costs no tea", async () => {
+    const app = newApp();
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text));
+    const ask = async (text: string, voice?: { confidence: number }) =>
+      AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, voice ? { text, voice } : { text })).text));
+    // Typed or confidently heard questions are never misheard.
+    for (let i = 0; i < 4; i++) expect((await ask("Tell me about your first dog")).misheard).toBeUndefined();
+    expect((await ask("Tell me about your first dog", { confidence: 0.95 })).misheard).toBeUndefined();
+    const before = (await ask("How is the garden?")).run.stamina;
+    const misheard = await ask("When did you marry grandpa?", { confidence: 0.4 });
+    expect(misheard.misheard).toEqual({ heard: "When did you marry grand piano?", said: "grandpa", as: "grand piano" });
+    expect(misheard.cost).toBe(0);
+    // She reacts to what she heard, in character, and gives nothing away on a free turn.
+    expect(misheard.reply).toMatch(/grand piano/i);
+    expect(misheard.reply).not.toMatch(/\b(19|20)\d\d\b/);
+    expect(misheard.mood).toBe("confused");
+    expect(misheard.costParts).toBeUndefined();
+    expect(misheard.run.stamina).toBe(before);
+    expect(misheard.run.questionCount).toBe(6);
+    // The next few unsure questions are heard properly (cap).
+    for (let i = 0; i < 4; i++) expect((await ask("Tell me about grandpa", { confidence: 0.3 })).misheard).toBeUndefined();
+    expect((await ask("Tell me about grandpa", { confidence: 0.3 })).misheard?.as).toBe("grand piano");
+  });
+
+  it("reading glasses reveal the smudged note once, and only when something is smudged", async () => {
+    const app = newApp();
+    const medium = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "medium" })).text));
+    expect(medium.note.smudged).toBe(true);
+    expect(medium.note.text).toContain("█");
+    expect(medium.glasses).toBe(false);
+    const on = ItemResponse.parse(JSON.parse((await post(app, `/api/runs/${medium.runId}/item`, { item: "glasses" })).text));
+    expect(on.run.glasses).toBe(true);
+    expect(on.run.note.smudged).toBe(false);
+    expect(on.run.note.text).not.toContain("█");
+    expect(on.run.note.text).toContain("color TV");
+    neverLeaks(JSON.stringify(on));
+    const again = ItemResponse.parse(JSON.parse((await post(app, `/api/runs/${medium.runId}/item`, { item: "glasses" })).text));
+    expect(again.run.note.text).toBe(on.run.note.text);
+    expect(again.run.stamina).toBe(on.run.stamina);
+
+    const easy = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text));
+    expect(easy.note.smudged).toBe(false);
+    const none = ItemResponse.parse(JSON.parse((await post(app, `/api/runs/${easy.runId}/item`, { item: "glasses" })).text));
+    expect(none.run.glasses).toBe(false);
+    expect(none.run.note.text).toBe(easy.note.text);
+  });
+
+  it("voice mode never mishears in relaxed mode or when asked for help", async () => {
+    const app = newApp();
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy", relaxed: true })).text));
+    for (let i = 0; i < 8; i++) {
+      const r = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, { text: "Tell me about grandpa", voice: { confidence: 0.2 } })).text));
+      expect(r.misheard).toBeUndefined();
+    }
   });
 
   it("does not charge for text Grandma cannot read, and explains every cost", async () => {
@@ -139,13 +200,13 @@ describe("solvability walkthroughs (data/grandmas/rosie.chains.md, mock Grandma)
     easy: {
       steps: [
         ["Who stole all the socks?", /Biscuit/],
-        ["When did you get married?", /1961/],
+        ["When did you get married?", /1961|'61/], // she may slip first: "1962… no, '61" (GDD §3.2)
       ],
       parts: ["biscuit", "1961"],
     },
     medium: {
       steps: [
-        ["When did you get the color TV?", /1969/],
+        ["When did you get the color TV?", /1969|'69/],
         ["When did you buy the house on Maple Avenue?", /Maple Avenue.*1964|1964.*Maple Avenue/],
         ["What number did Grandpa paint on the mailbox?", /412/],
       ],
@@ -198,4 +259,100 @@ describe("solvability walkthroughs (data/grandmas/rosie.chains.md, mock Grandma)
     expect(nudge).toMatch(/sled|bird/);
   });
 
+});
+
+describe("Daily Grandma (GDD §5)", () => {
+  const at = (iso: string) => () => new Date(iso);
+  const dailyApp = (iso: string) => createApp({ data, brain: new MockBrain(), store: new RunStore(null), asksPerMinute: 1000, now: at(iso) });
+
+  it("everyone gets the same Grandma, note and greeting on the same day", async () => {
+    const app = dailyApp("2026-11-20T09:00:00Z");
+    const info = DailyInfo.parse(await (await app.request("/api/daily")).json());
+    expect(info.number).toBe(8);
+    expect(info.date).toBe("2026-11-20");
+    expect(info.resetsInSeconds).toBe(15 * 3600);
+    const a = RunView.parse(JSON.parse((await post(app, "/api/runs", { daily: true, difficulty: "hard" })).text));
+    const b = RunView.parse(JSON.parse((await post(app, "/api/runs", { daily: true })).text));
+    expect(a.daily).toBe(8);
+    expect(a.runId).not.toBe(b.runId);
+    expect(a.difficulty).toBe(info.difficulty); // the requested difficulty is ignored
+    expect(a.note).toEqual(b.note);
+    expect(a.greeting).toBe(b.greeting);
+    // The daily info never spoils the note.
+    neverLeaks(JSON.stringify(info));
+    expect(JSON.stringify(info)).not.toContain(a.note.text);
+  });
+
+  it("shares how everyone is doing on today's daily, once a few visits have finished", async () => {
+    const app = dailyApp("2026-11-20T09:00:00Z");
+    const daily = async () => DailyInfo.parse(await (await app.request("/api/daily")).json());
+    const answers: Record<string, string[]> = { easy: ["biscuit", "1961"], medium: ["Maple", "412"], hard: ["sparrow", "1977"] };
+    const answer = answers[(await daily()).difficulty]!;
+    const visit = async (questions: number, solve: boolean) => {
+      const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { daily: true })).text));
+      for (let i = 0; i < questions; i++) await post(app, `/api/runs/${run.runId}/ask`, { text: "Tell me about your garden" });
+      if (solve) await post(app, `/api/runs/${run.runId}/guess`, { parts: answer });
+      else for (let i = 0; i < 3; i++) await post(app, `/api/runs/${run.runId}/guess`, { parts: ["x", "1"] });
+    };
+    await visit(2, true);
+    await visit(0, false);
+    await post(app, "/api/runs", { daily: true }); // still playing: not counted
+    expect((await daily()).stats).toBeUndefined(); // only 2 finished so far
+    await visit(6, true);
+    expect((await daily()).stats).toEqual({ finished: 3, solved: 2, medianQuestions: 2 });
+    // Ordinary visits never count toward the daily.
+    await post(app, "/api/runs", { difficulty: "easy" });
+    expect((await daily()).stats?.finished).toBe(3);
+  });
+
+  it("marks daily visits in the turn logs (for npm run stats)", async () => {
+    // Scratch folder in the OS temp dir; left for the OS to clean (the project avoids deletes in code).
+    const dir = mkdtempSync(join(tmpdir(), "gwp-daily-log-"));
+    const app = createApp({ data, brain: new MockBrain(), store: new RunStore(dir), asksPerMinute: 1000, now: at("2026-11-20T09:00:00Z") });
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { daily: true })).text));
+    await post(app, `/api/runs/${run.runId}/ask`, { text: "Tell me about your dog" });
+    await post(app, `/api/runs/${run.runId}/guess`, { parts: ["x", "1"] });
+    const lines = readdirSync(join(dir, "logs")).flatMap((f) => readFileSync(join(dir, "logs", f), "utf8").trim().split("\n"));
+    const logs = lines.map((l) => JSON.parse(l) as { daily?: number });
+    expect(logs.length).toBe(2);
+    expect(logs.every((l) => l.daily === 8)).toBe(true);
+  });
+
+  it("changes at UTC midnight, and ordinary visits are not dailies", async () => {
+    const notes = new Set<string>();
+    for (const iso of ["2026-11-20T23:59:59Z", "2026-11-21T00:00:00Z"]) {
+      const run = RunView.parse(JSON.parse((await post(dailyApp(iso), "/api/runs", { daily: true })).text));
+      notes.add(run.note.text);
+    }
+    expect(notes.size).toBe(2);
+    const plain = RunView.parse(JSON.parse((await post(newApp(), "/api/runs", { difficulty: "easy" })).text));
+    expect(plain.daily).toBeUndefined();
+  });
+});
+
+describe("review fixes (iteration 29)", () => {
+  it("a fallback reply (Grandma lost her train of thought) costs no tea and doesn't count", async () => {
+    const lost: GrandmaBrain = {
+      mode: "mock",
+      reply: async () => ({ output: { reply: "Now where was I?", fact_ids_used: [], distractor_ids: [], mood: "confused" }, attempts: 2, validatorErrors: ["x"], fallback: true, latencyMs: 1 }),
+    };
+    const app = createApp({ data, brain: lost, store: new RunStore(null), asksPerMinute: 1000 });
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text));
+    const res = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, { text: "Tell me about your first dog" })).text));
+    expect(res.cost).toBe(0);
+    expect(res.costParts).toBeUndefined();
+    expect(res.run.stamina).toBe(100);
+    expect(res.run.questionCount).toBe(0);
+  });
+
+  it("the 40th question ends the visit, even in relaxed mode", async () => {
+    const app = newApp();
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy", relaxed: true })).text));
+    let last: AskResponseT | undefined;
+    for (let i = 0; i < 40; i++) last = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, { text: "Tell me about your garden" })).text));
+    expect(last!.run.status).toBe("bedtime");
+    expect(last!.run.result?.questions).toBe(40);
+    expect(last!.after).toBeTruthy(); // she says goodnight
+    expect((await post(app, `/api/runs/${run.runId}/ask`, { text: "One more?" })).status).toBe(409);
+  });
 });

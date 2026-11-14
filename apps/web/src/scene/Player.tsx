@@ -60,7 +60,7 @@ function blocked(x: number, z: number, boxes: Box2[], scene: PublicScene): boole
 
 function isTyping(): boolean {
   const el = document.activeElement;
-  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
 }
 
 function interactIdOf(obj: Object3D | null): string | null {
@@ -173,13 +173,22 @@ export function Player({ scene, interactRef }: { scene: PublicScene; interactRef
         return;
       }
       if (isTyping()) return;
+      // With a card open, Tab, Space and the arrows keep their usual jobs: move between buttons, press them,
+      // change a dropdown. (Swallowing them left keyboard players stuck on a card; review, iteration 30.)
+      if (game.panel) {
+        keys.current.clear();
+        return;
+      }
       if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "KeyE", "KeyQ", "Tab"].includes(e.code)) {
         // preventDefault also stops the key from typing into a text box that opens because of it.
         e.preventDefault();
       }
       keys.current.add(e.code);
       if (e.repeat || game.panel) return;
-      if (e.code === "KeyO") {
+      if (e.code === "KeyV") {
+        keys.current.clear();
+        useGame.setState((s) => ({ voiceTick: s.voiceTick + 1 }));
+      } else if (e.code === "KeyO") {
         unlock();
         keys.current.clear();
         game.openPanel({ type: "settings" });

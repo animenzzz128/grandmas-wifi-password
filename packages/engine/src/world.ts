@@ -42,6 +42,8 @@ const Fact = z.strictObject({
   tags: z.array(z.string()).optional(),
   confusable_with: z.array(z.string()).optional(),
   disambiguator: z.string().optional(),
+  /** A wrong year she sometimes says first and then corrects ("1962… no, '61"). GDD §3.2. */
+  misremembers: z.number().int().optional(),
   salience: z.number().int().min(1).max(5),
 });
 
@@ -225,6 +227,15 @@ export function checkWorld(world: GrandmaWorld): string[] {
   for (const f of world.facts) {
     if (f.year === undefined) continue;
     if (f.year < world.profile.birth_year || f.year > thisYear) problems.push(`fact ${f.id}: year ${f.year} is outside ${world.profile.birth_year}–${thisYear}`);
+  }
+  // Self-corrections: a nearby wrong year on a fact that has a year, never a year she must hide.
+  for (const f of world.facts) {
+    if (f.misremembers === undefined) continue;
+    if (f.year === undefined) problems.push(`fact ${f.id}: misremembers ${f.misremembers} but has no year`);
+    else if (f.misremembers === f.year || Math.abs(f.misremembers - f.year) > 3) problems.push(`fact ${f.id}: misremembers ${f.misremembers} should be within 3 years of ${f.year} and different`);
+    for (const r of world.recipes) {
+      if (f.year !== undefined && hiddenYears(world, r).has(f.year)) problems.push(`fact ${f.id}: its year is hidden in ${r.id}, so it can't have a self-correction`);
+    }
   }
   for (const a of world.anchors ?? []) {
     for (const id of a.via_fact_ids ?? []) {

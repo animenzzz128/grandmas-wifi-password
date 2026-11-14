@@ -37,6 +37,8 @@ Ablations (eval plan §5); `--ablate` runs them all:
 | `src/run.ts` | Runner. Each item runs in a fresh visit on each recipe, through the same turn logic as the server (safety line, password deflection, then the brain) |
 | `src/metrics.ts` | Rule metrics: invented entities, year-mismatch contradictions, hidden-year leaks, joined chain links, password/slot leaks, recall, confusable fairness, retries, fallbacks, latency, cost |
 | `src/report.ts` | Writes `reports/<stamp>-<config>.md`: metric tables against the plan's targets, per-category and per-recipe breakdowns, example failures |
+| `src/playstats.ts` | Play stats from real play (technical design §9): `npm run stats` reads the server's turn logs (`var/logs`, or `-- --dir` for a copy from Fly) and reports, per puzzle, visits, solves, guesses-out, bedtimes and median questions to solve next to the par in use; daily results; and for the real Grandma, spend, latency p50/p95, validator retries, fallbacks, prompt-cache share and the commonest rejections. Aggregates only: no player text or replies. `-- --since YYYY-MM-DD`, `-- --out file.md` |
+| `data/golden.v1.json`, `src/golden.ts` | Golden transcripts (technical design §11): 20 recorded conversations (14 from the mock Grandma, 6 handwritten probes for each leak and invention rule) replayed against the validator on every test run. `npm run eval:golden` replays; `-- --record` re-records after a deliberate validator change (review the diff). Add LLM transcripts once the key is in `.env` |
 | `results/` | Raw turn records (JSONL), git-ignored |
 | `reports/` | Generated reports (keep the ones you cite) |
 

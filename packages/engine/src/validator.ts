@@ -4,7 +4,7 @@
  */
 import type { GrandmaWorld, Recipe } from "./world.ts";
 import { containsAllSlots, factById, hiddenYears, objectValue } from "./world.ts";
-import { normalizeForMatch } from "./text.ts";
+import { hasSelfCorrection, leakForms, normalizeForMatch, resolveSelfCorrections } from "./text.ts";
 
 export interface GrandmaOutput {
   reply: string;
@@ -101,14 +101,23 @@ export function validateReply(world: GrandmaWorld, out: GrandmaOutput, ctx: Vali
   for (const id of [...out.fact_ids_used, ...out.distractor_ids]) {
     if (!factIds.has(id)) errors.push(`unknown fact id "${id}"`);
   }
-  const reply = out.reply.trim();
+  // Allowed self-corrections ("1962… no, 1961") count as the year she settled on.
+  const corrections = new Map(world.facts.filter((f) => f.misremembers !== undefined && f.year !== undefined).map((f) => [f.misremembers!, f.year!] as const));
+  const reply = resolveSelfCorrections(out.reply.trim(), corrections);
   if (!reply) errors.push("empty reply");
   if (reply.length > MAX_REPLY_CHARS) errors.push(`reply too long (${reply.length} chars, max ${MAX_REPLY_CHARS})`);
+  if (hasSelfCorrection(reply)) errors.push("self-correction on a memory that isn't marked for one (or to the wrong year); say the year once");
 
-  // Numbers must come from the world (plus small counts and Grandma's age).
+  // Numbers must come from the world (plus small counts and Grandma's age). A short year ("'61") counts
+  // as the full year when that year is one of her memories.
   const vocab = worldVocabulary(world);
   const age = ctx.currentYear - world.profile.birth_year;
-  for (const raw of reply.match(/\d+/g) ?? []) {
+  const shortYear = (yy: string) => [1900, 2000].map((c) => c + Number(yy)).find((y) => vocab.numbers.has(y));
+  const forNumbers = reply.replace(/(^|[^\w])'(\d\d)\b/g, (m, pre: string, yy: string) => {
+    const full = shortYear(yy);
+    return full ? `${pre}${full}` : m;
+  });
+  for (const raw of forNumbers.match(/\d+/g) ?? []) {
     const n = Number(raw);
     if (ctx.hiddenYears.has(n)) {
       errors.push(`said the year ${n}, which must only be given as its anchor phrase`);
@@ -143,11 +152,13 @@ export function validateReply(world: GrandmaWorld, out: GrandmaOutput, ctx: Vali
   // Contradiction: a cited memory said with the wrong year in the same sentence.
   for (const c of contradictions(world, { reply, factIds: out.fact_ids_used })) errors.push(`contradicts a memory: ${c}`);
 
-  // Leak checks: the password forwards or backwards (ignoring case, spaces and punctuation), or every part of it.
+  // Leak checks: the password forwards or backwards (ignoring case, spaces and punctuation), or every part of it,
+  // also when parts are said another way ('61, "nineteen sixty-one", "four one two", "B-i-s-c-u-i-t").
   const pw = normalizeForMatch(ctx.password);
-  const said = normalizeForMatch(reply);
+  const forms = leakForms(reply);
+  const said = normalizeForMatch(reply); // already ignores spaces and dashes: "B-i-s-c-u-i-t 1961" is caught here
   if (pw.length >= 4 && (said.includes(pw) || said.includes([...pw].reverse().join("")))) errors.push("reply contains the password");
-  else if (ctx.recipe && containsAllSlots(world, ctx.recipe, reply)) errors.push("reply contains every part of the password; give one memory at a time");
+  else if (ctx.recipe && containsAllSlots(world, ctx.recipe, forms)) errors.push("reply contains every part of the password; give one memory at a time");
 
   return errors;
 }

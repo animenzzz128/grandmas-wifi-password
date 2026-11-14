@@ -19,13 +19,23 @@ export const GrandmaLines = z.strictObject({
   crisis: LineBank,
   /** Free: the player wrote in a language Grandma doesn't read. */
   pardon: LineBank,
+  /** Voice mode: she misheard a word. `{as}` / `{As}` is what she heard. Must not mention any facts. */
+  misheard: LineBank,
+  /** The player put on her reading glasses and can now read the smudged note. */
+  glasses_on: LineBank,
+  /** Glasses when there's nothing smudged, or already worn. */
+  glasses_not_needed: LineBank,
 });
 export type GrandmaLines = z.infer<typeof GrandmaLines>;
+
+/** Voice-mode puns: a word the player might say (`|` between spellings) and what Grandma hears instead. */
+export const PunTable = z.array(z.strictObject({ word: z.string().min(2), as: z.string().min(2) })).min(1);
 
 export const Strings = z.strictObject({
   lang: z.string(),
   ui: z.record(z.string(), z.string()),
   grandma: GrandmaLines,
+  mishears: PunTable,
 });
 export type Strings = z.infer<typeof Strings>;
 

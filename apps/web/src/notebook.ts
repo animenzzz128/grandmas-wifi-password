@@ -4,6 +4,7 @@
  * Outer Wilds' ship log). Nothing here comes from the server's fact graph, so it can't leak anything.
  */
 import type { CostBreakdown } from "@gwp/engine";
+import { resolveSelfCorrections } from "@gwp/engine";
 import type { NoteEntry } from "./store.ts";
 import { t } from "./strings.ts";
 
@@ -23,6 +24,8 @@ export function extractNotes(text: string, from: NoteEntry["from"]): NoteEntry[]
     if (!out.some((o) => o.kind === kind && o.value === value)) out.push({ kind, value, source: source.trim(), from });
   };
 
+  // "1962… no, '61": note the year she settled on, not the slip.
+  text = resolveSelfCorrections(text);
   for (const sentence of text.split(/(?<=[.!?])\s+/)) {
     // Years.
     for (const m of sentence.matchAll(/\b(1[89]\d\d|20[0-2]\d)\b/g)) add("year", m[1]!, sentence);
@@ -75,4 +78,19 @@ export function costWhy(parts?: Omit<CostBreakdown, "total">): string | undefine
   if (parts.rude) bits.push(t("cost.rude", { n: parts.rude }));
   if (parts.followUp) bits.push(t("cost.followUp", { n: -parts.followUp }));
   return bits.length > 1 ? bits.join(" ") : undefined;
+}
+
+/** Longest pinned quote, so a dragged-over paragraph stays a note and not a transcript. */
+export const PIN_MAX = 200;
+
+/**
+ * Add a quote the player highlighted (or a whole line) to their pins: whitespace tidied, too-short or
+ * duplicate quotes ignored, long ones cut at a word. Returns the same array when nothing changes.
+ */
+export function addPin(pins: string[], text: string): string[] {
+  let quote = text.replace(/\s+/g, " ").trim();
+  if (quote.length < 3) return pins;
+  if (quote.length > PIN_MAX) quote = quote.slice(0, PIN_MAX).replace(/\s+\S*$/, "") + "…";
+  if (pins.some((p) => p.includes(quote))) return pins;
+  return [...pins.filter((p) => !quote.includes(p)), quote];
 }

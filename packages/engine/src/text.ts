@@ -32,6 +32,8 @@ const SYNONYMS: Record<string, string[]> = {
   marri: ["wedd", "wedding"],
   marry: ["wedd", "wedding"],
   wedd: ["marri"],
+  meet: ["met"],
+  met: ["meet"],
   husband: ["grandpa", "walt"],
   grandpa: ["walt", "husband"],
   grandfather: ["grandpa", "walt"],
@@ -115,4 +117,70 @@ export function hashString(s: string): number {
 export function pick<T>(items: readonly T[], rand: () => number): T {
   if (items.length === 0) throw new Error("pick from empty list");
   return items[Math.floor(rand() * items.length)] as T;
+}
+
+/** True if the text still has a "WRONG… no, RIGHT" year correction in it. */
+export function hasSelfCorrection(text: string): boolean {
+  return /\b(1[89]\d\d|20\d\d)\s*(?:…|\.\.\.|,|—|-)?\s*(?:no|wait|oh no)[,!.]?\s*(?:it was\s+)?(?:'\d\d|1[89]\d\d|20\d\d)\b/i.test(text);
+}
+
+/**
+ * Self-corrections (game design §3.2): "It was 1962… no, '61." Replaces each "WRONG… no, RIGHT" with just
+ * RIGHT, so year checks and the notebook see the year she settled on. With `allowed` (wrong → right),
+ * only those exact pairs count; anything else is left alone (and then fails the usual checks).
+ */
+export function resolveSelfCorrections(text: string, allowed?: ReadonlyMap<number, number>): string {
+  const re = /\b(1[89]\d\d|20\d\d)\s*(?:…|\.\.\.|,|—|-)?\s*(?:no|wait|oh no)[,!.]?\s*(?:it was\s+)?(?:'(\d\d)|(1[89]\d\d|20\d\d))\b/gi;
+  return text.replace(re, (whole, wrongS: string, short?: string, full?: string) => {
+    const wrong = Number(wrongS);
+    const right = full ? Number(full) : Math.floor(wrong / 100) * 100 + Number(short);
+    if (right === wrong) return whole;
+    if (allowed && allowed.get(wrong) !== right) return whole;
+    return String(right);
+  });
+}
+
+const DIGIT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+const TEENS = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+
+/** "sixty-one" → 61, "twelve" → 12, "seven" → 7; undefined if it isn't a number under 100. */
+function wordsUnder100(s: string): number | undefined {
+  const w = s.toLowerCase().split(/[\s-]+/).filter(Boolean);
+  if (w.length === 1) {
+    const d = DIGIT_WORDS.indexOf(w[0]!);
+    if (d >= 0) return d;
+    const t = TEENS.indexOf(w[0]!);
+    if (t >= 0) return 10 + t;
+    const tens = TENS.indexOf(w[0]!);
+    return tens >= 2 ? tens * 10 : undefined;
+  }
+  if (w.length === 2) {
+    const tens = TENS.indexOf(w[0]!);
+    const d = DIGIT_WORDS.indexOf(w[1]!);
+    if (tens >= 2 && d >= 1) return tens * 10 + d;
+  }
+  return undefined;
+}
+
+const UNDER_100 = String.raw`(?:(?:${TENS.slice(2).join("|")})(?:[\s-]+(?:${DIGIT_WORDS.slice(1).join("|")}))?|${TEENS.join("|")}|${DIGIT_WORDS.join("|")})`;
+
+/**
+ * Other ways a reply can spell out an answer part, for the leak check (technical design §5⑥d):
+ * short years ('61 → 1961 and 2061), spelled years ("nineteen sixty-one" → 1961), runs of digit words
+ * ("four one two" → 412) and letter-by-letter words ("B-i-s-c-u-i-t" → Biscuit). Returns the text with
+ * those forms added, so a check that looks for the plain forms also catches them.
+ */
+export function leakForms(text: string): string {
+  const extra: string[] = [];
+  for (const m of text.matchAll(/['’‘](\d\d)\b/g)) extra.push(`19${m[1]}`, `20${m[1]}`);
+  const year = new RegExp(String.raw`\b(nineteen|twenty)[\s-]+(?:hundred[\s-]+(?:and[\s-]+)?)?(${UNDER_100})\b`, "gi");
+  for (const m of text.matchAll(year)) {
+    const n = wordsUnder100(m[2]!);
+    if (n !== undefined) extra.push(String((m[1]!.toLowerCase() === "nineteen" ? 1900 : 2000) + n));
+  }
+  const digits = new RegExp(String.raw`\b(?:${DIGIT_WORDS.join("|")})(?:[\s,-]+(?:${DIGIT_WORDS.join("|")}))+\b`, "gi");
+  for (const m of text.matchAll(digits)) extra.push(m[0].toLowerCase().split(/[\s,-]+/).map((w) => DIGIT_WORDS.indexOf(w)).join(""));
+  for (const m of text.matchAll(/\b[A-Za-z](?:[\s.\-–]+[A-Za-z]\b){2,}/g)) extra.push(m[0].replace(/[^A-Za-z]/g, ""));
+  return extra.length ? `${text} ${extra.join(" ")}` : text;
 }

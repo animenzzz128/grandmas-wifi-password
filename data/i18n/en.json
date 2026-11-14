@@ -9,7 +9,7 @@
     "difficulty.medium": "Medium",
     "difficulty.hard": "Hard",
     "clickToLook": "Click the room to look around with the mouse",
-    "controls": "WASD walk · Shift hurry · E interact · Q put back · Tab notebook · Enter talk · Esc back · M sound · O settings · F3 FPS",
+    "controls": "WASD walk · Shift hurry · E interact · Q put back · Tab notebook · Enter talk · V speak · Esc back · M sound · O settings",
     "prompt.grandma": "E · Talk to Grandma",
     "prompt.clue": "E · Look at the {label}",
     "prompt.note": "E · Read the sticky note",
@@ -85,7 +85,62 @@
     "settings.relaxedHint": "Applies from your next visit. Relaxed visits are marked on the result card.",
     "result.relaxed": "Relaxed visit (tea didn't run out)",
     "grandma.dozing": "z z z",
-    "settings.retro": "Retro filter (palette and dither)"
+    "settings.retro": "Retro filter (palette and dither)",
+    "settings.voice": "Grandma's voice",
+    "settings.voice.spoken": "Spoken (your browser's voice)",
+    "settings.voice.blips": "Babble blips",
+    "settings.voice.off": "Silent",
+    "settings.micHint": "V or 🎤 lets you ask out loud. Chrome sends what you say to Google's speech service to turn it into text.",
+    "ask.mic": "Ask out loud (V)",
+    "ask.listening": "Listening… ask your question",
+    "talk.micDenied": "The browser blocked the microphone. Allow it in the address bar to ask out loud.",
+    "talk.micUnsupported": "This browser can't listen. Type your question instead.",
+    "talk.micError": "Grandma didn't catch that. Try again, or type it.",
+    "notebook.pinned": "pinned",
+    "notebook.unpin": "Remove this pin",
+    "notebook.pinHint": "Tip: highlight any of Grandma's words in the chat (or click 📌 on a line) to pin them here.",
+    "notebook.pinIt": "Pin to notebook",
+    "notebook.pinLine": "Pin this line to the notebook",
+    "notebook.pinnedHint": "Pinned to your notebook (Tab).",
+    "notebook.pinSkipped": "That's already pinned.",
+    "error.server": "Grandma's house had a hiccup on our end. Try again in a moment.",
+    "error.askFailed": "(Grandma didn't catch that. Your question is back in the box; press Enter to try again.)",
+    "loading.room": "Setting up Grandma's living room… {pct}%",
+    "title.desktopOnly": "This game needs a keyboard and mouse (you walk, look around and type). Please play it on a computer.",
+    "mishear.big": "{as}?!",
+    "mishear.line": "(Grandma misheard you as “{heard}”. Ask again; that one didn't cost any tea.)",
+    "settings.textScale": "Text size",
+    "settings.readableFont": "Readable font (plain letters, wider spacing; also for the handwritten note)",
+    "glasses.putOn": "Put them on and read the note",
+    "glasses.wearing": "You're wearing them",
+    "glasses.notNeeded": "The note is clear enough without them",
+    "note.smudgedHint": "Part of the note is smudged (█). Grandma's reading glasses might help, or you can guess.",
+    "note.glassesHint": "With the reading glasses on, you can make out every word.",
+    "prompt.glasses": "E · Look at the {label}",
+    "mode.degraded.budget": "Grandma has talked a lot today, so you're visiting her practice version until tomorrow (UTC). It still plays, with simpler answers.",
+    "mode.degraded.kill": "The real Grandma is resting right now, so you're visiting her practice version. It still plays, with simpler answers.",
+    "daily.play": "Today's Grandma #{n} · {difficulty}",
+    "daily.again": "Replay Grandma #{n} (practice)",
+    "daily.solved": "You solved today's in {n} questions {stars}",
+    "daily.failed": "Today's got away from you",
+    "daily.next": "next Grandma in {time}",
+    "daily.streak": "🔥 {n} days in a row",
+    "daily.cardName": "Grandma #{n} · Daily",
+    "daily.practice": "Practice visit: your first try at today's Grandma is the one that counts.",
+    "result.cardSolved.one": "Solved in 1 question",
+    "result.cardFailed.one": "Gave up after 1 question",
+    "daily.solved.one": "You solved today's in 1 question {stars}",
+    "settings.roomSound": "Room sounds (a ticking clock)",
+    "settings.typeOut": "Grandma's words type out (click the chat to skip)",
+    "chat.skipTyping": "Click to show the whole line",
+    "loading.door": "Knocking on Grandma's door…",
+    "daily.stats": "Everyone today: {solved} of {finished} finished visits solved it ({pct}%)",
+    "daily.statsMedian": "· usually in {n} questions",
+    "daily.statsMedian.one": "· usually in 1 question",
+    "talk.wait": "Grandma is still answering. Give her a moment.",
+    "error.showFailed": "(Grandma didn't see that. You're still holding the {item}.)",
+    "cookie.label": "cookie",
+    "router.tried": "(Router: tried {guess}.)"
   },
   "grandma": {
     "greeting": [
@@ -138,6 +193,74 @@
     "pardon": [
       "Oh, sweetheart, I only speak English and a little Polish. Say it again for your old grandma?",
       "Pardon, dear? My English is fine but that went right over my head."
+    ],
+    "misheard": [
+      "{As}?! Speak up, sweetheart. Why on earth would I know about {as}?",
+      "Did you say {as}? Oh, my ears. Say it again, nice and slow, for your old grandma.",
+      "{As}! Ha! Your grandpa would have loved that one. Now ask me properly, dear.",
+      "{As}? At my age? Goodness. Come closer and say that again."
+    ],
+    "glasses_on": [
+      "Are those my reading glasses? Go on, borrow them, dear. Everything's clearer through those.",
+      "Oh, my spare glasses! Put them on, sweetheart. Now you can see what I see. Well, more or less."
+    ],
+    "glasses_not_needed": [
+      "You don't need my glasses, dear. Young eyes!",
+      "Keep them on if you like, sweetheart, but there's nothing more to read."
     ]
-  }
+  },
+  "mishears": [
+    {
+      "word": "password|pass word",
+      "as": "pass the sword"
+    },
+    {
+      "word": "wi-fi|wifi|wi fi",
+      "as": "wifey"
+    },
+    {
+      "word": "router",
+      "as": "rooster"
+    },
+    {
+      "word": "internet",
+      "as": "hairnet"
+    },
+    {
+      "word": "computer",
+      "as": "cucumber"
+    },
+    {
+      "word": "laptop",
+      "as": "lap dog"
+    },
+    {
+      "word": "email",
+      "as": "female"
+    },
+    {
+      "word": "phone",
+      "as": "foam"
+    },
+    {
+      "word": "married",
+      "as": "marinated"
+    },
+    {
+      "word": "wedding",
+      "as": "bedding"
+    },
+    {
+      "word": "grandpa",
+      "as": "grand piano"
+    },
+    {
+      "word": "street",
+      "as": "sweet"
+    },
+    {
+      "word": "dog",
+      "as": "frog"
+    }
+  ]
 }

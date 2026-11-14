@@ -22,7 +22,7 @@ const Prop = z.strictObject({
   collide: z.boolean().default(true),
 });
 
-export const InteractKind = z.enum(["grandma", "clue", "note", "router", "cookie_jar"]);
+export const InteractKind = z.enum(["grandma", "clue", "note", "router", "cookie_jar", "glasses"]);
 export type InteractKind = z.infer<typeof InteractKind>;
 
 const Interactable = Prop.extend({

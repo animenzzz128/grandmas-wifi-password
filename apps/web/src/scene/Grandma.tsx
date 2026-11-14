@@ -24,7 +24,10 @@ import {
   SkinnedMesh,
   TorusGeometry,
   BoxGeometry,
+  DoubleSide,
   CylinderGeometry,
+  CircleGeometry,
+  MeshBasicMaterial,
   SphereGeometry,
   Vector3,
 } from "three";
@@ -32,6 +35,7 @@ import type { Bone, Material, Object3D } from "three";
 import { useGame } from "../store.ts";
 import { t } from "../strings.ts";
 import { useHighlight } from "./Model.tsx";
+import { drapedBlanket } from "./blanket.ts";
 import type { Vec3 } from "./models.ts";
 
 const BODY_URL = "/models/quaternius/grandma_body.gltf";
@@ -39,6 +43,14 @@ const HAIR_URL = "/models/quaternius/hair_parted.gltf";
 
 /** How tall Grandma would be standing up (the base model is about 1.7 m). */
 const STANDING_HEIGHT = 1.56;
+/** How far each finger joint bends from the model's flat T-pose hand (radians, about the bone's Z). */
+const FINGER_CURL = 0.35;
+/** Extra bend of the cup hand's thumb joints (radians, bone Z). */
+const THUMB_CURL = 0.6;
+/** Lips sit this far below the eyes on the base model (metres, rest pose). */
+const MOUTH_BELOW_EYES = 0.075;
+/** Where her wrist goes, relative to her lips, when she sips (model space, before scaling). */
+const SIP_WRIST = new Vector3(-0.06, -0.065, 0.06);
 
 const PALETTE = {
   blouse: "#efe2cc",
@@ -240,6 +252,22 @@ function aim(bone: Object3D, child: Object3D, dir: Vector3) {
   bone.updateMatrixWorld(true);
 }
 
+/**
+ * Twist `bone` about its own length (the line to `child`) so that `normal` (a world direction that turns
+ * with the bone, e.g. the palm) points as close to `want` (model space) as the twist allows.
+ */
+function roll(bone: Object3D, child: Object3D, normal: Vector3, want: Vector3) {
+  const axis = child.getWorldPosition(new Vector3()).sub(bone.getWorldPosition(new Vector3())).normalize();
+  const n = normal.clone().projectOnPlane(axis).normalize();
+  const w = want.clone().projectOnPlane(axis).normalize();
+  const angle = Math.atan2(new Vector3().crossVectors(n, w).dot(axis), n.dot(w));
+  const turn = new Quaternion().setFromAxisAngle(axis, angle);
+  const world = bone.getWorldQuaternion(new Quaternion()).premultiply(turn);
+  const parent = bone.parent!.getWorldQuaternion(new Quaternion()).invert();
+  bone.quaternion.copy(parent.multiply(world));
+  bone.updateMatrixWorld(true);
+}
+
 /** A local axis for `bone` that matches the model's X axis right now (for nodding about X). */
 function localAxis(bone: Object3D, worldAxis: Vector3) {
   const inv = bone.getWorldQuaternion(new Quaternion()).invert();
@@ -281,6 +309,12 @@ interface Built {
   /** Neck turn (model Y) and head tilt (model Z), for looking at the player and mood poses. */
   neckYawAxis: Vector3;
   headTiltAxis: Vector3;
+  /** Arm bones (right upper, lower, hand; left upper, lower, hand) and their poses. */
+  arms: { bones: Bone[]; rest: Quaternion[]; sip: Quaternion[]; gesture: Quaternion[]; glasses: Quaternion[] };
+  /** The tea inside her cup (scaled with the tea meter). */
+  tea: Mesh;
+  /** Her mouth (scaled open while she talks). */
+  mouth: Mesh;
 }
 
 /**
@@ -358,6 +392,27 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
   glasses.updateMatrixWorld(true);
   head.attach(glasses);
 
+  // A mouth that opens while she talks (the model has no jaw bone or face shapes). It sits on her lips,
+  // found from the skinned face vertices just below the nose, and stays hidden while she is quiet.
+  const mouthY = eyeMid.y - MOUTH_BELOW_EYES;
+  let lipZ = -Infinity;
+  const p = new Vector3();
+  for (const m of dressing) {
+    const n = m.geometry.attributes.position!.count;
+    for (let i = 0; i < n; i++) {
+      m.getVertexPosition(i, p);
+      m.localToWorld(p);
+      if (Math.abs(p.x - eyeMid.x) < 0.012 && Math.abs(p.y - mouthY) < 0.006) lipZ = Math.max(lipZ, p.z);
+    }
+  }
+  if (!Number.isFinite(lipZ)) lipZ = (eyeBox?.max.z ?? eyeMid.z) - 0.005;
+  const mouth = new Mesh(new CircleGeometry(0.011, 12), new MeshBasicMaterial({ color: "#3b1717" }));
+  mouth.scale.set(1.5, 0.05, 1);
+  mouth.position.set(eyeMid.x, mouthY, lipZ + 0.002);
+  mouth.visible = false;
+  mouth.updateMatrixWorld(true);
+  head.attach(mouth);
+
   // Sit down. Directions are in model space: +z forward, +x is her left.
   const v = (x: number, y: number, z: number) => new Vector3(x, y, z);
   for (const s of [1, -1]) {
@@ -365,28 +420,97 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
     aim(bone(`thigh_${side}`), bone(`calf_${side}`), v(0.07 * s, -0.1, 1));
     aim(bone(`calf_${side}`), bone(`foot_${side}`), v(0.02 * s, -1, 0.18));
     aim(bone(`foot_${side}`), bone(`ball_${side}`), v(0.05 * s, -0.35, 1));
-    aim(bone(`upperarm_${side}`), bone(`lowerarm_${side}`), v(0.2 * s, -1, 0.3));
+    aim(bone(`upperarm_${side}`), bone(`lowerarm_${side}`), v(0.08 * s, -1, 0.32));
     aim(bone(`lowerarm_${side}`), bone(`hand_${side}`), v(-0.42 * s, -0.25, 1));
     aim(bone(`hand_${side}`), bone(`middle_01_${side}`), v(-0.35 * s, -0.4, 1));
+    // Relaxed fingers instead of a flat, splayed T-pose hand; the cup hand curls a little more.
+    for (const finger of ["index", "middle", "ring", "pinky"]) {
+      for (const j of [1, 2, 3]) {
+        bone(`${finger}_0${j}_${side}`).rotateZ(FINGER_CURL * (side === "r" ? 1.1 : 1) * (j === 1 ? 0.6 : 1));
+      }
+    }
+    // The cup hand's thumb wraps the cup instead of sticking up past her nose when she sips.
+    if (side === "r") for (const j of [2, 3]) bone(`thumb_0${j}_r`).rotateZ(THUMB_CURL);
   }
+  body.updateMatrixWorld(true);
+  /** Which way a palm faces (world), from the knuckle line and the finger direction. */
+  const palm = (side: "l" | "r") => {
+    const at = (name: string) => bone(`${name}_${side}`).getWorldPosition(new Vector3());
+    const finger = at("middle_01").sub(at("hand"));
+    const across = at("pinky_01").sub(at("index_01"));
+    return new Vector3().crossVectors(finger, across).normalize().multiplyScalar(side === "r" ? 1 : -1);
+  };
+  /** Turn a forearm so its palm faces `want`, then point the hand along `point` again. */
+  const turnPalm = (side: "l" | "r", want: Vector3, point: Vector3) => {
+    roll(bone(`lowerarm_${side}`), bone(`hand_${side}`), palm(side), want);
+    aim(bone(`hand_${side}`), bone(`middle_01_${side}`), point);
+  };
+  // The cup hand rests palm up on her lap so the cup sits in it.
+  turnPalm("r", v(0.35, 1, 0), v(0.3, -0.15, 1));
   const spine = bone("spine_02");
   const neck = bone("neck_01");
   aim(neck, head, v(0, 1, 0.12)); // a little hunched forward
 
-  // Crocheted blanket over her lap, from hips to knees, with a flap over the knees.
+  // Crocheted blanket draped over her lap and knees (see blanket.ts).
   const hipL = bone("thigh_l").getWorldPosition(new Vector3());
   const hipR = bone("thigh_r").getWorldPosition(new Vector3());
   const kneeL = bone("calf_l").getWorldPosition(new Vector3());
   const kneeR = bone("calf_r").getWorldPosition(new Vector3());
   const hips = hipL.clone().add(hipR).multiplyScalar(0.5);
   const knees = kneeL.clone().add(kneeR).multiplyScalar(0.5);
-  const blanketMat = new MeshStandardMaterial({ map: grannySquares(), roughness: 0.95 });
-  const width = Math.abs(hipL.x - hipR.x) + 0.3;
-  const lap = new Mesh(new BoxGeometry(width, 0.04, knees.z - hips.z + 0.12), blanketMat);
-  lap.position.set(hips.x, hips.y + 0.09, (hips.z + knees.z) / 2 + 0.04);
-  const flap = new Mesh(new BoxGeometry(width, 0.32, 0.04), blanketMat);
-  flap.position.set(knees.x, knees.y + 0.09 - 0.16, knees.z + 0.1);
-  body.add(lap, flap);
+  const blanketMat = new MeshStandardMaterial({ map: grannySquares(), roughness: 0.95, side: DoubleSide });
+  const width = Math.abs(hipL.x - hipR.x) + 0.2;
+  const blanket = new Mesh(drapedBlanket(hips, knees, width), blanketMat);
+  body.add(blanket);
+
+  // Her teacup, held in the right hand on her lap; the tea level follows the tea meter.
+  const cupMat = new MeshStandardMaterial({ color: "#f3ede2", roughness: 0.35 });
+  const cup = new Group();
+  const cupBody = new Mesh(new CylinderGeometry(0.03, 0.022, 0.055, 12, 1, true), cupMat);
+  cupBody.material.side = DoubleSide;
+  const cupBase = new Mesh(new CylinderGeometry(0.022, 0.022, 0.004, 12), cupMat);
+  cupBase.position.y = -0.0275;
+  const band = new Mesh(new CylinderGeometry(0.0305, 0.0295, 0.008, 12, 1, true), new MeshStandardMaterial({ color: "#c46a7a", roughness: 0.4 }));
+  band.position.y = 0.014;
+  const tea = new Mesh(new CylinderGeometry(0.027, 0.022, 0.045, 12), new MeshStandardMaterial({ color: "#7a4a22", roughness: 0.2 }));
+  tea.position.y = -0.0045;
+  cup.add(cupBody, cupBase, band, tea);
+  const handR = bone("hand_r");
+  // In the palm: between the wrist and the knuckles, resting on the hand.
+  const handPos = handR.getWorldPosition(new Vector3()).lerp(bone("middle_01_r").getWorldPosition(new Vector3()), 0.55);
+  cup.position.set(handPos.x, handPos.y + 0.04, handPos.z);
+  cup.updateMatrixWorld(true);
+  handR.attach(cup);
+
+  // Arm poses for gestures, computed once and blended at runtime. Captured as local bone rotations.
+  const armBones = ["upperarm_r", "lowerarm_r", "hand_r", "upperarm_l", "lowerarm_l", "hand_l"].map(bone);
+  const snapshot = () => armBones.map((b) => b.quaternion.clone());
+  const restore = (pose: Quaternion[]) => {
+    armBones.forEach((b, i) => b.quaternion.copy(pose[i]!));
+    body.updateMatrixWorld(true);
+  };
+  const rest = snapshot();
+  const eyeLine = glasses.getWorldPosition(new Vector3());
+  const toward = (from: Object3D, target: Vector3) => target.clone().sub(from.getWorldPosition(new Vector3()));
+  // Sip: elbow forward, the upturned hand brings the cup up under her lips, tipped toward her.
+  const lips = mouth.getWorldPosition(new Vector3());
+  aim(bone("upperarm_r"), bone("lowerarm_r"), v(-0.12, -0.35, 0.9));
+  aim(bone("lowerarm_r"), handR, toward(bone("lowerarm_r"), lips.clone().add(SIP_WRIST)));
+  turnPalm("r", v(0.1, 1, -0.4), v(0.75, 0.2, 0.25));
+  const sip = snapshot();
+  restore(rest);
+  // Talking gesture with the free (left) hand: elbow stays at her side, forearm lifts forward, palm up.
+  aim(bone("upperarm_l"), bone("lowerarm_l"), v(0.1, -1, 0.3));
+  aim(bone("lowerarm_l"), bone("hand_l"), v(0.12, 0.6, 1));
+  turnPalm("l", v(-0.4, 1, 0), v(0.05, 0.2, 1));
+  const gesture = snapshot();
+  restore(rest);
+  // Push up the glasses: left hand to the bridge of the nose.
+  aim(bone("upperarm_l"), bone("lowerarm_l"), v(0.15, -0.45, 0.85));
+  aim(bone("lowerarm_l"), bone("hand_l"), toward(bone("lowerarm_l"), eyeLine.clone().add(v(0.02, -0.03, 0.04))));
+  aim(bone("hand_l"), bone("middle_01_l"), v(-0.2, 0.9, 0.3));
+  const glassesPose = snapshot();
+  restore(rest);
 
   // Scale to her height, then put her hips on the seat (object space: seat at y = 0, hips at z = 0).
   const scale = STANDING_HEIGHT / 1.7;
@@ -410,8 +534,13 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
     spineAxis: localAxis(spine, X),
     neckYawAxis: localAxis(neck, v(0, 1, 0)),
     headTiltAxis: localAxis(head, v(0, 0, 1)),
+    arms: { bones: armBones, rest, sip, gesture, glasses: glassesPose },
+    tea,
+    mouth,
   };
 }
+
+const q1 = new Quaternion();
 
 const tmp = new Quaternion();
 
@@ -422,6 +551,7 @@ export function GrandmaModel({ size, highlight }: { size: Vec3; highlight: boole
   useHighlight(built.root, highlight, "#2a1f30");
 
   const busy = useGame((s) => s.busy);
+  const voicePlaying = useGame((s) => s.grandmaSpeaking);
   const stamina = useGame((s) => s.run?.stamina ?? 100);
   const status = useGame((s) => s.run?.status);
   const sleepy = stamina <= 20 || status === "bedtime";
@@ -434,6 +564,9 @@ export function GrandmaModel({ size, highlight }: { size: Vec3; highlight: boole
   const lastSeq = useGame((s) => s.log[lastIndex]?.seq ?? lastIndex);
   const said = lastIndex >= 0 ? { i: lastSeq, mood: lastMood, len: lastLen } : null;
   const speech = useRef({ index: -1, until: 0 });
+  const mouthOpen = useRef(0);
+  const gest = useRef({ sip: 0, talk: 0, glasses: 0, nextSip: 6, glassesUntil: 0 });
+  const teaLevel = Math.max(0.08, stamina / 100);
   const pose = useRef({ ...NEUTRAL, yaw: 0 });
   const local = useMemo(() => new Vector3(), []);
 
@@ -444,8 +577,9 @@ export function GrandmaModel({ size, highlight }: { size: Vec3; highlight: boole
 
     if (said && said.i !== speech.current.index) {
       speech.current = { index: said.i, until: t + Math.min(4, 0.6 + said.len * 0.035) };
+      if (said.mood === "confused" || said.mood === "suspicious") gest.current.glassesUntil = t + 1.8;
     }
-    const talking = t < speech.current.until;
+    const talking = t < speech.current.until || voicePlaying;
     const target = MOOD_POSE[said?.mood ?? ""] ?? NEUTRAL;
 
     // Look at the player when they're in front of her and not too far (she's seated; limited neck turn).
@@ -460,6 +594,36 @@ export function GrandmaModel({ size, highlight }: { size: Vec3; highlight: boole
     P.tilt = damp(P.tilt, target.tilt, 3, dt);
     P.laugh = damp(P.laugh, talking ? target.laugh : 0, 4, dt);
     P.yaw = damp(P.yaw, sleepy ? 0 : yawTarget, 2.5, dt);
+
+    // Gestures: a sip of tea now and then when idle, hands while talking, glasses when puzzled.
+    const G = gest.current;
+    const idleNow = !talking && !busy && doze.current < 0.3;
+    if (import.meta.env.DEV) (window as unknown as { __sip?: () => void }).__sip = () => void (G.nextSip = t);
+    const sipping = idleNow && t > G.nextSip && t < G.nextSip + 3;
+    if (t > G.nextSip + 3) G.nextSip = t + 12 + ((Math.sin(t * 7.3) + 1) * 5);
+    G.sip = damp(G.sip, sipping ? 1 : 0, 2.2, dt);
+    const animated = said?.mood === "happy" || said?.mood === "teasing" || said?.mood === "nostalgic";
+    G.talk = damp(G.talk, talking && animated ? 0.65 + Math.sin(t * 3.1) * 0.25 : 0, 4, dt);
+    G.glasses = damp(G.glasses, t < G.glassesUntil ? 1 : 0, 3.5, dt);
+    const A = b.arms;
+    A.bones.forEach((bone, i) => {
+      const right = i < 3;
+      bone.quaternion.copy(A.rest[i]!);
+      if (right) {
+        // The cup hand only sips (never waves the tea around).
+        bone.quaternion.slerp(q1.copy(A.sip[i]!), G.sip);
+      } else {
+        bone.quaternion.slerp(q1.copy(A.gesture[i]!), G.talk);
+        bone.quaternion.slerp(q1.copy(A.glasses[i]!), G.glasses);
+      }
+    });
+    b.tea.scale.y = teaLevel;
+    // Mouth: two out-of-step waves read as syllables; closes between words and when she stops.
+    const syll = Math.max(0, Math.sin(t * 11) * 0.6 + Math.sin(t * 17.3 + 1) * 0.5);
+    mouthOpen.current = damp(mouthOpen.current, talking ? syll : 0, 18, dt);
+    b.mouth.visible = mouthOpen.current > 0.08;
+    b.mouth.scale.y = 0.15 + mouthOpen.current * 0.85;
+    b.tea.position.y = -0.027 + 0.0225 * teaLevel;
 
     const breathe = Math.sin(t * 1.4) * 0.025;
     const laugh = P.laugh * Math.abs(Math.sin(t * 9)) * 0.05;

@@ -23,6 +23,8 @@ export interface Config {
   apiKey: string | undefined;
   apiBaseUrl: string;
   asksPerMinute: number;
+  /** Daily model spend limit in USD (UTC day); past it Grandma goes offline until midnight UTC. */
+  dailyBudgetUsd: number;
   dataDir: string;
   varDir: string;
   webDist: string;
@@ -49,6 +51,7 @@ export function readConfig(env: Env = process.env, dotenv: Env = {}, argv: reado
     // Pinned so an ambient ANTHROPIC_BASE_URL (e.g. from another tool) can't redirect the project key.
     apiBaseUrl: get("GRANDMA_API_BASE_URL") || "https://api.anthropic.com",
     asksPerMinute: Number(get("RATE_LIMIT_ASKS_PER_MIN") || 30),
+    dailyBudgetUsd: Number(get("GRANDMA_DAILY_BUDGET_USD") || 5),
     dataDir: join(REPO_ROOT, "data"),
     varDir: get("VAR_DIR") || join(REPO_ROOT, "var"),
     webDist: join(REPO_ROOT, "apps/web/dist"),

@@ -33,11 +33,11 @@ Roles (see §4): **AI** = AI/backend, **EV** = evaluation, **FE** = frontend/gam
 - [ ] (all) Write and submit the proposal
 
 ### M1: Core engine (≈ 25 h)
-- [ ] (AI) `packages/engine`: zod schemas matching `grandma.schema.json`, world loader, validator for worlds
-- [ ] (AI) Turn pipeline: context builder (config A), Haiku call with structured output, reply validator, retry and fallback
-- [ ] (AI) Stamina and intent rules, nap logic, guess checking
-- [ ] (AI) `packages/worldgen`: seeded skeleton generator, Opus enrichment, recipe selector
-- [ ] (EV) Mini eval set of 100 questions × 2 Grandmas, plus a contradiction checker (rule-based first)
+- [x] (AI) `packages/engine`: zod schemas matching `grandma.schema.json`, world loader, validator for worlds (`npm run validate`)
+- [x] (AI) Turn pipeline: context builder (config A), Haiku call with structured output, reply validator, retry and fallback
+- [x] (AI) Stamina and intent rules, nap logic, guess checking
+- [ ] (AI) `packages/worldgen`: seeded skeleton generator, Opus enrichment, recipe selector (only a README so far; Rosie is hand-written)
+- [ ] (EV) Mini eval set of 100 questions × 2 Grandmas, plus a contradiction checker (rule-based first). Partly done: 60-question bank + 32 red-team prompts for Rosie, rule-based contradiction check in the validator; second Grandma missing
 - [ ] (AR) Write persona guides and the deflection-line bank (40 lines), and curate the anchor list (30 public events)
 - [x] (FE) Grey-box 3D room from the scene manifest: walking, collision, interact prompts, UI overlay (scaffolded 11/12)
 - [ ] (FE) Playtest the controls and the room layout; tune walking speed, interact distance and the camera
@@ -57,6 +57,7 @@ From `docs/05-playtest-review.md`. Do these before any new features: they make t
 - [x] (AI/AR) Notes rewritten as inference hops. Medium is now Maple412, with Cherry/27 as the competing answer. Chain maps are in `data/grandmas/rosie.chains.md`
 - [x] (AI) `Recipe.separate`: a reply may use only one link of a chain (validator and mock), with tests
 - [x] (AI) Persona rule: Grandma doesn't connect memories in time; the player builds the timeline
+- [x] (AI) Self-corrections (GDD §3.2), 11/13: "1962… no, '61" on memories marked `misremembers` only, always ending on the true year; validator, mock, prompt, notebook and golden probes
 - [x] (AR) Clue objects carry a route for each slot fact (album, wedding photo, TV plate, house number)
 - [x] (FE) Talking needs Grandma within earshot (3.2 m); a hint explains why when you're too far
 - [x] (FE/AI) Slot-based router: one box per note slot; the server assembles and formats the password and says how many parts are right
@@ -91,6 +92,14 @@ From `docs/05-playtest-review.md`. Do these before any new features: they make t
 - [x] (FE) She turns her head toward the player when they are in front of her
 - [x] (FE) Voice: babble blips made in code (pitch and pace by mood), plus notebook and router chimes; M mutes; no audio files
 - [x] (FE) While talking, the chat moves to the right so she stays visible; outside talk mode the log is shorter
+- [x] (FE) No clipping in the chair (11/13): she sits square in a plain KayKit armchair, elbows tucked inside the armrests, and the lap blanket is a cloth draped over the knees (`scene/blanket.ts`, unit-tested) instead of two boxes
+- [x] (FE) Hands and gestures: relaxed fingers; a teacup in her right hand (tea level follows the tea meter) that she sips from every 12–22 s when idle; her left hand gestures palm-up while she talks happily; she pushes up her glasses when confused or suspicious
+- [x] (FE) Spoken voice: she reads her lines aloud with the browser's speech voice (rate and pitch by mood); her talking animation lasts as long as the voice. Settings: spoken, babble blips or silent
+- [x] (FE) Ask out loud: V or the 🎤 button uses the browser's speech recognition; interim words fill the box and the final words are sent. Only starts on a key press or click; Settings explains that Chrome sends the audio to Google's speech service
+- [x] (FE) Mouth moves while she talks (11/13): the model has no jaw bone or face shapes, so a small mouth placed on her lips (found from the face vertices) opens and closes in syllable rhythm while her voice plays. True lip sync would need a jaw bone or visemes
+- [x] (FE) Cup-hand pose (11/13): a forearm roll turns her palm up so the cup sits in it; the sip brings the cup to her lips; the talking hand is palm up too
+- [x] (FE/AI) Reading glasses (GDD §4), 11/13: on the coffee table; once per visit they reveal the smudged part of the note (a server rule)
+- [ ] (all) Human check of voice input in Chrome and Edge (microphone permission flow; not automatable without granting the mic)
 - [ ] (AR) Face pass: older features (Blender, or a stylised face texture)
 - [ ] (all) Muted test (Phase 5 exit): 4 of 5 testers can name her mood without reading
 
@@ -101,23 +110,29 @@ From `docs/05-playtest-review.md`. Do these before any new features: they make t
 - [x] (FE/AI) Settings (O, or the title screen): mouse sensitivity, field of view, invert Y, relaxed mode (tea never drains; server rule; marked on the result card)
 - [x] (FE) Retro post-process: warm grade, 4×4 ordered dither, posterize (Settings: "Retro filter"; `?post=0` to compare)
 - [ ] (AR) Set dressing that carries second and third clue routes; Grandma's face pass
+- [x] (FE) Text size (85–160%) and a readable-font option (GDD §10), 11/13; every panel scales, the 3D view doesn't
 - [ ] (all) Two reviewers score rubric dimensions 8 (visuals) and 9 (audio) (Phase 6 exit)
 
 Phases 4 and 7 (live Grandma, balance) need the course key and human playtesters; see `docs/06-skill-review-and-plan.md`.
 
 ### M2: Web vertical slice (≈ 30 h)
-- [ ] (AI) `apps/server`: Hono endpoints, in-memory session store, rate limiting, `.env` handling
-- [ ] (FE) Polish the overlay (chat log, inspect card, note card, router panel, result card) and the interaction feel
-- [ ] (FE) Result card and copy-to-clipboard, notebook pinning
-- [ ] (FE) Voice input through server-side speech-to-text, mishear pun table (stretch)
+- [x] (AI) `apps/server`: Hono endpoints, in-memory session store, rate limiting, `.env` handling
+- [x] (FE) Polish the overlay (chat log, inspect card, note card, router panel, result card) and the interaction feel (Phases 1 and 3)
+- [x] (FE) Result card and copy-to-clipboard, notebook pinning (11/13: highlight any of Grandma's words, or click 📌 on her line, to pin it; pins sit at the top of the notebook and can be removed)
+- [ ] (FE) Voice input through server-side speech-to-text, mishear pun table (stretch). Browser speech input and spoken replies done 11/13 (`apps/web/src/voice.ts`). Mishears done 11/13 (`packages/engine/src/mishear.ts`, pun table in `data/i18n/en.json`): a spoken question the recognizer was unsure of (confidence < 0.8) may have one word swapped ("grandpa" → "grand piano"), at most 1 in 5 questions, never in relaxed mode; she reacts with a canned line that reveals no facts, it costs no tea and doesn't count as a question, and the word is shown big ("GRAND PIANO?!"). Server-side STT and the hearing-aid item are not started
 - [x] (AR) First art pass: CC0 furniture (KayKit, Kenney), a posed and dressed Quaternius Grandma, code-made clue props; all listed in `CREDITS.md`
 - [ ] (AR) Polish: a unified retro palette, Grandma's face (older features), and Blender versions of the code-made props if we want more detail
 - [ ] (AR) Low-poly Grandma with 6 mood poses or expressions; clue-object models
-- [ ] (AR) Babble audio and music loop (licensed or original)
-- [ ] (AI) Config B (retrieval) behind a flag
-- [ ] (EV) AI player agent v1, which plays through the same server API
+- [ ] (AR) Babble audio and music loop (licensed or original). Babble and chimes done in code; no music yet
+- [x] (AI) Config B (retrieval) behind a flag (`--context retrieval` in the eval)
+- [x] (EV) AI player agent v1, which plays through the same server API (`npm run eval:player`; not yet run with the course key)
 
 ### M3: Evaluation and playtests (≈ 20 h)
+- [x] (EV) Golden transcripts (TDD §11), 11/13: 20 conversations replayed against the validator in the test suite (`eval/data/golden.v1.json`, `npm run eval:golden`); LLM transcripts to add once the key is in `.env`
+- [x] (EV) Play stats, 11/13: `npm run stats` turns the server's turn logs into per-puzzle solve rates and questions-to-solve against par, daily results, and the real Grandma's spend, latency, retries, fallbacks and cache share (aggregates only; the cost dashboard, as a report)
+- [x] (AI) Daily Grandma, 11/13: same Grandma, note and greeting for everyone each UTC day (`GET /api/daily`, `daily: true`), each puzzle once per seeded cycle and never twice in a row; first finished visit counts, replays are practice; streak and countdown on the title screen; "Grandma #N · Daily" on the result card. With one Grandma the pool is 3 puzzles. Global stats added the same day: "Everyone today: 12 of 30 finished visits solved it (40%) · usually in 9 questions" once 3 visits have finished
+- [x] (AI) Cost guard, 11/13: daily model budget (`GRANDMA_DAILY_BUDGET_USD`, default $5) and a kill-switch file (`var/KILL`); past either, the offline Grandma answers and players are told
+- [x] (AI) Running summary in the LLM context (TDD §5④), 11/13: memories already told and objects shown before the 6-exchange window, plus questions and tea; no extra model call
 - [ ] (EV) Full eval runs (`docs/04-evaluation-plan.md`): consistency, entities, leakage, solvability, latency, cost
 - [ ] (EV) Calibrate the LLM judge against 100 human-labeled replies (report Cohen's κ)
 - [ ] (EV) Ablations: config A vs B, effort level, with/without validator
@@ -125,7 +140,7 @@ Phases 4 and 7 (live Grandma, balance) need the course key and human playtesters
 - [ ] (AI/FE) Balance stamina costs and par values from the data
 
 ### M4: Polish and present (≈ 15 h)
-- [ ] (FE) Bug bash, loading and error states, a mobile-width sanity check
+- [ ] (FE) Bug bash, loading and error states, a mobile-width sanity check. Done 11/13 for loading and errors: a progress pill while models load; failed questions say so in the chat and stay in the box for a retry; proxy pages, crashes and malformed replies show one plain sentence instead of raw errors (`apps/web/test/api.test.ts`). Phone width: the title says the game needs a keyboard and mouse, and the controls banner no longer covers the HUD. Touch controls are out of scope; the full bug bash is still open
 - [ ] (AR) 30-second trailer or clip, presentation slides
 - [ ] (EV) Final results tables and charts
 - [ ] (all) Final report and code submission. Include the AI-assistance disclosure required by the course

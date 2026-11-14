@@ -3,10 +3,10 @@
  * and returns a RunView; this store only mirrors it and tracks UI state (panels, focus, pointer lock).
  */
 import { create } from "zustand";
-import type { HealthResponse, PublicScene, RunView } from "@gwp/engine";
+import type { DailyInfo, HealthResponse, PublicScene, RunView } from "@gwp/engine";
 import { api } from "./api.ts";
 import { t } from "./strings.ts";
-import { costWhy, extractNotes } from "./notebook.ts";
+import { addPin, costWhy, extractNotes } from "./notebook.ts";
 import { useSettings } from "./settings.ts";
 
 export type Panel = { type: "inspect"; objectId: string } | { type: "note" } | { type: "router" } | { type: "notebook" } | { type: "settings" } | null;
@@ -36,6 +36,10 @@ export interface NoteEntry {
 
 interface GameState {
   health: HealthResponse | null;
+  /** Today's Daily Grandma (null if the server couldn't say). */
+  daily: DailyInfo | null;
+  /** When `daily` was fetched (ms), so the countdown can tick without asking the server. */
+  dailyAt: number;
   scene: PublicScene | null;
   run: RunView | null;
   log: LogLine[];
@@ -56,15 +60,30 @@ interface GameState {
   inEarshot: boolean;
   /** A short message shown for a moment (e.g. "Grandma can't hear you from over here"). */
   hint: { text: string; at: number } | null;
+  /** The last thing Grandma misheard (shown big for a moment: "PASS THE SWORD?!"). */
+  mishear: { as: string; at: number } | null;
   /** The player has looked around with the mouse at least once, so the full controls hint can go. */
   controlsLearned: boolean;
   /** Clue objects the player has inspected this visit (for the objectives strip). */
   inspected: string[];
   notebook: NoteEntry[];
+  /** Quotes the player pinned from the chat (game design §5: highlight to pin). */
+  pins: string[];
+  /** Grandma's voice is playing (browser speech). Drives her talking animation. */
+  grandmaSpeaking: boolean;
+  /** The microphone is listening for the player's question. */
+  listening: boolean;
+  /** Bumped by the V key to start listening (the chat box owns the microphone). */
+  voiceTick: number;
 
   init(): Promise<void>;
   start(difficulty: "easy" | "medium" | "hard"): Promise<void>;
-  ask(text: string): Promise<void>;
+  /** Visit today's Daily Grandma. */
+  startDaily(): Promise<void>;
+  /** Fetch today's Daily Grandma again (after a visit, or when the day rolls over). */
+  refreshDaily(): void;
+  /** Ask Grandma; resolves false if the question didn't reach her (so the box can keep it). */
+  ask(text: string, voice?: { confidence: number }): Promise<boolean>;
   /** Show the carried clue to Grandma (must be near her). */
   showCarried(): Promise<void>;
   /** Give the carried cookie to Grandma (must be near her). */
@@ -80,6 +99,11 @@ interface GameState {
   setNearGrandma(near: boolean): void;
   setInEarshot(inEarshot: boolean): void;
   showHint(text: string): void;
+  /** Pin a quote to the notebook; returns false if it was too short or already pinned. */
+  pin(text: string): boolean;
+  /** Put on Grandma's reading glasses (once per visit); opens the now-readable note. */
+  putOnGlasses(): Promise<void>;
+  unpin(index: number): void;
   /** Esc: back out of exactly one layer (card, then talk). Returns false if there was nothing to close. */
   back(): boolean;
   leave(): void;
@@ -114,8 +138,16 @@ export const useGame = create<GameState>((set, get) => {
     });
   };
 
+  /** Enter a freshly created visit. */
+  const enter = async (run: RunView) => {
+    const scene = get().scene?.id === run.sceneId ? get().scene : await api.scene(run.sceneId);
+    set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy", seq: ++seq }], panel: null, noteSeen: false, carrying: null, talking: false, inspected: [], notebook: [], pins: [], hint: null, mishear: null });
+  };
+
   return {
     health: null,
+    daily: null,
+    dailyAt: 0,
     scene: null,
     run: null,
     log: [],
@@ -131,11 +163,21 @@ export const useGame = create<GameState>((set, get) => {
     nearGrandma: false,
     inEarshot: false,
     hint: null,
+    mishear: null,
     controlsLearned: false,
     inspected: [],
     notebook: [],
+    pins: [],
+    grandmaSpeaking: false,
+    listening: false,
+    voiceTick: 0,
 
     async init() {
+      // The daily is optional: the title screen just hides it if this fails.
+      void api.daily().then(
+        (daily) => set({ daily, dailyAt: Date.now() }),
+        () => set({ daily: null }),
+      );
       try {
         set({ health: await api.health() });
       } catch (e) {
@@ -144,25 +186,36 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     async start(difficulty) {
-      await act(async () => {
-        const run = await api.createRun(difficulty, useSettings.getState().relaxed);
-        const scene = get().scene?.id === run.sceneId ? get().scene : await api.scene(run.sceneId);
-        set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy" }], panel: null, noteSeen: false, carrying: null, talking: false, inspected: [], notebook: [] });
-      });
+      await act(async () => enter(await api.createRun(difficulty, useSettings.getState().relaxed)));
     },
 
-    async ask(text) {
+    async startDaily() {
+      await act(async () => enter(await api.createDaily(useSettings.getState().relaxed)));
+    },
+
+    async ask(text, voice) {
       const run = get().run;
-      if (!run || !text.trim()) return;
-      if (!get().inEarshot) return get().showHint(t("talk.tooFar"));
+      if (!run || !text.trim() || get().busy) return false;
+      if (!get().inEarshot) {
+        get().showHint(t("talk.tooFar"));
+        return false;
+      }
       push({ who: "player", text });
-      const res = await act(() => api.ask(run.runId, text));
-      if (!res) return;
+      const res = await act(() => api.ask(run.runId, text, voice));
+      if (!res) {
+        push({ who: "system", text: t("error.askFailed") });
+        return false;
+      }
+      if (res.misheard) {
+        push({ who: "system", text: t("mishear.line", { heard: res.misheard.heard }) });
+        set({ mishear: { as: res.misheard.as, at: Date.now() } });
+      }
       push({ who: "grandma", text: res.reply, mood: res.mood, cost: res.cost, costWhy: costWhy(res.costParts) });
       if (res.after) push({ who: "grandma", text: res.after, mood: "sleepy" });
       if (res.nudge) push({ who: "grandma", text: res.nudge, mood: "nostalgic" });
       learn(res.reply, "grandma");
       set({ run: res.run });
+      return true;
     },
 
     async showCarried() {
@@ -170,10 +223,16 @@ export const useGame = create<GameState>((set, get) => {
       if (!run || carrying?.kind !== "clue" || !nearGrandma) return;
       const obj = get().scene?.interactables.find((i) => i.id === carrying.objectId);
       if (!obj) return;
+      // She's still answering: keep the clue in hand rather than losing it to a skipped request.
+      if (get().busy) return get().showHint(t("talk.wait"));
       push({ who: "player", text: `[shows the ${obj.label}]` });
       set({ panel: null, carrying: null });
       const res = await act(() => api.show(run.runId, obj.id));
-      if (!res) return;
+      if (!res) {
+        push({ who: "system", text: t("error.showFailed", { item: obj.label }) });
+        set({ carrying });
+        return;
+      }
       push({ who: "grandma", text: res.reply, mood: res.mood, cost: res.cost, costWhy: costWhy(res.costParts) });
       if (res.after) push({ who: "grandma", text: res.after, mood: "sleepy" });
       if (res.nudge) push({ who: "grandma", text: res.nudge, mood: "nostalgic" });
@@ -184,11 +243,26 @@ export const useGame = create<GameState>((set, get) => {
     async giveCookie() {
       const { run, carrying, nearGrandma } = get();
       if (!run || carrying?.kind !== "cookie" || !nearGrandma) return;
+      if (get().busy) return get().showHint(t("talk.wait"));
       set({ carrying: null });
       const res = await act(() => api.cookie(run.runId));
-      if (!res) return;
+      if (!res) {
+        push({ who: "system", text: t("error.showFailed", { item: t("cookie.label") }) });
+        set({ carrying });
+        return;
+      }
       push({ who: "grandma", text: res.line, mood: "happy" });
       set({ run: res.run, panel: null });
+    },
+
+    async putOnGlasses() {
+      const run = get().run;
+      if (!run) return;
+      const res = await act(() => api.glasses(run.runId));
+      if (!res) return;
+      push({ who: "grandma", text: res.line, mood: "happy" });
+      const cleared = !run.glasses && res.run.glasses;
+      set({ run: res.run, panel: cleared ? { type: "note" } : null, noteSeen: true });
     },
 
     take(item) {
@@ -200,16 +274,33 @@ export const useGame = create<GameState>((set, get) => {
       if (!run) return null;
       const res = await act(() => api.guess(run.runId, parts));
       if (!res) return null;
+      if (!res.correct) {
+        const tried = t("router.tried", { guess: parts.join(" + ") });
+        const count = res.partsTotal ? ` ${t("router.partial", { n: res.partsCorrect ?? 0, total: res.partsTotal })}` : "";
+        push({ who: "system", text: `${tried}${count}` });
+      }
       push({ who: "grandma", text: res.line, mood: res.correct ? "happy" : "confused" });
       set({ run: res.run, panel: res.run.status === "playing" ? get().panel : null });
       return { correct: res.correct, partsCorrect: res.partsCorrect, partsTotal: res.partsTotal };
+    },
+
+    pin(text) {
+      const pins = get().pins;
+      const next = addPin(pins, text);
+      if (next === pins) return false;
+      set({ pins: next });
+      return true;
+    },
+
+    unpin(index) {
+      set({ pins: get().pins.filter((_, i) => i !== index) });
     },
 
     openPanel(panel) {
       set({ panel, noteSeen: get().noteSeen || panel?.type === "note" });
       if (panel?.type === "inspect") {
         const obj = get().scene?.interactables.find((i) => i.id === panel.objectId);
-        if (obj && !get().inspected.includes(obj.id)) set({ inspected: [...get().inspected, obj.id] });
+        if (obj?.kind === "clue" && !get().inspected.includes(obj.id)) set({ inspected: [...get().inspected, obj.id] });
         if (obj?.inspect_text) learn(obj.inspect_text, "object");
       }
     },
@@ -248,7 +339,16 @@ export const useGame = create<GameState>((set, get) => {
       return false;
     },
     leave() {
-      set({ run: null, log: [], panel: null, carrying: null, talking: false });
+      window.speechSynthesis?.cancel();
+      set({ run: null, log: [], panel: null, carrying: null, talking: false, grandmaSpeaking: false, hint: null, mishear: null });
+      get().refreshDaily();
+    },
+
+    refreshDaily() {
+      void api.daily().then(
+        (daily) => set({ daily, dailyAt: Date.now() }),
+        () => undefined, // keep what we had
+      );
     },
   };
 });

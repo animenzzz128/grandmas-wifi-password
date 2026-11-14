@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractNotes } from "../src/notebook.ts";
+import { addPin, extractNotes, PIN_MAX } from "../src/notebook.ts";
 
 describe("notebook extraction", () => {
   it("records names, years, places and numbers from Grandma's words", () => {
@@ -37,5 +37,28 @@ describe("notebook noise", () => {
   it("ignores caps phrases on plaques but keeps a single carved name", () => {
     const n = extractNotes("A little gold bowling pin trophy. The plaque says: TUESDAY LEAGUE, HIGH GAME, 212. Someone carved MIKEY into the seat.", "object");
     expect(n.filter((e) => e.kind === "name").map((e) => e.value)).toEqual(["MIKEY"]);
+  });
+});
+
+describe("pinning quotes", () => {
+  it("tidies whitespace and ignores tiny or duplicate quotes", () => {
+    let pins = addPin([], "  Walt proposed on\n Christmas Eve, 1960 ");
+    expect(pins).toEqual(["Walt proposed on Christmas Eve, 1960"]);
+    expect(addPin(pins, "ok")).toBe(pins);
+    expect(addPin(pins, "Christmas Eve")).toBe(pins);
+    pins = addPin(pins, "Biscuit stole every sock");
+    expect(pins).toHaveLength(2);
+  });
+
+  it("replaces a shorter pin when the player pins the whole sentence around it", () => {
+    const pins = addPin(["Maple Avenue"], "In 1964 we bought the house on Maple Avenue.");
+    expect(pins).toEqual(["In 1964 we bought the house on Maple Avenue."]);
+  });
+
+  it("cuts very long quotes at a word", () => {
+    const long = "word ".repeat(100);
+    const [pin] = addPin([], long);
+    expect(pin!.length).toBeLessThanOrEqual(PIN_MAX + 1);
+    expect(pin!.endsWith("word…")).toBe(true);
   });
 });
