@@ -24,7 +24,8 @@ The license text of each pack is in its download (`License.txt` / `License_Stand
 These are built in code, so there is no third-party license to track:
 - Props: bowling trophy, blue ribbon, sled, fishing rod and tackle box, cookie jar, router, sticky note, house number sign, front door, window and curtains (`apps/web/src/scene/handmade.tsx`).
 - Surface textures: wood floor, wallpaper with wainscot, ceiling (`apps/web/src/scene/textures.ts`).
-- Sounds: Grandma's babble voice and the UI chimes are synthesised at runtime with WebAudio (`apps/web/src/audio.ts`); there are no audio files. Her spoken voice is the browser's own speech-synthesis voice (`apps/web/src/voice.ts`), so nothing is bundled.
+- Sounds: Grandma's babble voice and the UI chimes are synthesised at runtime with WebAudio (`apps/web/src/audio.ts`); there are no audio files.
+- Music: the room loop "Kolaczki Rag" (8 bars, `apps/web/src/audio.ts`) was written note by note in code by Claude Code (Claude Opus 5.5, AI) under Jacky Yao's direction, 2026-11-16, and is played by the same WebAudio synth. It is AI-generated music: see the disclosure note below. Her spoken voice is the browser's own speech-synthesis voice (`apps/web/src/voice.ts`), so nothing is bundled.
 - Grandma's lap blanket (draped cloth, `apps/web/src/scene/blanket.ts`), glasses and teacup; the spare reading glasses on the coffee table (`handmade.tsx`).
 
 ## Updating the art
@@ -33,7 +34,7 @@ These are built in code, so there is no third-party license to track:
 
 ## AI-generated content
 
-No AI-generated 3D models, textures, music or sound are used. If that changes (for example a paid Meshy model), list it here **and** in the Steam "AI generated content" disclosure.
+No AI-generated 3D models, textures or sound effects are used. The room music is AI-written (see above). If that changes (for example a paid Meshy model), list it here **and** in the Steam "AI generated content" disclosure.
 
 ---
 *Drafted with Claude Code (Claude Opus 5.5) under Jacky Yao's direction. Please re-check the sources and licenses before a public release.*

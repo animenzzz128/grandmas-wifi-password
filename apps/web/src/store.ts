@@ -5,9 +5,10 @@
 import { create } from "zustand";
 import type { DailyInfo, HealthResponse, PublicScene, RunView } from "@gwp/engine";
 import { api } from "./api.ts";
-import { t } from "./strings.ts";
+import { hasString, t } from "./strings.ts";
 import { addPin, costWhy, extractNotes } from "./notebook.ts";
 import { useSettings } from "./settings.ts";
+import { firstTime, markVisited } from "./firsts.ts";
 
 export type Panel = { type: "inspect"; objectId: string } | { type: "note" } | { type: "router" } | { type: "notebook" } | { type: "settings" } | null;
 
@@ -125,6 +126,8 @@ export const useGame = create<GameState>((set, get) => {
   }
 
   let seq = 0;
+  /** Objects Grandma has already reacted to this visit. */
+  const barked = new Set<string>();
   const push = (...lines: LogLine[]) => set((s) => ({ log: [...s.log, ...lines.map((l) => ({ ...l, seq: ++seq }))].slice(-60) }));
 
   /** Add what a text mentions (years, names, places, numbers) to the notebook, without duplicates. */
@@ -141,6 +144,7 @@ export const useGame = create<GameState>((set, get) => {
   /** Enter a freshly created visit. */
   const enter = async (run: RunView) => {
     const scene = get().scene?.id === run.sceneId ? get().scene : await api.scene(run.sceneId);
+    barked.clear();
     set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy", seq: ++seq }], panel: null, noteSeen: false, carrying: null, talking: false, inspected: [], notebook: [], pins: [], hint: null, mishear: null });
   };
 
@@ -186,10 +190,12 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     async start(difficulty) {
+      markVisited();
       await act(async () => enter(await api.createRun(difficulty, useSettings.getState().relaxed)));
     },
 
     async startDaily() {
+      markVisited();
       await act(async () => enter(await api.createDaily(useSettings.getState().relaxed)));
     },
 
@@ -214,7 +220,15 @@ export const useGame = create<GameState>((set, get) => {
       if (res.after) push({ who: "grandma", text: res.after, mood: "sleepy" });
       if (res.nudge) push({ who: "grandma", text: res.nudge, mood: "nostalgic" });
       learn(res.reply, "grandma");
+      // Her tea dips under 30: she says she's flagging, so tiredness shows before the first nap (plan C1).
+      if (run.stamina > 30 && res.run.stamina <= 30 && res.run.status === "playing" && !res.napped) push({ who: "grandma", text: t("bark.yawn"), mood: "sleepy" });
       set({ run: res.run });
+      // Teach each rule the first time it happens, once per browser (plan A4), not in a wall of text up front.
+      const lesson = (key: string, when: boolean) => when && firstTime(key) && push({ who: "system", text: t(`lesson.${key}`) });
+      lesson("tea", res.cost > 0 && !res.run.relaxed);
+      lesson("followUp", (res.costParts?.followUp ?? 0) < 0);
+      lesson("nap", res.napped && res.run.status === "playing");
+      lesson("cookie", res.run.status === "playing" && !res.run.relaxed && res.run.cookies > 0 && res.run.stamina <= 40);
       return true;
     },
 
@@ -252,7 +266,9 @@ export const useGame = create<GameState>((set, get) => {
         return;
       }
       push({ who: "grandma", text: res.line, mood: "happy" });
-      set({ run: res.run, panel: null });
+      // Not eaten (her tea is still high): the cookie stays in the player's hand for later.
+      const kept = res.run.cookies === run.cookies && res.run.cookies > 0;
+      set({ run: res.run, panel: null, carrying: kept ? carrying : null });
     },
 
     async putOnGlasses() {
@@ -302,6 +318,15 @@ export const useGame = create<GameState>((set, get) => {
         const obj = get().scene?.interactables.find((i) => i.id === panel.objectId);
         if (obj?.kind === "clue" && !get().inspected.includes(obj.id)) set({ inspected: [...get().inspected, obj.id] });
         if (obj?.inspect_text) learn(obj.inspect_text, "object");
+        // The first time the player picks something up, Grandma reacts: a canned line, no model call, no tea,
+        // no facts. The room and the conversation feed each other (plan C2).
+        const run = get().run;
+        if (obj && run?.status === "playing" && !barked.has(obj.id)) {
+          barked.add(obj.id);
+          const variants = ["a", "b"].map((v) => `bark.${obj.id}.${v}`).filter(hasString);
+          const pickIt = variants[(run.runId.length + obj.id.length + barked.size) % Math.max(1, variants.length)];
+          if (pickIt) push({ who: "grandma", text: t(pickIt), mood: "teasing" });
+        }
       }
     },
     focusChat() {

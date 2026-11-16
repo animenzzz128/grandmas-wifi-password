@@ -140,6 +140,25 @@ export function resolveSelfCorrections(text: string, allowed?: ReadonlyMap<numbe
   });
 }
 
+/**
+ * The text as plain characters: fullwidth and other compatibility forms folded to ASCII ("Ｂｉｓ１９" → "Bis19")
+ * and invisible format characters (zero-width spaces and joiners) removed. Every check reads this form, so
+ * look-alike characters can't carry a password past them (security review, iteration 34).
+ */
+export function plainText(text: string): string {
+  return text.normalize("NFKC").replace(/\p{Cf}/gu, "");
+}
+
+/** Letters outside the Latin script and digits other than 0–9 (after `plainText`): look-alikes the checks can't read. */
+export function foreignChars(text: string): string[] {
+  return [...new Set(text.match(/[\p{L}\p{N}]/gu)?.filter((c) => !/[0-9]|\p{Script=Latin}/u.test(c)) ?? [])];
+}
+
+/** Single digits said one at a time ("1 9 6 1", "4-1-2") joined into one number. */
+export function spacedDigitRuns(text: string): string[] {
+  return [...text.matchAll(/\b\d(?:[\s.,\-–]+\d\b){2,}/g)].map((m) => m[0].replace(/\D/g, ""));
+}
+
 const DIGIT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 const TEENS = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
 const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
@@ -168,7 +187,7 @@ const UNDER_100 = String.raw`(?:(?:${TENS.slice(2).join("|")})(?:[\s-]+(?:${DIGI
 /**
  * Other ways a reply can spell out an answer part, for the leak check (technical design §5⑥d):
  * short years ('61 → 1961 and 2061), spelled years ("nineteen sixty-one" → 1961), runs of digit words
- * ("four one two" → 412) and letter-by-letter words ("B-i-s-c-u-i-t" → Biscuit). Returns the text with
+ * ("four one two" → 412), digits one at a time ("1 9 6 1" → 1961) and letter-by-letter words ("B-i-s-c-u-i-t" → Biscuit). Returns the text with
  * those forms added, so a check that looks for the plain forms also catches them.
  */
 export function leakForms(text: string): string {
@@ -182,5 +201,6 @@ export function leakForms(text: string): string {
   const digits = new RegExp(String.raw`\b(?:${DIGIT_WORDS.join("|")})(?:[\s,-]+(?:${DIGIT_WORDS.join("|")}))+\b`, "gi");
   for (const m of text.matchAll(digits)) extra.push(m[0].toLowerCase().split(/[\s,-]+/).map((w) => DIGIT_WORDS.indexOf(w)).join(""));
   for (const m of text.matchAll(/\b[A-Za-z](?:[\s.\-–]+[A-Za-z]\b){2,}/g)) extra.push(m[0].replace(/[^A-Za-z]/g, ""));
+  extra.push(...spacedDigitRuns(text));
   return extra.length ? `${text} ${extra.join(" ")}` : text;
 }

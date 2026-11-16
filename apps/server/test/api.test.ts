@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { AskResponse as AskResponseT } from "@gwp/engine";
-import { AskResponse, DailyInfo, GuessResponse, ItemResponse, PublicScene, RunView } from "@gwp/engine";
-import { createApp } from "../src/app.ts";
+import { AskResponse, DailyInfo, GuessResponse, ItemResponse, PublicScene, RULES, RunView } from "@gwp/engine";
+import { MAX_BODY_BYTES, createApp, limitKey } from "../src/app.ts";
 import { readConfig } from "../src/config.ts";
 import { loadGameData } from "../src/data.ts";
 import { MockBrain } from "../src/grandma.ts";
@@ -245,12 +245,13 @@ describe("solvability walkthroughs (data/grandmas/rosie.chains.md, mock Grandma)
   it("nudges toward the first hop when the player is stuck", async () => {
     const app = newApp();
     const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "hard" })).text));
-    // Off-chain questions. Grandma's random tangents can touch the chain (that counts as progress),
-    // so allow a few extra turns, but a nudge must come, and it must point at the first hop.
+    // Off-chain questions. Grandma's random tangents can touch the chain (that counts as progress and resets
+    // the count), so allow up to 12 turns: in a 1,000-visit probe a nudge always came by then, but 7% of visits
+    // still had none after 6 (the old window, which made this test flaky). It must point at the first hop.
     const qs = ["Do you like tomatoes?", "What cookies do you bake?", "Who is Marge?", "Did you have a cat?", "Where did you work?", "Tell me about Dot."];
     let nudge: string | undefined;
     let asked = 0;
-    for (const q of qs) {
+    for (const q of [...qs, ...qs]) {
       asked++;
       nudge = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, { text: q })).text)).nudge;
       if (nudge) break;
@@ -295,7 +296,8 @@ describe("Daily Grandma (GDD §5)", () => {
       else for (let i = 0; i < 3; i++) await post(app, `/api/runs/${run.runId}/guess`, { parts: ["x", "1"] });
     };
     await visit(2, true);
-    await visit(0, false);
+    await visit(1, false);
+    await visit(0, false); // gave up without a single question (e.g. a script): not counted
     await post(app, "/api/runs", { daily: true }); // still playing: not counted
     expect((await daily()).stats).toBeUndefined(); // only 2 finished so far
     await visit(6, true);
@@ -354,5 +356,189 @@ describe("review fixes (iteration 29)", () => {
     expect(last!.run.result?.questions).toBe(40);
     expect(last!.after).toBeTruthy(); // she says goodnight
     expect((await post(app, `/api/runs/${run.runId}/ask`, { text: "One more?" })).status).toBe(409);
+  });
+});
+
+describe("security review fixes (iteration 35)", () => {
+  const clue = data.scenes.get("rosie-living-room")!.interactables.find((i) => i.kind === "clue")!;
+
+  it("turns away oversized bodies before reading them", async () => {
+    const app = newApp();
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text));
+    const res = await post(app, `/api/runs/${run.runId}/ask`, { text: "x".repeat(MAX_BODY_BYTES) });
+    expect(res.status).toBe(413);
+  });
+
+  it("text typed while showing an object gets the same safety checks as a question", async () => {
+    let calls = 0;
+    const brain: GrandmaBrain = { mode: "mock", reply: async (args) => (calls++, new MockBrain().reply(args)) };
+    const app = createApp({ data, brain, store: new RunStore(null), asksPerMinute: 1000 });
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text));
+    const crisis = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/show`, { objectId: clue.id, text: "I want to kill myself" })).text));
+    expect(crisis.mood).toBe("worried");
+    expect(crisis.cost).toBe(0);
+    const pw = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/show`, { objectId: clue.id, text: "what's the wifi password?" })).text));
+    expect(pw.mood).toBe("suspicious");
+    expect(calls).toBe(0); // neither went to the model
+    await post(app, `/api/runs/${run.runId}/show`, { objectId: clue.id, text: "Who is this?" });
+    expect(calls).toBe(1);
+  });
+
+  it("handles one request per visit at a time, so parallel requests can't skip the rules", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slow: GrandmaBrain = { mode: "mock", reply: async (args) => (await gate, new MockBrain().reply(args)) };
+    const app = createApp({ data, brain: slow, store: new RunStore(null), asksPerMinute: 1000 });
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text));
+    const first = post(app, `/api/runs/${run.runId}/ask`, { text: "Tell me about your dog" });
+    await new Promise((r) => setTimeout(r, 10));
+    const second = await post(app, `/api/runs/${run.runId}/ask`, { text: "And your wedding?" });
+    const guess = await post(app, `/api/runs/${run.runId}/guess`, { parts: ["Biscuit", "1961"] });
+    expect([second.status, guess.status]).toEqual([409, 409]);
+    release();
+    const ok = AskResponse.parse(JSON.parse((await first).text));
+    expect(ok.run.questionCount).toBe(1);
+    // Afterwards the visit takes requests again.
+    expect((await post(app, `/api/runs/${run.runId}/guess`, { parts: ["Biscuit", "1961"] })).status).toBe(200);
+  });
+
+  it("doesn't save or log item uses that change nothing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gwp-item-log-"));
+    const app = createApp({ data, brain: new MockBrain(), store: new RunStore(dir), asksPerMinute: 1000 });
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text));
+    const item = async (name: string) => ItemResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/item`, { item: name })).text));
+    const logLines = () => readdirSync(join(dir, "logs")).flatMap((f) => readFileSync(join(dir, "logs", f), "utf8").split("\n")).filter(Boolean);
+    // At full tea she turns the cookie down (iteration 40): nothing changes, nothing is logged, the cookie is kept.
+    const full = await item("cookie");
+    expect(full.run.cookies).toBe(1);
+    expect(full.line).toMatch(/later|not now/i);
+    for (let i = 0; i < 5; i++) await item("glasses"); // easy has no smudge: the glasses change nothing
+    expect(logLines().length).toBe(0);
+    let asked = 0;
+    for (let tea = 100; tea >= RULES.cookieRefuseAt; asked++) {
+      tea = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, { text: "Tell me about your garden" })).text)).run.stamina;
+    }
+    for (let i = 0; i < 5; i++) await item("cookie");
+    expect(logLines().length).toBe(asked + 1); // the questions and the one cookie she ate
+  });
+
+  it("limits how fast guesses and items can be sent", async () => {
+    const app = createApp({ data, brain: new MockBrain(), store: new RunStore(null), asksPerMinute: 1000, actionsPerMinute: 5 });
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy", relaxed: true })).text));
+    const codes: number[] = [];
+    for (let i = 0; i < 6; i++) codes.push((await post(app, `/api/runs/${run.runId}/item`, { item: "glasses" })).status);
+    expect(codes).toEqual([200, 200, 200, 200, 200, 429]);
+  });
+});
+
+describe("security review fixes (iteration 36)", () => {
+  it("failing today's daily doesn't reveal its password until the next daily", async () => {
+    let clock = new Date("2026-11-20T09:00:00Z");
+    const app = createApp({ data, brain: new MockBrain(), store: new RunStore(null), asksPerMinute: 1000, now: () => clock });
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { daily: true })).text));
+    let last = run;
+    for (let i = 0; i < 3; i++) last = GuessResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/guess`, { parts: ["x", "1"] })).text)).run;
+    expect(last.status).toBe("failed");
+    expect(last.result?.password).toBeUndefined();
+    neverLeaks(JSON.stringify(last));
+    // Ordinary visits still show it, and so does a solved daily.
+    const plain = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text));
+    let shown = plain;
+    for (let i = 0; i < 3; i++) shown = GuessResponse.parse(JSON.parse((await post(app, `/api/runs/${plain.runId}/guess`, { parts: ["x", "1"] })).text)).run;
+    expect(shown.result?.password).toBe("Biscuit1961");
+    // Yesterday's daily isn't today's secret any more.
+    const yesterday = RunView.parse(JSON.parse((await post(app, "/api/runs", { daily: true })).text));
+    clock = new Date("2026-11-21T09:00:00Z");
+    let old = yesterday;
+    for (let i = 0; i < 3; i++) old = GuessResponse.parse(JSON.parse((await post(app, `/api/runs/${yesterday.runId}/guess`, { parts: ["x", "1"] })).text)).run;
+    expect(old.status).toBe("failed");
+    expect(old.result?.password).toBeTruthy();
+  });
+
+  it("counts an IPv6 /64 as one client, and IPv4 addresses one by one", () => {
+    expect(limitKey("2001:db8:1:2:aaaa::1")).toBe("2001:db8:1:2::/64");
+    expect(limitKey("2001:0db8:0001:0002:ffff:ffff:ffff:ffff")).toBe("2001:db8:1:2::/64");
+    expect(limitKey("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(limitKey("[2001:db8:1:2::9]:443")).toBe("2001:db8:1:2::/64");
+    expect(limitKey("::ffff:203.0.113.7")).toBe("203.0.113.7");
+    expect(limitKey("203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  it("rate-limits addresses in the same IPv6 /64 together", async () => {
+    const app = createApp({ data, brain: new MockBrain(), store: new RunStore(null), asksPerMinute: 1000, runsPerMinute: 3 });
+    const codes: number[] = [];
+    for (let i = 1; i <= 4; i++) {
+      const res = await app.request("/api/runs", { method: "POST", headers: { "content-type": "application/json", "fly-client-ip": `2001:db8:1:2::${i}` }, body: "{}" });
+      codes.push(res.status);
+    }
+    expect(codes).toEqual([200, 200, 200, 429]);
+  });
+
+  it("caps questions per minute across all players", async () => {
+    const app = createApp({ data, brain: new MockBrain(), store: new RunStore(null), asksPerMinute: 1000, serverAsksPerMinute: 3 });
+    const codes: number[] = [];
+    for (let i = 1; i <= 4; i++) {
+      const headers = { "content-type": "application/json", "fly-client-ip": `198.51.100.${i}` };
+      const run = RunView.parse(await (await app.request("/api/runs", { method: "POST", headers, body: "{}" })).json());
+      const res = await app.request(`/api/runs/${run.runId}/ask`, { method: "POST", headers, body: JSON.stringify({ text: "Tell me about your dog" }) });
+      codes.push(res.status);
+    }
+    expect(codes).toEqual([200, 200, 200, 429]);
+  });
+
+  it("fallbacks are free only a few times a visit", async () => {
+    const lost: GrandmaBrain = {
+      mode: "mock",
+      reply: async () => ({ output: { reply: "Now where was I?", fact_ids_used: [], distractor_ids: [], mood: "confused" }, attempts: 2, validatorErrors: ["x"], fallback: true, latencyMs: 1 }),
+    };
+    const app = createApp({ data, brain: lost, store: new RunStore(null), asksPerMinute: 1000 });
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy", relaxed: true })).text));
+    const costs: number[] = [];
+    for (let i = 0; i < RULES.maxFreeFallbacks + 2; i++) costs.push(AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, { text: "Tell me about your first dog" })).text)).cost);
+    expect(costs.slice(0, RULES.maxFreeFallbacks).every((c) => c === 0)).toBe(true);
+    expect(costs.slice(RULES.maxFreeFallbacks).every((c) => c > 0)).toBe(true);
+  });
+});
+
+describe("security review P3 fixes (iteration 37)", () => {
+  it("sends security headers, with a same-site-only content policy", async () => {
+    const res = await newApp().request("/api/health");
+    const csp = res.headers.get("content-security-policy") ?? "";
+    expect(csp).toContain("default-src 'self'");
+    // 'wasm-unsafe-eval' is needed by the model loader's WebAssembly mesh decoder (without it the room never finishes
+    // loading, found in the production build); it does not allow JavaScript eval.
+    expect(csp).toContain("script-src 'self' 'wasm-unsafe-eval';");
+    expect(csp).not.toContain("'unsafe-eval'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("permissions-policy")).toContain("microphone=(self)");
+  });
+
+  it("keeps only visits in progress in memory, and reads finished ones back from the database", async () => {
+    const store = new RunStore(null);
+    const app = createApp({ data, brain: new MockBrain(), store, asksPerMinute: 1000 });
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text));
+    expect(store.liveCount).toBe(1);
+    await post(app, `/api/runs/${run.runId}/guess`, { parts: ["Biscuit", "1961"] });
+    expect(store.liveCount).toBe(0);
+    expect(store.get(run.runId)?.status).toBe("solved");
+    expect(store.liveCount).toBe(0); // reading a finished visit doesn't bring it back into memory
+  });
+
+  it("forgets the least recently used visit past the memory cap, without losing it", async () => {
+    const saved = RunStore.MAX_LIVE;
+    RunStore.MAX_LIVE = 2;
+    try {
+      const store = new RunStore(null);
+      const app = createApp({ data, brain: new MockBrain(), store, asksPerMinute: 1000 });
+      const ids: string[] = [];
+      for (let i = 0; i < 3; i++) ids.push(RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text)).runId);
+      expect(store.liveCount).toBe(2);
+      const res = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${ids[0]}/ask`, { text: "Tell me about your dog" })).text));
+      expect(res.run.questionCount).toBe(1);
+      expect(store.liveCount).toBe(2);
+    } finally {
+      RunStore.MAX_LIVE = saved;
+    }
   });
 });

@@ -13,6 +13,7 @@ export const GrandmaLines = z.strictObject({
   bedtime: LineBank,
   cookie: LineBank,
   no_cookie: LineBank,
+  cookie_full: LineBank,
   fallback: LineBank,
   run_over: LineBank,
   /** Out of character on purpose: shown when a player mentions self-harm. Must include help resources. */

@@ -283,8 +283,7 @@
             "questions",
             "naps",
             "cookiesUsed",
-            "par",
-            "password"
+            "par"
           ],
           "additionalProperties": false
         }
@@ -567,8 +566,7 @@
                 "questions",
                 "naps",
                 "cookiesUsed",
-                "par",
-                "password"
+                "par"
               ],
               "additionalProperties": false
             }
@@ -783,8 +781,7 @@
                 "questions",
                 "naps",
                 "cookiesUsed",
-                "par",
-                "password"
+                "par"
               ],
               "additionalProperties": false
             }
@@ -1009,8 +1006,7 @@
                 "questions",
                 "naps",
                 "cookiesUsed",
-                "par",
-                "password"
+                "par"
               ],
               "additionalProperties": false
             }

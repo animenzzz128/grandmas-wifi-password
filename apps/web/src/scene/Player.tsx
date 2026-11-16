@@ -30,6 +30,14 @@ const REACH = 2.6; // how far away you can interact
 const NEAR_GRANDMA = 2.4; // how close you must be to show or give her something (meters, floor distance)
 const EARSHOT = 3.2; // how close you must be to talk to her
 const EYE_HEIGHT = 1.6;
+const GRANDMA_FACE_Y = 1.1; // her face, seated
+
+/** The shortest signed turn from b to a, in radians. */
+export function angleDiff(a: number, b: number): number {
+  return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+}
+
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 const RADIUS = PLAYER_RADIUS;
 
 interface Box2 {
@@ -173,33 +181,40 @@ export function Player({ scene, interactRef }: { scene: PublicScene; interactRef
         return;
       }
       if (isTyping()) return;
+      // Visit over: the result card owns the keyboard (Enter/Space press its buttons, Tab moves between them).
+      // The room's keys used to swallow them and open hidden cards underneath (review, iteration 39).
+      if (game.run?.status !== "playing") {
+        keys.current.clear();
+        return;
+      }
       // With a card open, Tab, Space and the arrows keep their usual jobs: move between buttons, press them,
       // change a dropdown. (Swallowing them left keyboard players stuck on a card; review, iteration 30.)
       if (game.panel) {
         keys.current.clear();
         return;
       }
-      if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "KeyE", "KeyQ", "Tab"].includes(e.code)) {
+      const bind = useSettings.getState().keys;
+      if ([bind.forward, bind.back, bind.left, bind.right, "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", bind.use, bind.putBack, bind.notebook].includes(e.code)) {
         // preventDefault also stops the key from typing into a text box that opens because of it.
         e.preventDefault();
       }
       keys.current.add(e.code);
       if (e.repeat || game.panel) return;
-      if (e.code === "KeyV") {
+      if (e.code === bind.speak) {
         keys.current.clear();
         useGame.setState((s) => ({ voiceTick: s.voiceTick + 1 }));
       } else if (e.code === "KeyO") {
         unlock();
         keys.current.clear();
         game.openPanel({ type: "settings" });
-      } else if (e.code === "Tab") {
+      } else if (e.code === bind.notebook) {
         e.preventDefault();
         unlock();
         keys.current.clear();
         game.openPanel({ type: "notebook" });
-      } else if (e.code === "KeyQ" && game.carrying) {
+      } else if (e.code === bind.putBack && game.carrying) {
         game.take(null);
-      } else if (e.code === "KeyE" && game.focusId) {
+      } else if (e.code === bind.use && game.focusId) {
         const it = scene.interactables.find((i) => i.id === game.focusId);
         if (!it) return;
         keys.current.clear();
@@ -216,8 +231,9 @@ export function Player({ scene, interactRef }: { scene: PublicScene; interactRef
         else game.openPanel({ type: "inspect", objectId: it.id });
       } else if (e.code === "Enter") {
         e.preventDefault();
-        unlock();
         keys.current.clear();
+        // Out of earshot, focusChat only shows "too far": keep mouse look rather than dropping it for nothing.
+        if (game.inEarshot) unlock();
         game.focusChat();
       }
     };
@@ -247,6 +263,20 @@ export function Player({ scene, interactRef }: { scene: PublicScene; interactRef
       L.dx = 0;
       L.dy = 0;
     }
+    // While talking, ease round to face Grandma so she's in view while she answers (plan C3). The mouse is
+    // free in talk mode, so this never fights the player's own looking. Off with the setting or reduced motion.
+    if (grandmaAt && useGame.getState().talking && useSettings.getState().cameraAssist && !reducedMotion()) {
+      const dx = grandmaAt[0] - camera.position.x;
+      const dz = grandmaAt[2] - camera.position.z;
+      const flat = Math.hypot(dx, dz);
+      if (flat > 0.3) {
+        const wantYaw = Math.atan2(-dx, -dz);
+        const wantPitch = Math.atan2(GRANDMA_FACE_Y - camera.position.y, flat);
+        const ease = 1 - Math.exp(-3 * dt);
+        L.yaw += angleDiff(wantYaw, L.yaw) * ease;
+        L.pitch += (wantPitch - L.pitch) * ease;
+      }
+    }
     camera.rotation.set(L.pitch, L.yaw, 0, "YXZ");
 
     // 2) Walking, relative to where you're facing (yaw only, so looking down doesn't slow you).
@@ -255,8 +285,9 @@ export function Player({ scene, interactRef }: { scene: PublicScene; interactRef
     let f = 0;
     let r = 0;
     if (canWalk) {
-      f = (k.has("KeyW") || k.has("ArrowUp") ? 1 : 0) - (k.has("KeyS") || k.has("ArrowDown") ? 1 : 0);
-      r = (k.has("KeyD") || k.has("ArrowRight") ? 1 : 0) - (k.has("KeyA") || k.has("ArrowLeft") ? 1 : 0);
+      const b = useSettings.getState().keys;
+      f = (k.has(b.forward) || k.has("ArrowUp") ? 1 : 0) - (k.has(b.back) || k.has("ArrowDown") ? 1 : 0);
+      r = (k.has(b.right) || k.has("ArrowRight") ? 1 : 0) - (k.has(b.left) || k.has("ArrowLeft") ? 1 : 0);
     }
     const len = Math.hypot(f, r) || 1;
     const speed = k.has("ShiftLeft") || k.has("ShiftRight") ? SPRINT_SPEED : WALK_SPEED;

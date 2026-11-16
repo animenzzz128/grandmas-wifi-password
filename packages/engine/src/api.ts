@@ -50,8 +50,11 @@ export const RunResult = z.strictObject({
   naps: z.number().int(),
   cookiesUsed: z.number().int(),
   par: z.number().int(),
-  /** Only revealed once the run is over. */
-  password: z.string(),
+  /**
+   * Only revealed once the run is over, and for a daily not solved, only from the next day on: otherwise
+   * failing on purpose with three free guesses would give away today’s answer (security review E).
+   */
+  password: z.string().optional(),
 });
 
 export const RunView = z.strictObject({
@@ -152,7 +155,7 @@ export type GuessResponse = z.infer<typeof GuessResponse>;
 export type HealthResponse = z.infer<typeof HealthResponse>;
 export type DailyInfo = z.infer<typeof DailyInfo>;
 
-export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe): RunView {
+export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe, opts: { hidePassword?: boolean } = {}): RunView {
   const ended = state.status !== "playing";
   const greeting = state.history[0]?.text ?? "";
   return {
@@ -188,7 +191,7 @@ export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe):
           naps: state.naps,
           cookiesUsed: state.cookiesUsed,
           par: recipe.par ?? RULES.defaultPar[recipe.difficulty],
-          password: recipe.password,
+          ...(opts.hidePassword ? {} : { password: recipe.password }),
         }
       : undefined,
   };

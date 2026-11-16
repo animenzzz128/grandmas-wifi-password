@@ -4,7 +4,7 @@
  */
 import type { GrandmaWorld, Recipe } from "./world.ts";
 import { containsAllSlots, factById, hiddenYears, objectValue } from "./world.ts";
-import { hasSelfCorrection, leakForms, normalizeForMatch, resolveSelfCorrections } from "./text.ts";
+import { factKeywords, foreignChars, hasSelfCorrection, leakForms, normalizeForMatch, plainText, resolveSelfCorrections, spacedDigitRuns, tokens } from "./text.ts";
 
 export interface GrandmaOutput {
   reply: string;
@@ -48,6 +48,26 @@ export function contradictions(world: GrandmaWorld, t: { reply: string; factIds:
 /** The validation context for a run of this recipe. */
 export function validationContext(world: GrandmaWorld, recipe: Recipe, currentYear = new Date().getFullYear()): ValidationContext {
   return { password: recipe.password, hiddenYears: hiddenYears(world, recipe), currentYear, separate: recipe.separate ?? [], recipe };
+}
+
+/**
+ * Which of these facts a reply tells, read from its text: a sentence with the fact's year (or its number, for a
+ * fact that is a number) and one of the fact's own words. "In 1964 we bought the house on Maple" tells f_house.
+ */
+export function factsToldIn(world: GrandmaWorld, reply: string, ids: readonly string[]): string[] {
+  const sentences = reply
+    .split(/(?<=[.!?…])\s+|\n+/)
+    .map((s) => ({ nums: new Set((s.match(/\d+/g) ?? []).map(Number)), words: new Set(tokens(s)) }));
+  return ids.filter((id) => {
+    const fact = factById(world, id);
+    if (!fact) return false;
+    const n = fact.object;
+    if (typeof n === "number") return sentences.some((s) => s.nums.has(n));
+    const year = fact.year;
+    if (year === undefined) return false;
+    const keys = [...factKeywords(world, fact)].filter((k) => !/^\d+$/.test(k));
+    return sentences.some((s) => s.nums.has(year) && keys.some((k) => s.words.has(k)));
+  });
 }
 
 /** Facts from one separate-group that a reply used together. */
@@ -103,8 +123,11 @@ export function validateReply(world: GrandmaWorld, out: GrandmaOutput, ctx: Vali
   }
   // Allowed self-corrections ("1962… no, 1961") count as the year she settled on.
   const corrections = new Map(world.facts.filter((f) => f.misremembers !== undefined && f.year !== undefined).map((f) => [f.misremembers!, f.year!] as const));
-  const reply = resolveSelfCorrections(out.reply.trim(), corrections);
+  // Checks read the plain form: fullwidth "１９６１" is 1961, zero-width characters are gone (security review, iteration 34).
+  const reply = resolveSelfCorrections(plainText(out.reply).trim(), corrections);
   if (!reply) errors.push("empty reply");
+  const foreign = foreignChars(reply);
+  if (foreign.length) errors.push(`characters outside plain English (${foreign.slice(0, 5).join(" ")}); write in plain English letters and digits`);
   if (reply.length > MAX_REPLY_CHARS) errors.push(`reply too long (${reply.length} chars, max ${MAX_REPLY_CHARS})`);
   if (hasSelfCorrection(reply)) errors.push("self-correction on a memory that isn't marked for one (or to the wrong year); say the year once");
 
@@ -117,7 +140,7 @@ export function validateReply(world: GrandmaWorld, out: GrandmaOutput, ctx: Vali
     const full = shortYear(yy);
     return full ? `${pre}${full}` : m;
   });
-  for (const raw of forNumbers.match(/\d+/g) ?? []) {
+  for (const raw of [...(forNumbers.match(/\d+/g) ?? []), ...spacedDigitRuns(forNumbers)]) {
     const n = Number(raw);
     if (ctx.hiddenYears.has(n)) {
       errors.push(`said the year ${n}, which must only be given as its anchor phrase`);
@@ -145,7 +168,9 @@ export function validateReply(world: GrandmaWorld, out: GrandmaOutput, ctx: Vali
   if (unknown.size) errors.push(`names not in Grandma's world: ${[...unknown].join(", ")}`);
 
   // One link of an inference chain per reply.
-  for (const hit of joinedFacts(out.fact_ids_used, ctx.separate)) {
+  // The model's own list of memories, plus any it told without listing them (citing nothing doesn't skip the rule).
+  const told = [...new Set([...out.fact_ids_used, ...factsToldIn(world, reply, (ctx.separate ?? []).flat())])];
+  for (const hit of joinedFacts(told, ctx.separate)) {
     errors.push(`used ${hit.join(" and ")} together; tell just one of these memories per reply and let the grandchild ask a follow-up`);
   }
 

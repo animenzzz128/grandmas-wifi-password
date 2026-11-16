@@ -7,6 +7,7 @@
  */
 import { useGame } from "./store.ts";
 import { isMuted } from "./audio.ts";
+import { useSettings } from "./settings.ts";
 
 const synth: SpeechSynthesis | undefined = typeof window !== "undefined" ? window.speechSynthesis : undefined;
 
@@ -43,6 +44,7 @@ export function speak(text: string, mood = "happy") {
   const p = PROSODY[mood] ?? PROSODY.happy!;
   u.rate = p.rate;
   u.pitch = p.pitch;
+  u.volume = Math.min(1, Math.max(0, useSettings.getState().voiceVolume));
   u.onstart = () => useGame.setState({ grandmaSpeaking: true });
   u.onend = u.onerror = () => useGame.setState({ grandmaSpeaking: false });
   synth.speak(u);

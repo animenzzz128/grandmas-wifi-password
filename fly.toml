@@ -3,8 +3,11 @@
 #   fly launch --no-deploy --copy-config        (pick an app name; update `app` below)
 #   fly volumes create grandma_data --size 1
 #   fly secrets set ANTHROPIC_API_KEY=<course key> GRANDMA_MODE=llm
-#   fly deploy
+#   fly deploy --ha=false                        (exactly one machine, see below)
+#   fly scale show                               (check: count 1)
 # The key only ever lives in Fly secrets; GRANDMA_MODE=llm is what lets the server use an env key.
+# One machine only: rate limits, the one-request-per-visit lock, live visits and the daily budget are kept in
+# the server process and its volume, so a second machine would have its own limits and its own budget.
 app = "grandmas-wifi-password"
 primary_region = "ewr"
 

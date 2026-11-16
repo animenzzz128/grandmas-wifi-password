@@ -2,6 +2,8 @@
  * The player's Daily Grandma record, kept in this browser (game design §5). Only the first finished
  * visit of a day counts; replays that day are practice. Global stats would need the server.
  */
+import { storage as defaultStorage } from "./storage.ts";
+import type { KeyValueStore } from "./storage.ts";
 
 export interface DailyRecord {
   number: number;
@@ -10,12 +12,12 @@ export interface DailyRecord {
   questions: number;
 }
 
-type Store = Pick<Storage, "getItem" | "setItem">;
+type Store = KeyValueStore;
 const KEY = "gwp-daily";
 /** Records older than this many days are dropped (enough for any streak worth showing). */
 const KEEP = 400;
 
-export function loadDailyRecords(storage: Store = localStorage): Record<number, DailyRecord> {
+export function loadDailyRecords(storage: Store = defaultStorage): Record<number, DailyRecord> {
   try {
     const raw = JSON.parse(storage.getItem(KEY) ?? "{}") as unknown;
     return raw && typeof raw === "object" ? (raw as Record<number, DailyRecord>) : {};
@@ -25,7 +27,7 @@ export function loadDailyRecords(storage: Store = localStorage): Record<number, 
 }
 
 /** Save a finished daily. Returns false (and keeps the old one) if that day already has a record. */
-export function saveDailyRecord(rec: DailyRecord, storage: Store = localStorage): boolean {
+export function saveDailyRecord(rec: DailyRecord, storage: Store = defaultStorage): boolean {
   const all = loadDailyRecords(storage);
   if (all[rec.number]) return false;
   all[rec.number] = rec;

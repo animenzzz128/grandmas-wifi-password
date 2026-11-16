@@ -5,11 +5,16 @@
  * - chime(): small UI cues (notebook entry, router success/failure).
  * - snore(): one soft snore while she dozes (GDD §8.3).
  * - clock: a quiet ticking clock for the room (GDD §8.2 ambience); a setting turns it off.
+ * - music: a short original parlor-piano loop for the room, written note by note below (plan C4).
+ * Three channels (effects, voice, music) with their own volume in Settings (Game Accessibility Guidelines).
  * Everything also has an on-screen equivalent (text), so muting (M) loses no information.
  */
+import { storage } from "./storage.ts";
+import { useSettings } from "./settings.ts";
+
 const MUTE_KEY = "gwp-muted";
 let ctx: AudioContext | null = null;
-let muted = typeof localStorage !== "undefined" && localStorage.getItem(MUTE_KEY) === "1";
+let muted = storage.getItem(MUTE_KEY) === "1";
 
 function audio(): AudioContext | null {
   if (muted || typeof AudioContext === "undefined") return null;
@@ -18,17 +23,38 @@ function audio(): AudioContext | null {
   return ctx;
 }
 
+type Channel = "sfx" | "voice" | "music";
+const channels: Partial<Record<Channel, GainNode>> = {};
+const level = (ch: Channel) => {
+  const s = useSettings.getState();
+  return ch === "music" ? s.musicVolume : ch === "voice" ? s.voiceVolume : s.sfxVolume;
+};
+/** Each channel is a gain node in front of the speakers, following its volume setting live. */
+function channel(c: AudioContext, ch: Channel): AudioNode {
+  let g = channels[ch];
+  if (!g) {
+    g = c.createGain();
+    g.gain.value = level(ch);
+    g.connect(c.destination);
+    channels[ch] = g;
+  }
+  return g;
+}
+useSettings.subscribe(() => {
+  for (const ch of ["sfx", "voice", "music"] as const) channels[ch]?.gain.setTargetAtTime(level(ch), ctx?.currentTime ?? 0, 0.05);
+});
+
 export function isMuted(): boolean {
   return muted;
 }
 
 export function toggleMute(): boolean {
   muted = !muted;
-  localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+  storage.setItem(MUTE_KEY, muted ? "1" : "0");
   return muted;
 }
 
-function tone(c: AudioContext, at: number, freq: number, dur: number, gain: number, type: OscillatorType = "triangle", slideTo?: number) {
+function tone(c: AudioContext, at: number, freq: number, dur: number, gain: number, type: OscillatorType = "triangle", slideTo?: number, out: Channel = "sfx") {
   const osc = c.createOscillator();
   const g = c.createGain();
   osc.type = type;
@@ -37,7 +63,7 @@ function tone(c: AudioContext, at: number, freq: number, dur: number, gain: numb
   g.gain.setValueAtTime(0, at);
   g.gain.linearRampToValueAtTime(gain, at + 0.012);
   g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-  osc.connect(g).connect(c.destination);
+  osc.connect(g).connect(channel(c, out));
   osc.start(at);
   osc.stop(at + dur + 0.02);
 }
@@ -65,11 +91,11 @@ export function babble(text: string, mood = "happy") {
   let at = c.currentTime + 0.05;
   for (let i = 0; i < count; i++) {
     const f = v.pitch * (1 + (rand() - 0.5) * v.lilt);
-    tone(c, at, f, 0.06, 0.035, "triangle");
+    tone(c, at, f, 0.06, 0.035, "triangle", undefined, "voice");
     at += v.gap + rand() * 0.02;
     if (/[.!?]/.test(text) && i > 0 && i % 9 === 0) at += 0.12; // a breath between sentences
   }
-  if (mood === "confused") tone(c, at, v.pitch, 0.12, 0.03, "triangle", v.pitch * 1.4); // rising "hm?"
+  if (mood === "confused") tone(c, at, v.pitch, 0.12, 0.03, "triangle", v.pitch * 1.4, "voice"); // rising "hm?"
 }
 
 let noise: AudioBuffer | null = null;
@@ -97,7 +123,7 @@ function hiss(c: AudioContext, at: number, filter: { type: BiquadFilterType; fre
   g.gain.exponentialRampToValueAtTime(gain, at + a);
   g.gain.setValueAtTime(gain, at + a + h);
   g.gain.exponentialRampToValueAtTime(0.0001, at + a + h + r);
-  src.connect(f).connect(g).connect(c.destination);
+  src.connect(f).connect(g).connect(channel(c, "sfx"));
   src.start(at, Math.random() * 0.5);
   src.stop(at + a + h + r + 0.05);
 }
@@ -135,11 +161,14 @@ export function stopClock() {
   clockTimer = null;
 }
 
-export function chime(kind: "note" | "success" | "fail") {
+export function chime(kind: "note" | "pin" | "success" | "fail") {
   const c = audio();
   if (!c) return;
   const t = c.currentTime + 0.02;
-  if (kind === "note") {
+  if (kind === "pin") {
+    tone(c, t, 1175, 0.08, 0.025, "sine"); // a light "tack"
+    tone(c, t + 0.05, 1568, 0.12, 0.02, "sine");
+  } else if (kind === "note") {
     tone(c, t, 880, 0.12, 0.03, "sine");
     tone(c, t + 0.07, 1320, 0.16, 0.025, "sine");
   } else if (kind === "success") {
@@ -148,4 +177,66 @@ export function chime(kind: "note" | "success" | "fail") {
     tone(c, t, 220, 0.18, 0.05, "square");
     tone(c, t + 0.2, 165, 0.25, 0.05, "square");
   }
+}
+
+// ---- Music: "Kolaczki Rag", an original 8-bar parlor-piano loop (plan C4) ----------------------------------
+// Oom-pah left hand (bass on 1 and 3, chord on 2 and 4) under a music-box melody, swung, about 92 BPM.
+// Every other time round the melody thins out, so the loop doesn't wear thin. MIDI note numbers.
+const BEAT = 60 / 92;
+const PROGRESSION: { bass: number; chord: number[] }[] = [
+  { bass: 48, chord: [60, 64, 67] }, // C
+  { bass: 45, chord: [61, 64, 67] }, // A7
+  { bass: 50, chord: [62, 65, 69] }, // Dm
+  { bass: 43, chord: [59, 62, 65] }, // G7
+  { bass: 48, chord: [60, 64, 67] }, // C
+  { bass: 40, chord: [59, 62, 68] }, // E7
+  { bass: 41, chord: [60, 65, 69] }, // F
+  { bass: 43, chord: [59, 62, 65] }, // G7
+];
+const MELODY: (number | null)[][] = [
+  [72, 76, 79, 76, 74, 72, null, 67],
+  [73, 76, 79, 81, 79, 76, 73, null],
+  [74, 77, 81, 77, 76, 74, null, 69],
+  [71, 74, 77, 74, 71, 67, null, null],
+  [72, 76, 79, 84, 83, 79, 76, null],
+  [80, 83, 76, 80, 83, 80, 76, null],
+  [77, 81, 84, 81, 79, 77, 76, 74],
+  [74, 77, 71, 74, 72, null, null, null],
+];
+const hz = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
+
+/** When each eighth note of a bar sounds, with a gentle swing (long-short). */
+export function eighthOffsets(beat = BEAT, swing = 0.62): number[] {
+  return Array.from({ length: 8 }, (_, i) => Math.floor(i / 2) * beat + (i % 2 ? swing * beat : 0));
+}
+
+let musicTimer: ReturnType<typeof setInterval> | null = null;
+export function startMusic() {
+  if (musicTimer) return;
+  let bar = 0;
+  let barStart = 0;
+  const offsets = eighthOffsets();
+  musicTimer = setInterval(() => {
+    const c = audio();
+    if (!c) return;
+    if (barStart < c.currentTime) barStart = c.currentTime + 0.1;
+    while (barStart < c.currentTime + 0.5) {
+      const { bass, chord } = PROGRESSION[bar % 8]!;
+      const sparse = Math.floor(bar / 8) % 2 === 1;
+      tone(c, barStart, hz(bass), BEAT * 0.9, 0.05, "triangle", undefined, "music");
+      tone(c, barStart + 2 * BEAT, hz(bass + 7), BEAT * 0.9, 0.04, "triangle", undefined, "music");
+      for (const beat of [1, 3]) for (const n of chord) tone(c, barStart + beat * BEAT, hz(n), BEAT * 0.5, 0.012, "triangle", undefined, "music");
+      MELODY[bar % 8]!.forEach((n, i) => {
+        if (n === null || (sparse && i % 3 === 2)) return;
+        tone(c, barStart + offsets[i]!, hz(n), 0.32, 0.03, "sine", undefined, "music");
+      });
+      barStart += 4 * BEAT;
+      bar++;
+    }
+  }, 200);
+}
+
+export function stopMusic() {
+  if (musicTimer) clearInterval(musicTimer);
+  musicTimer = null;
 }

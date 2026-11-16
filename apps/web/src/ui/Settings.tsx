@@ -1,12 +1,48 @@
 /** Settings: look, text size and font, voice, retro filter, relaxed mode. Saved in this browser. */
-import { useSettings } from "../settings.ts";
+import { useEffect, useState } from "react";
+import { ACTIONS, DEFAULT_KEYS, keyLabel, rebind, useSettings } from "../settings.ts";
+import type { Action } from "../settings.ts";
 import { t } from "../strings.ts";
+
+/** Click an action, then press the key you want for it (Esc cancels). A key already in use swaps over. */
+function KeyBindings() {
+  const keys = useSettings((s) => s.keys);
+  const set = useSettings((s) => s.set);
+  const [waiting, setWaiting] = useState<Action | null>(null);
+  useEffect(() => {
+    if (!waiting) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code !== "Escape" && e.code !== "Enter" && !e.code.startsWith("Arrow")) set({ keys: rebind(keys, waiting, e.code) });
+      setWaiting(null);
+    };
+    window.addEventListener("keydown", onKey, true); // capture: the room never sees this key
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [waiting, keys, set]);
+  return (
+    <fieldset className="key-bindings">
+      <legend>{t("settings.keys")}</legend>
+      {ACTIONS.map((a) => (
+        <label key={a} className="key-row">
+          <span>{t(`settings.key.${a}`)}</span>
+          <button type="button" className={waiting === a ? "waiting" : ""} onClick={() => setWaiting(waiting === a ? null : a)}>
+            {waiting === a ? t("settings.keys.press") : keyLabel(keys[a])}
+          </button>
+        </label>
+      ))}
+      <button type="button" className="ghost" onClick={() => set({ keys: DEFAULT_KEYS })}>
+        {t("settings.keys.reset")}
+      </button>
+    </fieldset>
+  );
+}
 
 export function SettingsCard({ onClose }: { onClose: () => void }) {
   const s = useSettings();
   return (
     <div className="card settings-card">
-      <h3>{t("settings.title")}</h3>
+      <h3 id="panel-title">{t("settings.title")}</h3>
       <label>
         {t("settings.sensitivity")} <b>{s.sensitivity.toFixed(1)}×</b>
         <input type="range" min={0.3} max={2.5} step={0.1} value={s.sensitivity} onChange={(e) => s.set({ sensitivity: Number(e.target.value) })} />
@@ -37,9 +73,22 @@ export function SettingsCard({ onClose }: { onClose: () => void }) {
       <label className="check">
         <input type="checkbox" checked={s.typeOut} onChange={(e) => s.set({ typeOut: e.target.checked })} /> {t("settings.typeOut")}
       </label>
+      {(["musicVolume", "sfxVolume", "voiceVolume"] as const).map((key) => (
+        <label key={key}>
+          {t(`settings.${key}`)} <b>{Math.round(s[key] * 100)}%</b>
+          <input type="range" min={0} max={1} step={0.05} value={s[key]} onChange={(e) => s.set({ [key]: Number(e.target.value) })} />
+        </label>
+      ))}
       <label className="check">
         <input type="checkbox" checked={s.roomSound} onChange={(e) => s.set({ roomSound: e.target.checked })} /> {t("settings.roomSound")}
       </label>
+      <label className="check">
+        <input type="checkbox" checked={s.cameraAssist} onChange={(e) => s.set({ cameraAssist: e.target.checked })} /> {t("settings.cameraAssist")}
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={s.highContrast} onChange={(e) => s.set({ highContrast: e.target.checked })} /> {t("settings.highContrast")}
+      </label>
+      <KeyBindings />
       <label className="check">
         <input type="checkbox" checked={s.retro} onChange={(e) => s.set({ retro: e.target.checked })} /> {t("settings.retro")}
       </label>

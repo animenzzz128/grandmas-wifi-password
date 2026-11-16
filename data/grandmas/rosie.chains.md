@@ -44,7 +44,7 @@ Slot 1 "the bird" (1 hop)
   routes: Grandma: Walt calls her Sparrow because she never stops chirping · story s_fair · wedding photo back "My Sparrow"
 Slot 2 year (3 hops, 1977 hidden from the model)
   hop 1 the big snowstorm → "the same winter Michael broke his arm"
-  hop 2 Michael broke his arm sledding "the winter he was eleven" (sled: MIKEY, cracked runner)
+  hop 2 Michael broke his arm sledding "the year he turned eleven" (sled: MIKEY, cracked runner). Not "the winter he was eleven": for most birth months that winter runs into the next year, so 1978 would be a fair answer too (review, iteration 39)
   hop 3 Michael born 1966 → Grandma; album: birth announcement "baby Michael, 1966" → 1966 + 11 = 1977
   separate: [f_snowstorm, f_michael_born], [f_michael_arm, f_michael_born]
 Suffix "!" from the note.

@@ -82,7 +82,7 @@ Open http://localhost:5173. Click to look around, WASD to walk, E to interact, E
 | `npm run schema` | Exports the API contract and scene format as JSON Schema to `data/schema/` |
 | `npm run build` then `npm start` | Production: the server also serves the built client on :8787 |
 
-**Deploying (Fly.io, not done yet):** `Dockerfile` and `fly.toml` are ready. The steps are at the top of `fly.toml`: create the app and a volume, set `ANTHROPIC_API_KEY` and `GRANDMA_MODE=llm` as Fly secrets, then `fly deploy`. The key never goes into the image.
+**Deploying (Fly.io, not done yet):** `Dockerfile` and `fly.toml` are ready. The steps are at the top of `fly.toml`: create the app and a volume, set `ANTHROPIC_API_KEY` and `GRANDMA_MODE=llm` as Fly secrets, then `fly deploy --ha=false`. The key never goes into the image. Run exactly one machine (`fly scale show` should say 1): rate limits and the daily budget live in the server process, so a second machine would double them. The image hasn't been built yet (no Docker on the machine it was written on).
 
 **Cost guard:** the real Grandma stops for the day once today's model spend reaches `GRANDMA_DAILY_BUDGET_USD` (default $5, UTC day, counted from the turn logs so restarts don't reset it). Creating the file `var/KILL` (`/data/KILL` on Fly) switches her off at once, without a redeploy. Either way players keep playing with the offline Grandma, and the title screen says why. The server prints today's spend at startup; per-turn cost is in `var/logs/turns-*.jsonl`, and `npm run stats` sums it up with latency, retries and solve rates (aggregates only).
 

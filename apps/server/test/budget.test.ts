@@ -72,6 +72,16 @@ describe("cost guard (roadmap 03 §6)", () => {
     expect(brain.degraded).toBe("budget");
   });
 
+  it("reads a log bigger than its read buffer, with lines split across chunks", () => {
+    const logs = join(tmp(), "logs");
+    mkdirSync(logs);
+    // ~3 MB: 30,000 lines of padding with 1,000 priced turns spread through them.
+    const lines: string[] = [];
+    for (let i = 0; i < 30_000; i++) lines.push(i % 30 === 0 ? `{"costUsd":0.01,"pad":"${"x".repeat(80)}"}` : `{"kind":"item","pad":"${"y".repeat(90)}"}`);
+    writeFileSync(join(logs, "turns-2026-11-14.jsonl"), lines.join("\n") + "\n");
+    expect(spentInLog(logs, "2026-11-14")).toBeCloseTo(10, 6);
+  });
+
   it("tells players why on /api/health", async () => {
     const brain = new BudgetBrain(new PricyBrain(), new MockBrain(), { dailyUsd: 0 });
     const app = createApp({ data: loadGameData(readConfig({}, {}).dataDir), brain, store: new RunStore(null), asksPerMinute: 1000 });

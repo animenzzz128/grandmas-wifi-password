@@ -5,9 +5,10 @@ import { useProgress } from "@react-three/drei";
 import { useGame } from "../store.ts";
 import type { Carrying } from "../store.ts";
 import { t } from "../strings.ts";
-import { babble, chime, snore, startClock, stopClock, toggleMute } from "../audio.ts";
+import { babble, chime, snore, startClock, startMusic, stopClock, stopMusic, toggleMute } from "../audio.ts";
 import { canListen, listen, speak, stopSpeaking } from "../voice.ts";
 import { useSettings } from "../settings.ts";
+import { suggestions } from "../suggest.ts";
 import { SettingsCard } from "./Settings.tsx";
 import { saveDailyRecord } from "../daily.ts";
 import { revealPlan, typedLength } from "../typeout.ts";
@@ -83,12 +84,14 @@ function Crosshair() {
   const near = useGame((s) => s.nearGrandma);
   const learned = useGame((s) => s.controlsLearned);
   const carriedLabel = useCarriedLabel();
+  const finished = useGame((s) => s.run?.status !== "playing");
+  const cookiesLeft = useGame((s) => s.run?.cookies ?? 0);
   const it = scene?.interactables.find((i) => i.id === focusId);
-  if (panel || talking) return null;
+  if (panel || talking || finished) return null;
   return (
     <>
       <div className={`crosshair ${it ? "on" : ""}`} />
-      {it && <div className="prompt">{promptFor(it.kind, it.label, carrying, carriedLabel, near)}</div>}
+      {it && <div className="prompt">{promptFor(it.kind === "cookie_jar" && cookiesLeft <= 0 ? "cookie_jar_empty" : it.kind, it.label, carrying, carriedLabel, near)}</div>}
       {!locked &&
         (learned ? (
           <div className="look-hint">{t("clickToLook")}</div>
@@ -96,7 +99,7 @@ function Crosshair() {
           <div className="look-hint">
             {t("clickToLook")}
             <br />
-            <small>{t("controls")}</small>
+            <small>{t("controls.basic")}</small>
           </div>
         ))}
     </>
@@ -114,7 +117,7 @@ function Objectives() {
     { done: inspected.length > 0, label: t("goal.proof") },
     { done: run.attemptsLeft < run.maxAttempts || run.status === "solved", label: t("goal.router") },
   ];
-  if (steps.every((s) => s.done)) return null;
+  if (run.status !== "playing" || steps.every((s) => s.done)) return null;
   return (
     <div className="hud-panel objectives">
       {steps.map((s) => (
@@ -136,7 +139,7 @@ function NotebookCard() {
   const groups = (["name", "year", "place", "number"] as const).map((kind) => ({ kind, items: notebook.filter((n) => n.kind === kind) }));
   return (
     <div className="card notebook-card">
-      <h3>{t("notebook.title")}</h3>
+      <h3 id="panel-title">{t("notebook.title")}</h3>
       <p className="riddle">{run.note.text}</p>
       {pins.length > 0 && (
         <div className="group pins">
@@ -187,6 +190,12 @@ function Ambience() {
     startClock();
     return stopClock;
   }, [playing, roomSound]);
+  const musicOn = useSettings((s) => s.musicVolume > 0);
+  useEffect(() => {
+    if (!playing || !musicOn) return;
+    startMusic();
+    return stopMusic;
+  }, [playing, musicOn]);
   useEffect(() => {
     if (!dozing) return;
     const first = setTimeout(snore, 1200);
@@ -305,6 +314,32 @@ function MishearBanner() {
   ) : null;
 }
 
+/**
+ * For screen readers: one polite live region that reads each new line from Grandma or the game (in full,
+ * not as it types out) and each hint. The visible chat and toasts change too often to be live regions
+ * themselves (review, iteration 40).
+ */
+function Announcer() {
+  const log = useGame((s) => s.log);
+  const hint = useGame((s) => s.hint);
+  const [message, setMessage] = useState("");
+  const seen = useRef(log.length);
+  useEffect(() => {
+    if (log.length < seen.current) seen.current = 0; // a new visit
+    const fresh = log.slice(seen.current).filter((l) => l.who !== "player");
+    seen.current = log.length;
+    if (fresh.length) setMessage(fresh.map((l) => (l.who === "grandma" ? `${t("a11y.grandmaSays")} ${l.text}` : l.text)).join(" "));
+  }, [log]);
+  useEffect(() => {
+    if (hint) setMessage(hint.text);
+  }, [hint]);
+  return (
+    <div className="sr-only" role="status" aria-live="polite">
+      {message}
+    </div>
+  );
+}
+
 function HintToast() {
   const hint = useGame((s) => s.hint);
   const [visible, setVisible] = useState(false);
@@ -405,8 +440,22 @@ function ChatLog() {
   useEffect(() => {
     ref.current?.scrollTo({ top: ref.current.scrollHeight });
   }, [log, busy]);
+  // The pin button goes away with its highlight: when the selection is cleared (a click in the room, Esc) or
+  // the mouse is captured again. It used to stay floating over the room and pin stale text (review, iteration 40).
+  const locked = useGame((s) => s.locked);
+  useEffect(() => {
+    if (!picked) return;
+    if (locked) return setPicked(null);
+    const onChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) setPicked(null);
+    };
+    document.addEventListener("selectionchange", onChange);
+    return () => document.removeEventListener("selectionchange", onChange);
+  }, [picked, locked]);
   const pinIt = (text: string) => {
     const ok = useGame.getState().pin(text);
+    if (ok) chime("pin");
     useGame.getState().showHint(ok ? t("notebook.pinnedHint") : t("notebook.pinSkipped"));
     window.getSelection()?.removeAllRanges();
     setPicked(null);
@@ -421,7 +470,7 @@ function ChatLog() {
     setPicked({ text, x: r.left + r.width / 2, y: r.top });
   };
   return (
-    <div className="chat-log" ref={ref} onMouseUp={onSelect} onKeyUp={onSelect} onClick={() => plan.includes("typing") && showAll()} title={plan.includes("typing") ? t("chat.skipTyping") : undefined}>
+    <div className="chat-log" aria-label={t("a11y.chat")} ref={ref} onMouseUp={onSelect} onKeyUp={onSelect} onClick={() => plan.includes("typing") && showAll()} title={plan.includes("typing") ? t("chat.skipTyping") : undefined}>
       {log.map((l, i) => plan[i] === "hidden" ? null : (
         <div key={i} className={`line ${l.who}`}>
           {l.who === "grandma" ? "👵 " : l.who === "player" ? "🧑 " : ""}
@@ -445,6 +494,28 @@ function ChatLog() {
         )}
     </div>
   );
+}
+
+/** Suggested questions for the ask box (plan A2): the note's parts, the object just looked at, a follow-up. */
+function useSuggestions(): string[] {
+  const run = useGame((s) => s.run);
+  const log = useGame((s) => s.log);
+  const inspected = useGame((s) => s.inspected);
+  const scene = useGame((s) => s.scene);
+  if (!run) return [];
+  const lastId = inspected.at(-1);
+  const lastObject = lastId ? scene?.interactables.find((i) => i.id === lastId)?.label : undefined;
+  return suggestions({
+    note: run.note.text,
+    asked: log.filter((l) => l.who === "player").map((l) => l.text),
+    lastObject,
+    answered: run.questionCount > 0,
+    words: {
+      remember: (part) => t("suggest.remember", { part }),
+      object: (label) => t("suggest.object", { label }),
+      followUp: t("suggest.followUp"),
+    },
+  });
 }
 
 function AskBar() {
@@ -489,6 +560,8 @@ function AskBar() {
     }
   }, [tick]);
   useEffect(() => () => setTalking(false), [setTalking]);
+  const chips = useSuggestions();
+  const showChips = playing && !busy && !listening && !text && (inEarshot || talking) && chips.length > 0;
   const submit = async () => {
     const q = text.trim();
     if (!q || useGame.getState().busy) return; // live state: two quick Enters in one tick send once
@@ -508,6 +581,7 @@ function AskBar() {
         ref={input}
         value={text}
         maxLength={280}
+        aria-label={t("ask.label")}
         disabled={!playing || (!inEarshot && !talking)}
         placeholder={listening ? t("ask.listening") : inEarshot || talking ? t("ask.placeholder") : t("ask.placeholderFar")}
         onChange={(e) => setText(e.target.value)}
@@ -521,6 +595,25 @@ function AskBar() {
       )}
       <button disabled={busy || !text.trim() || !playing}>{t("ask.send")}</button>
       {talking && <div className="talk-mode">{t("talk.mode")}</div>}
+      {showChips && (
+        <div className="chips" aria-label={t("suggest.label")}>
+          {chips.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className="chip"
+              // Keep the box focused: a chip only fills it, the player still sends.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setText(c);
+                input.current?.focus();
+              }}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
     </form>
   );
 }
@@ -536,7 +629,7 @@ function InspectCard({ objectId }: { objectId: string }) {
   const holdingCookie = carrying?.kind === "cookie";
   return (
     <div className="card">
-      <h3 className="cap">{it.label}</h3>
+      <h3 id="panel-title" className="cap">{it.label}</h3>
       <p>{it.inspect_text}</p>
       {it.kind === "glasses" ? (
         <button disabled={run.glasses || !run.note.smudged} onClick={() => void useGame.getState().putOnGlasses()}>
@@ -563,7 +656,7 @@ function NoteCard() {
   const openPanel = useGame((s) => s.openPanel);
   return (
     <div className="card note-card">
-      <h3>{t("note.title")}</h3>
+      <h3 id="panel-title">{t("note.title")}</h3>
       <div className="sticky big">
         <div>{run.note.text}</div>
         <small>
@@ -588,7 +681,7 @@ function RouterCard() {
   const ready = parts.every((p) => p.trim());
   return (
     <div className="card router-card">
-      <h3>{t("router.title", { ssid: `${(run.grandma.name.split(" ").at(-1) ?? "HOME").toUpperCase()}_HOME` })}</h3>
+      <h3 id="panel-title">{t("router.title", { ssid: `${(run.grandma.name.split(" ").at(-1) ?? "HOME").toUpperCase()}_HOME` })}</h3>
       <form
         className="slots"
         onSubmit={async (e) => {
@@ -634,7 +727,8 @@ function RouterCard() {
 function ResultCard() {
   const run = useGame((s) => s.run)!;
   const leave = useGame((s) => s.leave);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"no" | "yes" | "manual">("no");
+  const preRef = useRef<HTMLPreElement>(null);
   const r = run.result;
   // The first finished visit of a daily is the one that counts; later ones are practice.
   // (`prev ?? saved`: React's dev double-run of effects must not turn the first save into "practice".)
@@ -646,6 +740,19 @@ function ResultCard() {
     const saved = saveDailyRecord({ number: run.daily, solved: res.solved, stars: res.stars, questions: res.questions });
     setFirstDaily((prev) => prev ?? saved);
   }, [run.runId, finished]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The card needs the mouse: let go of it if the visit ended while the player was looking around.
+  useEffect(() => {
+    if (finished && document.pointerLockElement) document.exitPointerLock();
+  }, [finished]);
+  const copy = (text: string, pre: HTMLPreElement | null) => {
+    const fallback = () => {
+      // No clipboard (an insecure page or a refused permission): select the text so Ctrl+C works.
+      if (pre) window.getSelection()?.selectAllChildren(pre);
+      setCopied("manual");
+    };
+    if (!navigator.clipboard) return fallback();
+    navigator.clipboard.writeText(text).then(() => setCopied("yes"), fallback);
+  };
   if (!r) return null;
   const title = r.solved ? t("result.solved") : run.status === "bedtime" ? t("result.bedtime") : t("result.failed");
   const stars = "⭐".repeat(r.stars) || "—";
@@ -660,19 +767,22 @@ function ResultCard() {
   });
   return (
     <div className="modal">
-      <div className="card result">
-        <h2>{title}</h2>
-        <div className="stars">{stars}</div>
+      <div className="card result" role="dialog" aria-modal="true" aria-labelledby="result-title">
+        <h2 id="result-title">{title}</h2>
+        <div className="stars" role="img" aria-label={t("result.starsLabel", { n: r.stars })}>
+          {stars}
+        </div>
         {run.relaxed && <p className="hint">{t("result.relaxed")}</p>}
         {run.daily !== undefined && firstDaily === false && <p className="hint">{t("daily.practice")}</p>}
-        <p>{t("result.password", { password: r.password })}</p>
-        <pre>{card}</pre>
-        <button
-          onClick={() => {
-            void navigator.clipboard.writeText(card).then(() => setCopied(true));
-          }}
-        >
-          {copied ? t("result.copied") : t("result.copy")}
+        <p>{r.password ? t("result.password", { password: r.password }) : t("result.passwordHidden")}</p>
+        <pre ref={preRef}>{card}</pre>
+        {copied === "manual" && (
+          <p className="hint" role="status">
+            {t("result.copyManual")}
+          </p>
+        )}
+        <button autoFocus onClick={() => copy(card, preRef.current)}>
+          {copied === "yes" ? t("result.copied") : t("result.copy")}
         </button>
         <button className="ghost" onClick={leave}>
           {t("result.again")}
@@ -701,12 +811,13 @@ export function Hud() {
       <Crosshair />
       <CarryHint />
       <HintToast />
+      <Announcer />
       <MishearBanner />
       <LoadingPill />
       <AudioDirector />
       <FpsMeter />
       {panel && (
-        <div className="panel-wrap">
+        <div className="panel-wrap" role="dialog" aria-labelledby="panel-title">
           {panel.type === "inspect" && <InspectCard objectId={panel.objectId} />}
           {panel.type === "note" && <NoteCard />}
           {panel.type === "router" && <RouterCard />}
@@ -715,7 +826,7 @@ export function Hud() {
         </div>
       )}
       <div className={`bottom ${talking ? "side" : ""}`}>
-        {error && <div className="error">{error}</div>}
+        {error && <div className="error" role="alert">{error}</div>}
         <ChatLog />
         <AskBar />
       </div>

@@ -18,8 +18,12 @@ export const RULES = {
   attempts: 3,
   cookies: 1,
   cookieStamina: 25,
+  /** She turns the cookie down (the player keeps it) while her tea is at or above this. */
+  cookieRefuseAt: 80,
   maxQuestionChars: 280,
   maxQuestionsPerRun: 40,
+  /** Fallback replies (her fault) are free only this many times a visit; after that they cost like a question. */
+  maxFreeFallbacks: 8,
   defaultPar: { easy: 7, medium: 10, hard: 13, expert: 16 },
 } as const;
 

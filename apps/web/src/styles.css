@@ -164,3 +164,43 @@ input {
 /* Type-out caret on Grandma's newest line (GDD §8.1) */
 .caret { display: inline-block; width: 0.45em; height: 1em; margin-left: 2px; vertical-align: text-bottom; background: currentColor; opacity: 0.5; animation: caret-blink 0.8s steps(1) infinite; }
 @keyframes caret-blink { 50% { opacity: 0; } }
+
+/* Read by screen readers, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* First visit: one obvious way in (plan A1). */
+button.primary.big { font-size: 1.35em; padding: 14px 32px; background: #c98a3e; box-shadow: 0 4px 0 #7a4a20; }
+button.primary.big:hover:not(:disabled) { filter: brightness(1.08); }
+details.controls { opacity: 0.75; font-size: 14px; max-width: 640px; text-align: center; }
+details.controls summary { cursor: pointer; text-decoration: underline; }
+
+/* Suggested questions over the ask box (plan A2). */
+.ask-bar { flex-wrap: wrap; }
+/* Room for the "Talking to Grandma" label above the box, so it never covers the chat's last line. */
+.ask-bar.talking { margin-top: 26px; }
+.ask-bar .chips { order: -1; flex-basis: 100%; display: flex; gap: 6px; flex-wrap: wrap; }
+.ask-bar .chip { background: rgba(43, 33, 24, 0.85); color: #f6efe0; border: 1px solid #c98a3e; border-radius: 999px; padding: 4px 12px; font-size: 0.9em; }
+.ask-bar .chip:hover, .ask-bar .chip:focus-visible { background: #c98a3e; color: #2b2118; }
+
+/* Key remapping in Settings (plan C6). */
+.key-bindings { border: 1px solid rgba(43, 33, 24, 0.25); border-radius: 8px; padding: 6px 10px; display: grid; gap: 4px; }
+.key-bindings .key-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.key-bindings .key-row button { min-width: 5em; font-family: monospace; }
+.key-bindings .key-row button.waiting { background: #f0c060; color: #2b2118; }
+
+/* High contrast (Xbox Accessibility Guideline 102; plan C7): opaque dark panels, white bold text, clear outlines. */
+.contrast .card, .contrast .chat-log, .contrast .hud-panel, .contrast .prompt, .contrast .look-hint, .contrast .hint-toast, .contrast .ask-bar input { background: #000 !important; color: #fff !important; font-weight: 600; }
+.contrast .card { border: 2px solid #fff; }
+.contrast button { outline: 2px solid #fff; outline-offset: 1px; }
+.contrast .line.grandma { color: #ffe08a; }
+.contrast .line.system { color: #9fd3ff; }
+.contrast .sticky { color: #000; border: 2px solid #000; }

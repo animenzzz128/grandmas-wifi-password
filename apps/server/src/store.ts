@@ -60,13 +60,36 @@ export class RunStore {
 
   get(id: string): RunState | undefined {
     const hit = this.live.get(id);
-    if (hit) return hit;
+    if (hit) {
+      // Most recently used goes to the back of the line for eviction.
+      this.live.delete(id);
+      this.live.set(id, hit);
+      return hit;
+    }
     const row = this.db.prepare("SELECT state FROM runs WHERE id = ?").get(id) as { state: string } | undefined;
     if (!row) return undefined;
     const state = JSON.parse(row.state) as RunState;
-    this.live.set(id, state);
+    this.remember(state);
     return state;
   }
+
+  /** Runs kept in memory (the rest are read back from SQLite when asked for). */
+  get liveCount(): number {
+    return this.live.size;
+  }
+
+  /**
+   * Memory holds only visits in progress, at most MAX_LIVE of them (least recently used go first); finished
+   * visits live in SQLite only. Before this the map grew with every visit ever started (security review P3).
+   */
+  private remember(state: RunState): void {
+    this.live.delete(state.id);
+    if (state.status !== "playing") return;
+    this.live.set(state.id, state);
+    while (this.live.size > RunStore.MAX_LIVE) this.live.delete(this.live.keys().next().value!);
+  }
+
+  static MAX_LIVE = 2000;
 
   /**
    * How today's Daily Grandma is going for everyone: finished visits, how many were solved, and the
@@ -77,7 +100,7 @@ export class RunStore {
     const rows = this.db
       .prepare(
         `SELECT status, json_extract(state, '$.questionCount') AS q FROM runs
-         WHERE json_extract(state, '$.daily') = ? AND status != 'playing'`,
+         WHERE json_extract(state, '$.daily') = ? AND status != 'playing' AND json_extract(state, '$.questionCount') >= 1`,
       )
       .all(daily) as { status: string; q: number }[];
     const solvedQs = rows.filter((r) => r.status === "solved").map((r) => r.q).sort((a, b) => a - b);
@@ -86,7 +109,7 @@ export class RunStore {
   }
 
   save(state: RunState): void {
-    this.live.set(state.id, state);
+    this.remember(state);
     this.db
       .prepare(
         `INSERT INTO runs (id, world_id, recipe_id, status, created_at, updated_at, state)

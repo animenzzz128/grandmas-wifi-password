@@ -380,24 +380,6 @@
       ],
       "color": "#efe6d2",
       "collide": false
-    },
-    {
-      "id": "moon_plate",
-      "node": "MoonPlate",
-      "shape": "box",
-      "size": [
-        0.22,
-        0.24,
-        0.05
-      ],
-      "position": [
-        3.68,
-        0.67,
-        -1.12
-      ],
-      "rotation_y": -1.5707963267948966,
-      "color": "#e8e4da",
-      "collide": false
     }
   ],
   "interactables": [
@@ -593,6 +575,31 @@
       "fact_ids": [
         "f_tv",
         "f_moon"
+      ]
+    },
+    {
+      "id": "moon_plate",
+      "node": "MoonPlate",
+      "kind": "clue",
+      "label": "moon-landing plate",
+      "shape": "box",
+      "size": [
+        0.22,
+        0.24,
+        0.05
+      ],
+      "position": [
+        3.68,
+        0.67,
+        -1.12
+      ],
+      "rotation_y": -1.5707963267948966,
+      "color": "#e8e4da",
+      "collide": false,
+      "inspect_text": "A commemorative plate: APOLLO 11 · JULY 20, 1969. Grandpa bought it the same summer as the TV, so they could watch it together.",
+      "fact_ids": [
+        "f_moon",
+        "f_tv"
       ]
     },
     {

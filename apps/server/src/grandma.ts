@@ -146,7 +146,8 @@ export class LlmBrain implements GrandmaBrain {
     try {
       const response = await this.client.messages.parse({
         model: this.model,
-        max_tokens: 2000,
+        // A reply is at most 700 characters (~200 tokens) plus its JSON; 1000 leaves room and halves the worst case.
+        max_tokens: 1000,
         // Low effort keeps latency down; the eval will measure whether quality holds (technical design §5.3).
         output_config: { effort: this.options.effort ?? "low", format: zodOutputFormat(GrandmaReply) },
         system:

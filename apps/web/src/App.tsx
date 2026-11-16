@@ -1,9 +1,11 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Component, Suspense, lazy, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { SettingsCard } from "./ui/Settings.tsx";
 import { applyTextSettings, useSettings } from "./settings.ts";
 import { useGame } from "./store.ts";
 import { t } from "./strings.ts";
 import { dailyStreak, formatCountdown, loadDailyRecords } from "./daily.ts";
+import { hasVisited } from "./firsts.ts";
 
 /** The 3D game is its own chunk; started loading as soon as the title shows, so a click rarely waits. */
 const loadGame = () => import("./Game.tsx");
@@ -60,29 +62,49 @@ function TitleScreen() {
   const error = useGame((s) => s.error);
   const health = useGame((s) => s.health);
   const [settings, setSettings] = useState(false);
+  // First visit: one obvious button straight into an Easy visit; the daily, the other difficulties and the full
+  // key list wait behind "More ways to play" (players should be playing within seconds; plan A1).
+  const [firstVisit] = useState(() => !hasVisited());
+  const [more, setMore] = useState(!firstVisit);
   return (
     <div className="title-screen">
       {settings && (
-        <div className="panel-wrap">
+        <div className="panel-wrap" role="dialog" aria-labelledby="panel-title">
           <SettingsCard onClose={() => setSettings(false)} />
         </div>
       )}
       <h1>{t("title")}</h1>
       <p className="tagline">{t("tagline")}</p>
+      {firstVisit && (
+        <button className="primary big" autoFocus disabled={busy} onClick={() => void start("easy")}>
+          {t("title.firstVisit")}
+        </button>
+      )}
       <p className="premise">{t("premise")}</p>
-      <DailyBox />
-      <div className="difficulty">
-        {(["easy", "medium", "hard"] as const).map((d) => (
-          <button key={d} disabled={busy} onClick={() => void start(d)}>
-            {t("start")} · {t(`difficulty.${d}`)}
-          </button>
-        ))}
-      </div>
-      <p className="difficulty-help">{t("difficulty.help")}</p>
+      {more ? (
+        <>
+          <DailyBox />
+          <div className="difficulty">
+            {(["easy", "medium", "hard"] as const).map((d) => (
+              <button key={d} disabled={busy} onClick={() => void start(d)}>
+                {t("start")} · {t(`difficulty.${d}`)}
+              </button>
+            ))}
+          </div>
+          <p className="difficulty-help">{t("difficulty.help")}</p>
+        </>
+      ) : (
+        <button className="ghost" onClick={() => setMore(true)}>
+          {t("title.moreWays")}
+        </button>
+      )}
       <button className="ghost" onClick={() => setSettings(true)}>
         {t("settings.title")}
       </button>
-      <p className="controls">{t("controls")}</p>
+      <details className="controls">
+        <summary>{t("title.controls")}</summary>
+        {t("controls")}
+      </details>
       {needsKeyboard() && <p className="device-note">{t("title.desktopOnly")}</p>}
       {health && import.meta.env.DEV && <div className="badge">{health.grandmaMode === "mock" ? t("mode.mock") : t("mode.llm", { model: health.model ?? "" })}</div>}
       {health?.degraded && <p className="device-note">{t(`mode.degraded.${health.degraded}`)}</p>}
@@ -100,14 +122,46 @@ export function App() {
   useEffect(() => {
     void init();
   }, [init]);
-  useEffect(() => applyTextSettings({ textScale, readableFont }), [textScale, readableFont]);
+  const highContrast = useSettings((s) => s.highContrast);
+  useEffect(() => applyTextSettings({ textScale, readableFont, highContrast }), [textScale, readableFont, highContrast]);
   useEffect(() => {
     void loadGame().catch(() => undefined); // prefetch; a real failure shows when the game mounts
   }, []);
   if (!run || !scene) return <TitleScreen />;
   return (
-    <Suspense fallback={<div className="title-screen"><p className="tagline">{t("loading.door")}</p></div>}>
-      <Game scene={scene} />
-    </Suspense>
+    <GameErrorBoundary key={run.runId}>
+      <Suspense fallback={<div className="title-screen"><p className="tagline">{t("loading.door")}</p></div>}>
+        <Game scene={scene} />
+      </Suspense>
+    </GameErrorBoundary>
   );
+}
+
+/**
+ * If the 3D room can't start (no WebGL, a failed download, a crash while drawing), say so in plain words
+ * with a way back, instead of a blank page (review, iteration 39).
+ */
+class GameErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  override componentDidCatch(err: unknown) {
+    console.error("[game] the room failed to start:", err);
+  }
+  override render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="title-screen" role="alert">
+        <h1>{t("title")}</h1>
+        <p className="tagline">{t("error.room")}</p>
+        <div className="difficulty">
+          <button onClick={() => window.location.reload()}>{t("error.reload")}</button>
+          <button className="ghost" onClick={() => useGame.getState().leave()}>
+            {t("error.back")}
+          </button>
+        </div>
+      </div>
+    );
+  }
 }

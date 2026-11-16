@@ -6,7 +6,8 @@
  *   "touch /data/KILL"`), without a redeploy. Delete the file to turn her back on.
  * Players keep playing either way; the health endpoint says why, and the title screen tells them.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readSync } from "node:fs";
+import { StringDecoder } from "node:string_decoder";
 import { join } from "node:path";
 import { costUsd } from "@gwp/engine";
 import type { BrainResult, GrandmaBrain, ReplyArgs } from "./grandma.ts";
@@ -20,14 +21,29 @@ export function spentInLog(logDir: string, day: string): number {
   const file = join(logDir, `turns-${day}.jsonl`);
   if (!existsSync(file)) return 0;
   let total = 0;
-  for (const line of readFileSync(file, "utf8").split("\n")) {
-    if (!line.trim()) continue;
+  const add = (line: string) => {
+    if (!line.trim()) return;
     try {
       const entry = JSON.parse(line) as { costUsd?: number };
       if (typeof entry.costUsd === "number") total += entry.costUsd;
     } catch {
       // a torn last line after a crash: skip it
     }
+  };
+  // Read in 1 MB chunks, not all at once: a huge log must not stop the server from starting (security review C).
+  const fd = openSync(file, "r");
+  try {
+    const buf = Buffer.alloc(1 << 20);
+    const decoder = new StringDecoder("utf8");
+    let rest = "";
+    for (let n = readSync(fd, buf); n > 0; n = readSync(fd, buf)) {
+      const lines = (rest + decoder.write(buf.subarray(0, n))).split("\n");
+      rest = lines.pop() ?? "";
+      lines.forEach(add);
+    }
+    add(rest + decoder.end());
+  } finally {
+    closeSync(fd);
   }
   return total;
 }

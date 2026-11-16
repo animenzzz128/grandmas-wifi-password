@@ -187,6 +187,22 @@ export function containsAllSlots(world: GrandmaWorld, recipe: Recipe, text: stri
 }
 
 /**
+ * Facts that move the player forward on this recipe: the chain facts, plus any fact about the answer itself
+ * when a part of the answer is a person, pet or place. "Biscuit stole every sock" is about the answer to Easy's
+ * first part, so asking who stole the socks is progress, not stalling (review, iteration 41).
+ */
+export function progressFacts(world: GrandmaWorld, recipe: Recipe): Set<string> {
+  const ids = chainFacts(world, recipe);
+  const answers = new Set<string>();
+  for (const slot of recipe.slots) {
+    const fact = factById(world, slot.fact_id);
+    if (slot.field !== "year" && typeof fact?.object === "string" && entityById(world, fact.object)) answers.add(fact.object);
+  }
+  for (const f of world.facts) if (answers.has(f.subject) || (typeof f.object === "string" && answers.has(f.object))) ids.add(f.id);
+  return ids;
+}
+
+/**
  * Years the model must not see for this recipe: the year behind any anchor the recipe requires.
  * In hard mode the player has to work the year out from the anchor phrase.
  */

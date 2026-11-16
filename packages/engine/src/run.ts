@@ -4,7 +4,7 @@
  */
 import type { Difficulty, GrandmaWorld, Recipe } from "./world.ts";
 import { RULES } from "./rules.ts";
-import { chainFacts, slotParts } from "./world.ts";
+import { progressFacts, slotParts } from "./world.ts";
 
 export type RunStatus = "playing" | "solved" | "failed" | "bedtime";
 
@@ -46,6 +46,8 @@ export interface RunState {
   glassesOn?: boolean;
   /** Daily Grandma number (game design §5) when this visit is the daily puzzle. */
   daily?: number;
+  /** Fallback replies so far that cost nothing (capped at RULES.maxFreeFallbacks). */
+  freeFallbacks?: number;
   status: RunStatus;
   createdAt: string;
   endedAt?: string;
@@ -116,12 +118,17 @@ export function endAtQuestionCap(state: RunState, now = new Date()): boolean {
   return true;
 }
 
-export function giveCookie(state: RunState): boolean {
-  if (state.cookies <= 0) return false;
+/**
+ * Give Grandma the cookie. While her tea is still high she says "save it for later" and the player keeps
+ * it: eating it then would waste most of its 25 points, silently (review, iteration 40).
+ */
+export function giveCookie(state: RunState): "given" | "none" | "full" {
+  if (state.cookies <= 0) return "none";
+  if (state.stamina >= RULES.cookieRefuseAt) return "full";
   state.cookies -= 1;
   state.cookiesUsed += 1;
   state.stamina = Math.min(RULES.maxStamina, state.stamina + RULES.cookieStamina);
-  return true;
+  return "given";
 }
 
 /**
@@ -178,7 +185,7 @@ export function checkGuessParts(state: RunState, world: GrandmaWorld, recipe: Re
  * `after` turns in a row that used none of the recipe's chain facts.
  */
 export function stallNudge(state: RunState, world: GrandmaWorld, recipe: Recipe, usedFactIds: readonly string[], after = 3): string | undefined {
-  const chain = chainFacts(world, recipe);
+  const chain = progressFacts(world, recipe);
   state.stall = usedFactIds.some((id) => chain.has(id)) ? 0 : (state.stall ?? 0) + 1;
   const lines = recipe.nudges ?? [];
   if (state.stall < after || !lines.length) return undefined;

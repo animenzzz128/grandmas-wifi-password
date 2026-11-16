@@ -3,6 +3,8 @@
  */
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
+import { secureHeaders } from "hono/secure-headers";
 import type { Context } from "hono";
 import type { z } from "zod";
 import {
@@ -31,6 +33,7 @@ import {
   hashString,
   pick,
   playerTurnText,
+  typedText,
   questionCost,
   recipeById,
   rng,
@@ -52,13 +55,20 @@ export interface AppDeps {
   asksPerDay?: number;
   /** Per-IP new visits per minute (default 10). */
   runsPerMinute?: number;
+  /** Per-IP guesses and item uses per minute (default 60). */
+  actionsPerMinute?: number;
+  /** Questions per minute from everyone together (default 120). */
+  serverAsksPerMinute?: number;
   /** Clock for the Daily Grandma (tests). */
   now?: () => Date;
 }
 
+/** Largest request body accepted. The biggest real one is a 280-character question. */
+export const MAX_BODY_BYTES = 8 * 1024;
+
 class HttpError extends Error {
   constructor(
-    public status: 400 | 404 | 409 | 429,
+    public status: 400 | 404 | 409 | 413 | 429,
     message: string,
   ) {
     super(message);
@@ -82,8 +92,23 @@ async function body<T extends z.ZodType>(c: Context, schema: T): Promise<z.infer
  * The client's address for rate limits. On Fly.io the proxy sets Fly-Client-IP (trustworthy); elsewhere
  * fall back to the first X-Forwarded-For hop, which a client can spoof, so limits are best-effort there.
  */
-function clientIp(c: Context): string {
-  return c.req.header("fly-client-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+export function clientIp(c: Context): string {
+  return limitKey(c.req.header("fly-client-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "local");
+}
+
+/**
+ * The key an address is limited under. An IPv6 user usually holds a whole /64 (2^64 addresses), so each
+ * /64 counts as one client; IPv4 addresses count one by one (security review B).
+ */
+export function limitKey(ip: string): string {
+  if (!ip.includes(":")) return ip;
+  const bare = ip.replace(/^\[|\](:\d+)?$/g, "").split("%")[0]!.toLowerCase();
+  if (/^::ffff:\d+\.\d+\.\d+\.\d+$/.test(bare)) return bare.slice(7); // IPv4 written as IPv6
+  const [head = "", tail] = bare.split("::");
+  const left = head ? head.split(":") : [];
+  const right = tail ? tail.split(":") : [];
+  const groups = tail === undefined ? left : [...left, ...Array<string>(Math.max(0, 8 - left.length - right.length)).fill("0"), ...right];
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "") || "0").join(":")}::/64`;
 }
 
 /** Per-IP cap per UTC day (eval plan / technical design §4: 300 asks a day). */
@@ -117,11 +142,53 @@ export function createApp(deps: AppDeps) {
   const limitAsks = rateLimiter(deps.asksPerMinute);
   const limitDay = dailyCap(deps.asksPerDay ?? 300, "Grandma has talked enough for today. Come back tomorrow.");
   const limitRuns = rateLimiter(deps.runsPerMinute ?? 10, "Slow down, sweetheart. One visit at a time.");
+  // All players together: whatever the addresses, spend can't outrun this (security review B).
+  const limitServer = rateLimiter(deps.serverAsksPerMinute ?? 120, "Grandma has a lot of visitors right now. Try again in a minute, dear.");
   const limit = (ip: string) => {
     limitAsks(ip);
     limitDay(ip);
+    limitServer("all");
   };
+  // Guesses and items cost no model money but write to disk; a person never needs more than a few a minute.
+  const limitActions = rateLimiter(deps.actionsPerMinute ?? 60, "Slow down, sweetheart.");
+  /** Runs with a request being handled. One at a time per run, so parallel requests can't skip the rules. */
+  const busy = new Set<string>();
+  async function oneAtATime<T>(runId: string, work: () => Promise<T> | T): Promise<T> {
+    if (busy.has(runId)) throw new HttpError(409, "Grandma's still answering. One thing at a time, dear.");
+    busy.add(runId);
+    try {
+      return await work();
+    } finally {
+      busy.delete(runId);
+    }
+  }
   const app = new Hono();
+  // Security headers on every response, the built web client included (security review P3). The game loads
+  // nothing from other sites; three.js turns embedded textures into blob: URLs, and React sets inline styles.
+  // The model loader decodes meshes with WebAssembly, which needs 'wasm-unsafe-eval' (it doesn't allow JS eval).
+  app.use(
+    "*",
+    secureHeaders({
+      contentSecurityPolicy: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'", "data:", "blob:"],
+        mediaSrc: ["'self'", "data:", "blob:"],
+        workerSrc: ["'self'", "blob:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+      // Voice input needs the microphone on this site only.
+      permissionsPolicy: { microphone: ["self"], camera: [], geolocation: [] },
+    }),
+  );
+  app.use(
+    "/api/*",
+    bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.json({ error: "That's far too long for Grandma." }, 413) }),
+  );
 
   const lineFor = (run: RunState, bank: readonly string[], salt: string) =>
     pick(bank, rng(hashString(`${run.id}:${run.questionCount}:${run.guesses.length}:${salt}`)));
@@ -164,6 +231,12 @@ export function createApp(deps: AppDeps) {
     return { d, world, recipe: recipeById(world, d.recipeId)! };
   };
 
+  /** The player's view of a run. A daily that wasn't solved keeps its password secret until the next daily. */
+  const view = (run: RunState, world: GrandmaWorld, recipe: Recipe) => {
+    const secret = run.daily !== undefined && run.status !== "solved" && dailyPick(data.worlds.values(), now())?.number === run.daily;
+    return toRunView(run, world, recipe, { hidePassword: secret });
+  };
+
   app.get("/api/daily", (c) => {
     const { d, world } = today();
     const stats = store.dailyStats(d.number);
@@ -199,7 +272,7 @@ export function createApp(deps: AppDeps) {
     const greeting = pick(lines.greeting, rng(hashString(daily ? `daily:${daily}` : id)));
     const run = createRunState({ id, world, recipe, sceneId, greeting, relaxed: req.relaxed, daily });
     store.save(run);
-    return c.json(toRunView(run, world, recipe));
+    return c.json(view(run, world, recipe));
   });
 
   async function talk(c: Context, runId: string, input: TurnInput, voice?: { confidence: number }): Promise<AskResponse> {
@@ -217,18 +290,20 @@ export function createApp(deps: AppDeps) {
     let meta: Partial<Parameters<RunStore["log"]>[0]> = {};
     /** Turns that are Grandma's fault, not the player's, cost no tea and don't count: mishears and fallbacks. */
     let free = false;
-    if (input.kind === "ask" && mentionsSelfHarm(input.text)) {
+    // What the player typed, also when they show an object with a question (security review F).
+    const said = input.kind === "ask" ? input.text : (input.text ?? "");
+    if (mentionsSelfHarm(said)) {
       // Safety first, and free: no model call, no tea, no question counted.
       const reply = lines.crisis[0] ?? "";
       run.history.push({ role: "player", text: playerText }, { role: "grandma", text: reply, mood: "worried" });
       store.save(run);
-      return { reply, mood: "worried", cost: 0, napped: false, run: toRunView(run, world, recipe) };
+      return { reply, mood: "worried", cost: 0, napped: false, run: view(run, world, recipe) };
     }
-    if (input.kind === "ask" && notEnglish(input.text)) {
+    if (said && notEnglish(said)) {
       const reply = lineFor(run, lines.pardon, "pardon");
       run.history.push({ role: "player", text: playerText }, { role: "grandma", text: reply, mood: "confused" });
       store.save(run);
-      return { reply, mood: "confused", cost: 0, napped: false, run: toRunView(run, world, recipe) };
+      return { reply, mood: "confused", cost: 0, napped: false, run: view(run, world, recipe) };
     }
     // Voice mode: she may mishear one word (a capped rule, after the safety checks above).
     // She reacts to what she heard with a canned line: no model call and no facts, so the free turn gives nothing away.
@@ -237,13 +312,18 @@ export function createApp(deps: AppDeps) {
       const as = misheard.as;
       reply = fill(lineFor(run, lines.misheard, "mishear"), { as, As: as.charAt(0).toUpperCase() + as.slice(1) });
       mood = "confused";
-    } else if (input.kind === "ask" && asksForPassword(input.text)) {
+    } else if (asksForPassword(said)) {
       reply = lineFor(run, lines.password_deflect, "pw");
       mood = "suspicious";
     } else {
       const result = await brain.reply({ world, recipe, run, input, lines });
       // She lost her train of thought (the model failed or every try was rejected): the player shouldn't pay for that.
-      if (result.fallback) free = true;
+      // Only up to a point, though: questions built to fail every check would otherwise buy model calls for nothing
+      // (security review B). Past the limit a fallback is charged and counted like any question.
+      if (result.fallback && (run.freeFallbacks ?? 0) < RULES.maxFreeFallbacks) {
+        free = true;
+        run.freeFallbacks = (run.freeFallbacks ?? 0) + 1;
+      }
       reply = result.output.reply;
       mood = result.output.mood;
       factIds = result.output.fact_ids_used;
@@ -258,7 +338,7 @@ export function createApp(deps: AppDeps) {
     }
 
     run.history.push(
-      { role: "player", text: misheard ? misheard.heard : playerText, objectId: input.kind === "show" ? input.object.id : undefined },
+      { role: "player", text: misheard ? typedText(misheard.heard) : playerText, objectId: input.kind === "show" ? input.object.id : undefined },
       { role: "grandma", text: reply, factIds, mood },
     );
     if (factIds.length) run.lastFactIds = factIds;
@@ -293,12 +373,13 @@ export function createApp(deps: AppDeps) {
       ...meta,
     });
     const costParts = { base: cost.base, long: cost.long, rude: cost.rude, followUp: cost.followUp };
-    return { reply, mood: napped ? "sleepy" : mood, cost: cost.total, costParts: free ? undefined : costParts, napped, after, nudge, misheard, run: toRunView(run, world, recipe) };
+    return { reply, mood: napped ? "sleepy" : mood, cost: cost.total, costParts: free ? undefined : costParts, napped, after, nudge, misheard, run: view(run, world, recipe) };
   }
 
   app.post("/api/runs/:id/ask", async (c) => {
     const req = await body(c, AskRequest);
-    return c.json(await talk(c, c.req.param("id"), { kind: "ask", text: req.text }, req.voice));
+    const id = c.req.param("id");
+    return c.json(await oneAtATime(id, () => talk(c, id, { kind: "ask", text: req.text }, req.voice)));
   });
 
   app.post("/api/runs/:id/show", async (c) => {
@@ -307,38 +388,50 @@ export function createApp(deps: AppDeps) {
     const scene = data.scenes.get(run.sceneId);
     const obj = scene?.interactables.find((i) => i.id === req.objectId && (i.kind === "clue" || i.kind === "cookie_jar"));
     if (!obj) throw new HttpError(400, "Grandma squints. She can't see that from here.");
-    return c.json(
-      await talk(c, run.id, {
-        kind: "show",
-        object: { id: obj.id, label: obj.label, inspectText: obj.inspect_text ?? obj.label, factIds: obj.fact_ids ?? [] },
-        text: req.text || undefined,
-      }),
-    );
+    const turn: TurnInput = {
+      kind: "show",
+      object: { id: obj.id, label: obj.label, inspectText: obj.inspect_text ?? obj.label, factIds: obj.fact_ids ?? [] },
+      text: req.text || undefined,
+    };
+    return c.json(await oneAtATime(run.id, () => talk(c, run.id, turn)));
   });
 
   app.post("/api/runs/:id/item", async (c) => {
+    limitActions(clientIp(c));
     const req = await body(c, ItemRequest);
     const { run, world, recipe } = loadRun(c.req.param("id"));
-    requirePlaying(run);
-    let line: string;
-    if (req.item === "glasses") {
-      const result = wearGlasses(run, recipe);
-      line = lineFor(run, result === "on" ? lines.glasses_on : lines.glasses_not_needed, "glasses");
-      if (result === "on") run.history.push({ role: "grandma", text: line, mood: "happy" });
-    } else {
-      const ok = giveCookie(run);
-      line = lineFor(run, ok ? lines.cookie : lines.no_cookie, "cookie");
-      if (ok) run.history.push({ role: "grandma", text: line, mood: "happy" });
-    }
-    store.save(run);
-    store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "item", input: req.item, reply: line, stamina: run.stamina, status: run.status, ...(run.daily ? { daily: run.daily } : {}) });
-    const res: ItemResponse = { line, run: toRunView(run, world, recipe) };
-    return c.json(res);
+    return oneAtATime(run.id, () => {
+      requirePlaying(run);
+      let line: string;
+      let changed: boolean;
+      if (req.item === "glasses") {
+        const result = wearGlasses(run, recipe);
+        changed = result === "on";
+        line = lineFor(run, changed ? lines.glasses_on : lines.glasses_not_needed, "glasses");
+      } else {
+        const result = giveCookie(run);
+        changed = result === "given";
+        line = lineFor(run, result === "given" ? lines.cookie : result === "full" ? lines.cookie_full : lines.no_cookie, "cookie");
+      }
+      // Only real changes are saved and logged, so repeating a no-op can't fill the disk (security review C).
+      if (changed) {
+        run.history.push({ role: "grandma", text: line, mood: "happy" });
+        store.save(run);
+        store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "item", input: req.item, reply: line, stamina: run.stamina, status: run.status, ...(run.daily ? { daily: run.daily } : {}) });
+      }
+      const res: ItemResponse = { line, run: view(run, world, recipe) };
+      return c.json(res);
+    });
   });
 
   app.post("/api/runs/:id/guess", async (c) => {
+    limitActions(clientIp(c));
     const req = await body(c, GuessRequest);
     const { run, world, recipe } = loadRun(c.req.param("id"));
+    return oneAtATime(run.id, () => guessTurn(c, req, run, world, recipe));
+  });
+
+  function guessTurn(c: Context, req: z.infer<typeof GuessRequest>, run: RunState, world: GrandmaWorld, recipe: Recipe) {
     requirePlaying(run);
     const partial = req.parts ? checkGuessParts(run, world, recipe, req.parts) : undefined;
     const correct = partial ? partial.correct : checkGuess(run, recipe, req.password!);
@@ -348,9 +441,9 @@ export function createApp(deps: AppDeps) {
     store.save(run);
     // Log only whether the guess was right, not the text, so logs never hold the password.
     store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "guess", input: correct ? "(correct)" : "(wrong)", reply: line, stamina: run.stamina, status: run.status, ...(run.daily ? { daily: run.daily } : {}) });
-    const res: GuessResponse = { correct, line, partsCorrect: partial?.partsCorrect, partsTotal: partial?.partsTotal, run: toRunView(run, world, recipe) };
+    const res: GuessResponse = { correct, line, partsCorrect: partial?.partsCorrect, partsTotal: partial?.partsTotal, run: view(run, world, recipe) };
     return c.json(res);
-  });
+  }
 
   return app;
 }

@@ -18,9 +18,18 @@ export interface ShownObject {
 
 export type TurnInput = { kind: "ask"; text: string } | { kind: "show"; object: ShownObject; text?: string };
 
+/**
+ * What the player typed, with square brackets turned into round ones. Brackets in a message are the game's
+ * own notes to Grandma ("[shows you the photo]", "[Memories this object brings back: …]"), so typed text
+ * must not be able to imitate them (security review P3).
+ */
+export function typedText(text: string): string {
+  return text.replace(/\[/g, "(").replace(/\]/g, ")");
+}
+
 export function playerTurnText(input: TurnInput): string {
-  if (input.kind === "ask") return input.text;
-  const said = input.text ? ` and asks: ${input.text}` : "";
+  if (input.kind === "ask") return typedText(input.text);
+  const said = input.text ? ` and asks: ${typedText(input.text)}` : "";
   return `[shows you the ${input.object.label}]${said}`;
 }
 

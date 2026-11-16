@@ -26,7 +26,7 @@
         {
           "player": "When did you and Grandpa get married?",
           "grandma": {
-            "reply": "We got married in June of 1961 at St. Stanislaus church. Michael broke his arm sledding the winter he was eleven, and he still blames the dog.",
+            "reply": "We got married in June of 1961 at St. Stanislaus church. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
             "fact_ids_used": [
               "f_wedding",
               "f_michael_arm"
@@ -41,9 +41,9 @@
         {
           "player": "Where did you meet Grandpa?",
           "grandma": {
-            "reply": "Oh, for heaven's sake. Walt proposed on Christmas Eve, 1960, with a ring hidden in a pierogi. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
+            "reply": "Oh, for heaven's sake. I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
             "fact_ids_used": [
-              "f_engaged",
+              "f_met_walt",
               "f_job2"
             ],
             "distractor_ids": [
@@ -56,13 +56,13 @@
         {
           "player": "What does Grandpa call you?",
           "grandma": {
-            "reply": "Now where was I. Your grandpa has called me 'Sparrow' since the day we met, because I never stop chirping. I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear.",
+            "reply": "Now where was I. Your grandpa has called me 'Sparrow' since the day we met, because I never stop chirping. Walt proposed on Christmas Eve, 1960, with a ring hidden in a pierogi.",
             "fact_ids_used": [
               "f_nickname",
-              "f_met_walt"
+              "f_engaged"
             ],
             "distractor_ids": [
-              "f_met_walt"
+              "f_engaged"
             ],
             "mood": "nostalgic"
           },
@@ -205,7 +205,7 @@
         {
           "player": "What's the name of your sister?",
           "grandma": {
-            "reply": "My little sister Dorothy, we all call her Dot, is three years younger than me. Michael broke his arm sledding the winter he was eleven, and he still blames the dog.",
+            "reply": "My little sister Dorothy, we all call her Dot, is three years younger than me. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
             "fact_ids_used": [
               "f_sister",
               "f_michael_arm"
@@ -257,7 +257,7 @@
         {
           "player": "What do you grow in the garden?",
           "grandma": {
-            "reply": "I grow tomatoes in the backyard and the squirrels eat half of them. Michael broke his arm sledding the winter he was eleven, and he still blames the dog.",
+            "reply": "I grow tomatoes in the backyard and the squirrels eat half of them. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
             "fact_ids_used": [
               "f_garden",
               "f_michael_arm"
@@ -503,7 +503,7 @@
         {
           "player": "When did Michael break his arm?",
           "grandma": {
-            "reply": "Michael broke his arm sledding the winter he was eleven, and he still blames the dog. Uncle Stan is your grandpa's older brother. Loud as a foghorn.",
+            "reply": "Michael broke his arm sledding the year he turned eleven, and he still blames the dog. Uncle Stan is your grandpa's older brother. Loud as a foghorn.",
             "fact_ids_used": [
               "f_michael_arm",
               "f_stan"
@@ -533,7 +533,7 @@
         {
           "player": "When did you get the color TV?",
           "grandma": {
-            "reply": "Don't tell your grandfather I said that. We watched the moon landing in 1969 on our brand-new color TV. Walt cried, don't tell him I told you. Michael broke his arm sledding the winter he was eleven, and he still blames the dog.",
+            "reply": "Don't tell your grandfather I said that. We watched the moon landing in 1969 on our brand-new color TV. Walt cried, don't tell him I told you. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
             "fact_ids_used": [
               "f_moon",
               "f_michael_arm"
@@ -600,7 +600,7 @@
         {
           "player": "What happened at his cabin?",
           "grandma": {
-            "reply": "Sweetheart. The big snowstorm was the same winter Michael broke his arm. Uncle Stan got stuck in the outhouse at the fishing cabin. Michael broke his arm sledding the winter he was eleven, and he still blames the dog.",
+            "reply": "Sweetheart. The big snowstorm was the same winter Michael broke his arm. Uncle Stan got stuck in the outhouse at the fishing cabin. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
             "fact_ids_used": [
               "f_snowstorm",
               "f_michael_arm"
@@ -788,7 +788,7 @@
         {
           "player": "What is the Wi-Fi password?",
           "grandma": {
-            "reply": "Now where was I. Michael set up the Wi-Fi box and wrote the hint on that sticky note. I never could remember these things. Michael broke his arm sledding the winter he was eleven, and he still blames the dog.",
+            "reply": "Now where was I. Michael set up the Wi-Fi box and wrote the hint on that sticky note. I never could remember these things. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
             "fact_ids_used": [
               "f_router",
               "f_michael_arm"
@@ -1018,9 +1018,9 @@
         {
           "player": "Where did you meet Grandpa?",
           "grandma": {
-            "reply": "Oh, for heaven's sake. Walt proposed on Christmas Eve, 1960, with a ring hidden in a pierogi. Your uncle Michael came along in 1966, the first baby in the Maple Avenue house.",
+            "reply": "Oh, for heaven's sake. I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear. Your uncle Michael came along in 1966, the first baby in the Maple Avenue house.",
             "fact_ids_used": [
-              "f_engaged",
+              "f_met_walt",
               "f_michael_born"
             ],
             "distractor_ids": [
