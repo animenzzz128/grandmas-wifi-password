@@ -275,3 +275,17 @@ export function posedPoints(meshes: SkinnedMesh[], bones: RegExp): Vector3[] {
   }
   return out;
 }
+
+/** `index` without the triangles that touch a flagged vertex. */
+export function dropTriangles(index: ArrayLike<number>, flagged: (v: number) => boolean): { keep: number[]; dropped: number } {
+  const keep: number[] = [];
+  let dropped = 0;
+  for (let t = 0; t < index.length; t += 3) {
+    const a = index[t]!;
+    const b = index[t + 1]!;
+    const c = index[t + 2]!;
+    if (flagged(a) || flagged(b) || flagged(c)) dropped++;
+    else keep.push(a, b, c);
+  }
+  return { keep, dropped };
+}

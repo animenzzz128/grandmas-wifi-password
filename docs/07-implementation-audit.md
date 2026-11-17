@@ -463,3 +463,14 @@ Jacky asked to go on with steps 3 and 4.
   - the fit gaps aren't an automated test yet, because the glTF body doesn't load under Vitest;
   - the blanket looks thick, about 13 cm above the thigh line, so that its sides cover the widest part of the thighs;
   - the tall armrests.
+
+### Iteration 52 (11/17): a thinner blanket
+Jacky found the blanket too thick.
+- **Cause:** measured by tenths of the way from hip to knee, the base body's athletic thighs rise up to 13.8 cm above the bone line mid-thigh. A blanket clearing all of that looked like a box; smaller side drops changed nothing.
+- **Fix:**
+  - The blanket is lifted only to clear the knees (from 80% of the way), where it rolls over. Lift is now 8.0 cm, down from 12.7 cm.
+  - The 242 thigh triangles that would poke up through it aren't drawn: the blanket covers that spot from above, like the cardigan over her arms. Nothing behind the hip joints is hidden, so no holes open where her body rises out of the blanket.
+  - The sides drop 3.5 cm (was 9 cm) and reach 1.5 cm past her thighs (was 3.5 cm).
+- **Measured:** hands 7.5 mm above the blanket, 6.2 cm apart; arms 9.2 cm inside the armrests.
+- **Checks:** screenshots from the front and a low three-quarter view, where holes would show (none); 222 tests; typecheck; build.
+

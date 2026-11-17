@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LIMITS, limitHead, soft, softRange } from "../src/scene/poseLimits.ts";
 import { Vector3 } from "three";
-import { twoBoneElbow, uncoveredTriangles } from "../src/scene/body.ts";
+import { dropTriangles, twoBoneElbow, uncoveredTriangles } from "../src/scene/body.ts";
 import { drapeSurfaceY, liftToClear } from "../src/scene/blanket.ts";
 
 describe("Grandma's pose limits (clipping plan step 2)", () => {
@@ -105,5 +105,14 @@ describe("the lap blanket is shaped from her legs (clipping plan step 4)", () =>
     let tightest = Infinity;
     for (const p of points) tightest = Math.min(tightest, drapeSurfaceY(hips, knees, 0.5, { ...opts, lift }, p.x, p.z)! - p.y);
     expect(tightest).toBeCloseTo(0.008, 6);
+  });
+});
+
+describe("thigh triangles under the blanket aren't drawn", () => {
+  it("drops every triangle that touches a flagged vertex and keeps the rest", () => {
+    const index = [0, 1, 2, 2, 1, 3, 2, 3, 4];
+    const { keep, dropped } = dropTriangles(index, (v) => v === 3);
+    expect(dropped).toBe(2);
+    expect(keep).toEqual([0, 1, 2]);
   });
 });

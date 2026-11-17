@@ -37,7 +37,7 @@ import { t } from "../strings.ts";
 import { useHighlight } from "./Model.tsx";
 import { drapeSurfaceY, drapedBlanket, liftToClear } from "./blanket.ts";
 import { limitHead } from "./poseLimits.ts";
-import { BODY_URL, HAIR_URL, aim, clothMaterial, hairMaterial, regionsOf, roll, setRegions, posedPoints, softenChest, twoBoneElbow, uncoveredTriangles } from "./body.ts";
+import { BODY_URL, HAIR_URL, aim, clothMaterial, hairMaterial, regionsOf, roll, setRegions, dropTriangles, posedPoints, softenChest, twoBoneElbow, uncoveredTriangles } from "./body.ts";
 import type { Outfit } from "./body.ts";
 import type { Vec3 } from "./models.ts";
 
@@ -62,14 +62,14 @@ const LAP_HAND_ALONG = 0.62;
 const WRIST_ABOVE_LAP = 0.028;
 /** Her fingers rest this far above the blanket's surface (it's soft; just not inside it). */
 const HAND_ON_LAP = 0.003;
-/** The blanket only has to clear her thighs from this fraction of the way from hip to knee. */
-const LAP_FROM = 0.25;
+/** The blanket is lifted to clear her thighs from this fraction of the way from hip to knee (the knees). */
+const BLANKET_CLEARS_FROM = 0.8;
 /**
  * The blanket: how far it reaches past the outside of her thighs, how far its sides drop, and the smallest
  * gap it keeps above them (model space).
  */
-const BLANKET_OVERHANG = 0.035;
-const BLANKET_SAG = 0.09;
+const BLANKET_OVERHANG = 0.015;
+const BLANKET_SAG = 0.035;
 const BLANKET_GAP = 0.008;
 
 /**
@@ -101,8 +101,10 @@ export interface Fit {
   handGap: number;
   /** Her arms inside the armrests. */
   armGap: number;
-  /** How high the blanket had to sit to clear her thighs. */
+  /** How high the blanket sits above the line from hip to knee. */
   blanketLift: number;
+  /** Thigh triangles not drawn because the blanket covers them. */
+  underBlanket: number;
 }
 
 /** How much room the sip leaves (metres; negative means the cup or hand is in her face). */
@@ -378,24 +380,53 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
   };
 
   // Crocheted blanket draped over her lap and knees (see blanket.ts), shaped from her posed legs (clipping
-  // plan step 4): wide enough to reach over the outside of her thighs, and lifted just enough to clear them.
+  // plan step 4). The base body's thighs are athletic: mid-thigh they rise about 13 cm above the bone, so a
+  // blanket clearing them looked like a box. Instead it is only lifted to clear her knees, where it rolls over,
+  // and the thigh triangles that would poke up through it aren't drawn (the blanket covers that spot from
+  // above, like the cardigan over her arms).
   const hipL = bone("thigh_l").getWorldPosition(new Vector3());
   const hipR = bone("thigh_r").getWorldPosition(new Vector3());
   const kneeL = bone("calf_l").getWorldPosition(new Vector3());
   const kneeR = bone("calf_r").getWorldPosition(new Vector3());
   const hips = hipL.clone().add(hipR).multiplyScalar(0.5);
   const knees = kneeL.clone().add(kneeR).multiplyScalar(0.5);
-  // The lap part of the thighs: from a quarter of the way to the knees on. Nearer the hip crease the cloth
-  // tucks into her lap anyway, and the hip bulge there would hold the whole blanket up.
   const thighLen = hips.distanceTo(knees);
-  const thighPoints = posedPoints(dressing, /^thigh_/).filter((p) => p.z - hips.z > thighLen * LAP_FROM);
-  const legSpan = Math.max(...thighPoints.map((p) => Math.abs(p.x - hips.x)));
+  const along = (p: Vector3) => (p.z - hips.z) / thighLen;
+  const thighPoints = posedPoints(dressing, /^thigh_/);
+  const legSpan = Math.max(...thighPoints.filter((p) => along(p) > 0.25).map((p) => Math.abs(p.x - hips.x)));
   const blanketWidth = 2 * (legSpan + BLANKET_OVERHANG);
   const drape = { sag: BLANKET_SAG, lift: 0 };
-  drape.lift = liftToClear(hips, knees, blanketWidth, drape, thighPoints, BLANKET_GAP);
+  drape.lift = liftToClear(hips, knees, blanketWidth, drape, thighPoints.filter((p) => along(p) > BLANKET_CLEARS_FROM), BLANKET_GAP);
   const blanketMat = new MeshStandardMaterial({ map: grannySquares(), roughness: 0.95, side: DoubleSide });
   const blanket = new Mesh(drapedBlanket(hips, knees, blanketWidth, drape), blanketMat);
   body.add(blanket);
+  let underBlanket = 0;
+  for (const m of dressing) {
+    const g = m.geometry;
+    const idx = g.getAttribute("skinIndex");
+    const wt = g.getAttribute("skinWeight");
+    const n = g.getAttribute("position").count;
+    const poke = new Uint8Array(n);
+    const p = new Vector3();
+    for (let i = 0; i < n; i++) {
+      let best = 0;
+      let bestW = -1;
+      for (let k = 0; k < 4; k++) {
+        if (wt.getComponent(i, k) > bestW) {
+          bestW = wt.getComponent(i, k);
+          best = idx.getComponent(i, k);
+        }
+      }
+      if (!/^thigh_/.test(m.skeleton.bones[best]?.name ?? "")) continue;
+      m.localToWorld(m.getVertexPosition(i, p));
+      if (along(p) < 0) continue; // behind the hip joints the body rises out of the blanket: keep it
+      const top = drapeSurfaceY(hips, knees, blanketWidth, drape, p.x, p.z);
+      if (top !== null && p.y > top - 0.002) poke[i] = 1;
+    }
+    const kept = dropTriangles(g.getIndex()!.array as ArrayLike<number>, (v) => poke[v] === 1);
+    g.setIndex(kept.keep);
+    underBlanket += kept.dropped;
+  }
   const lapY = (x: number, z: number) => drapeSurfaceY(hips, knees, blanketWidth, drape, x, z) ?? hips.y + drape.lift;
 
   // Hands rest on the blanket, one on each thigh, placed by two-bone IK (clipping plan step 3). They used to
@@ -559,7 +590,7 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
   root.position.set(0, seatY, seatZ);
   root.updateMatrixWorld(true);
   const armGap = Math.min(...posedPoints(torso, /^(upperarm|lowerarm|hand|index|middle|ring|pinky|thumb)_/).map((p) => CHAIR.armInnerX - Math.abs(p.x)));
-  const fit: Fit = { lapGap: lapGap * scale, handGap: handGap * scale, armGap, blanketLift: drape.lift * scale };
+  const fit: Fit = { lapGap: lapGap * scale, handGap: handGap * scale, armGap, blanketLift: drape.lift * scale, underBlanket };
 
   const X = v(1, 0, 0);
   return {
