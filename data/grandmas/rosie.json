@@ -667,6 +667,16 @@
         "f_linda_born"
       ],
       "source": "family"
+    },
+    {
+      "id": "a_biscuit",
+      "phrase": "the year Biscuit came home",
+      "resolves_to_year": 1949,
+      "via_fact_ids": [
+        "f_birth",
+        "f_dog1"
+      ],
+      "source": "family"
     }
   ],
   "stories": [
@@ -740,7 +750,7 @@
       "id": "r_medium",
       "difficulty": "medium",
       "note_text": "the street we lived on the year we got the color TV + the number Grandpa painted crooked",
-      "smudged_text": "the street we lived on the year we got the col█r TV + the number Grandpa painted crooked",
+      "smudged_text": "the street we lived on the year we got the color TV + the number Grandpa ███████ ███████",
       "slots": [
         {
           "fact_id": "f_house",
@@ -821,6 +831,197 @@
       "nudges": [
         "Michael's old sled is still by the door. That boy and that sled, I tell you.",
         "Ask me what your grandpa calls me, dear. He's had a pet name for me since the day we met."
+      ],
+      "smudged_text": "the bird Grandpa named me after + year of the big █████████ + !"
+    },
+    {
+      "id": "r_easy_2",
+      "difficulty": "easy",
+      "note_text": "where we spent our honeymoon + the year your mom was born",
+      "slots": [
+        {
+          "fact_id": "f_honeymoon",
+          "field": "object",
+          "transform": "first_word"
+        },
+        {
+          "fact_id": "f_linda_born",
+          "field": "year",
+          "transform": "none"
+        }
+      ],
+      "format": {
+        "join": "",
+        "rules_shown_on_note": [
+          "no spaces",
+          "first letter capital"
+        ]
+      },
+      "password": "Niagara1963",
+      "par": null,
+      "separate": [
+        [
+          "f_honeymoon",
+          "f_linda_born"
+        ]
+      ],
+      "nudges": [
+        "Your grandpa got soaked on our honeymoon, did I ever tell you? That wedding picture brings it all back.",
+        "Your mom was my very first baby, you know. Ask me when she came along, sweetheart."
+      ]
+    },
+    {
+      "id": "r_easy_3",
+      "difficulty": "easy",
+      "note_text": "my favorite dog + the year I won the blue ribbon",
+      "slots": [
+        {
+          "fact_id": "f_dog2",
+          "field": "object",
+          "transform": "capitalize"
+        },
+        {
+          "fact_id": "f_pie",
+          "field": "year",
+          "transform": "none"
+        }
+      ],
+      "format": {
+        "join": "",
+        "rules_shown_on_note": [
+          "no spaces",
+          "first letter capital"
+        ]
+      },
+      "password": "Buttons1972",
+      "par": null,
+      "separate": [
+        [
+          "f_dog2",
+          "f_pie"
+        ]
+      ],
+      "nudges": [
+        "Did you see the spaniel in my album? Oh, she was my favorite. Ask me her name.",
+        "That blue ribbon on the wall is my proudest moment, sweetheart. Ask me about it."
+      ]
+    },
+    {
+      "id": "r_medium_2",
+      "difficulty": "medium",
+      "note_text": "the friend I bowl with every Tuesday + the year your grandpa lost three dollars at the fair",
+      "slots": [
+        {
+          "fact_id": "f_marge",
+          "field": "object",
+          "transform": "first_word"
+        },
+        {
+          "fact_id": "f_met_walt",
+          "field": "year",
+          "transform": "none"
+        }
+      ],
+      "format": {
+        "join": "",
+        "rules_shown_on_note": [
+          "no spaces",
+          "first letter capital"
+        ]
+      },
+      "password": "Marge1958",
+      "par": null,
+      "separate": [
+        [
+          "f_marge",
+          "f_met_walt"
+        ],
+        [
+          "f_bowling",
+          "f_met_walt"
+        ]
+      ],
+      "nudges": [
+        "That bowling trophy is from the Tuesday league. I haven't missed a Tuesday in forty years.",
+        "Two of my best days were at the county fair, you know. Ask me about the fair, sweetheart."
+      ]
+    },
+    {
+      "id": "r_medium_3",
+      "difficulty": "medium",
+      "note_text": "the dog we got the year before the men walked on the moon + the number on the door of our first home",
+      "slots": [
+        {
+          "fact_id": "f_dog2",
+          "field": "object",
+          "transform": "capitalize"
+        },
+        {
+          "fact_id": "f_apt_number",
+          "field": "object",
+          "transform": "none"
+        }
+      ],
+      "format": {
+        "join": "",
+        "rules_shown_on_note": [
+          "no spaces",
+          "first letter capital"
+        ]
+      },
+      "password": "Buttons27",
+      "par": null,
+      "separate": [
+        [
+          "f_dog2",
+          "f_moon"
+        ],
+        [
+          "f_dog2",
+          "f_tv"
+        ]
+      ],
+      "nudges": [
+        "We got our first color TV just for the moon landing. Our dog loved lying in front of it.",
+        "Our first little apartment had stairs that squeaked something awful. Ask me about it."
+      ]
+    },
+    {
+      "id": "r_hard_2",
+      "difficulty": "hard",
+      "note_text": "the sock thief + the year the sock thief came home + !",
+      "slots": [
+        {
+          "fact_id": "f_dog1",
+          "field": "object",
+          "transform": "capitalize"
+        },
+        {
+          "fact_id": "f_dog1",
+          "field": "year",
+          "transform": "none",
+          "requires_anchor": "a_biscuit"
+        }
+      ],
+      "literal_suffix": "!",
+      "format": {
+        "join": "",
+        "rules_shown_on_note": [
+          "no spaces",
+          "first letter capital"
+        ]
+      },
+      "password": "Biscuit1949!",
+      "par": null,
+      "separate": [
+        [
+          "f_dog1",
+          "f_birth"
+        ]
+      ],
+      "nudges": [
+        "Biscuit came home when I was just a little girl, you know. Ask me how old I was.",
+        "I'm an Erie girl, born and raised. Ask me when I was born, sweetheart."
       ]
     }
   ]

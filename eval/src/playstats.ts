@@ -20,8 +20,11 @@ export interface LogEntry {
   runId: string;
   worldId: string;
   recipeId: string;
-  kind: "ask" | "show" | "item" | "guess";
+  kind: "ask" | "show" | "item" | "guess" | "start" | "event";
   status: string;
+  /** For kind "event": what the player did (a name, never text), and on which object. */
+  event?: string;
+  objectId?: string;
   grandmaMode?: string;
   latencyMs?: number;
   attempts?: number;
@@ -45,7 +48,18 @@ export interface PuzzleStats {
   par?: number;
 }
 
+/** The play funnel (design plan E3): of the visits that started, how many reached each step. */
+export interface Funnel {
+  visits: number;
+  steps: { step: string; visits: number }[];
+  /** Median seconds from the start of a visit to its first question. */
+  secondsToFirstQuestion: number | null;
+  /** Share of visits that looked at each object (which clues get found). */
+  objects: { objectId: string; visits: number }[];
+}
+
 export interface PlayStats {
+  funnel: Funnel;
   days: string[];
   runs: number;
   turns: number;
@@ -94,13 +108,19 @@ export type ParOf = (key: string) => number | undefined;
 export function playStats(entries: readonly LogEntry[], parOf: ParOf = () => undefined): PlayStats {
   const sorted = [...entries].sort((a, b) => a.ts.localeCompare(b.ts));
   const days = [...new Set(sorted.map((e) => e.ts.slice(0, 10)))];
-  const runs = new Map<string, { key: string; status: string; questions: number; daily?: number }>();
+  const runs = new Map<string, { key: string; status: string; questions: number; daily?: number; started?: string; firstQuestion?: string; did: Set<string>; objects: Set<string> }>();
   const modes: Record<string, number> = {};
   let turns = 0;
   const model = sorted.filter((e) => (e.kind === "ask" || e.kind === "show") && e.grandmaMode === "llm");
   for (const e of sorted) {
-    const r = runs.get(e.runId) ?? { key: `${e.worldId}/${e.recipeId}`, status: "playing", questions: 0, daily: e.daily };
+    const r = runs.get(e.runId) ?? { key: `${e.worldId}/${e.recipeId}`, status: "playing", questions: 0, daily: e.daily, did: new Set<string>(), objects: new Set<string>() };
     r.status = e.status;
+    if (e.kind === "start") r.started ??= e.ts;
+    if ((e.kind === "ask" || e.kind === "show") && !r.firstQuestion) r.firstQuestion = e.ts;
+    if (e.kind === "ask" || e.kind === "show") r.did.add("asked");
+    if (e.kind === "guess") r.did.add("guessed");
+    if (e.kind === "event" && e.event) r.did.add(e.event);
+    if (e.kind === "event" && e.event === "inspect" && e.objectId) r.objects.add(e.objectId);
     if (e.kind === "ask" || e.kind === "show") {
       r.questions++;
       turns++;
@@ -129,11 +149,27 @@ export function playStats(entries: readonly LogEntry[], parOf: ParOf = () => und
     }
   }
 
+  // The funnel counts only visits whose start was logged (logs from before iteration 43 have none).
+  const started = [...runs.values()].filter((r) => r.started);
+  const reached = (step: string) => started.filter((r) => (step === "solved" ? r.status === "solved" : r.did.has(step))).length;
+  const objectCounts = new Map<string, number>();
+  for (const r of started) for (const o of r.objects) objectCounts.set(o, (objectCounts.get(o) ?? 0) + 1);
+  const funnel: Funnel = {
+    visits: started.length,
+    steps: ["note", "asked", "inspect", "notebook", "pin", "guessed", "solved", "share"].map((step) => ({ step, visits: reached(step) })),
+    secondsToFirstQuestion: percentile(
+      started.flatMap((r) => (r.firstQuestion ? [(Date.parse(r.firstQuestion) - Date.parse(r.started!)) / 1000] : [])),
+      50,
+    ),
+    objects: [...objectCounts].map(([objectId, visits]) => ({ objectId, visits })).sort((a, b) => b.visits - a.visits || a.objectId.localeCompare(b.objectId)),
+  };
+
   const errors = new Map<string, number>();
   for (const e of model) for (const err of e.validatorErrors ?? []) errors.set(errorType(err), (errors.get(errorType(err)) ?? 0) + 1);
   const input = model.reduce((s, e) => s + (e.usage?.input ?? 0), 0);
   const cached = model.reduce((s, e) => s + (e.usage?.cacheRead ?? 0), 0);
   return {
+    funnel,
     days,
     runs: runs.size,
     turns,
@@ -161,6 +197,20 @@ export function renderPlayStats(s: PlayStats): string {
   out.push(`# Play stats (${s.days.length ? `${s.days[0]} to ${s.days.at(-1)}` : "no logs"})`, "");
   out.push(`Aggregates from the server's turn logs. No player text or Grandma replies are included.`, "");
   out.push(`- Visits: ${s.runs} · questions: ${s.turns} · Grandma mode: ${Object.entries(s.modes).map(([m, n]) => `${m} ${n}`).join(", ") || "—"}`, "");
+  const f = s.funnel;
+  out.push("## Play funnel", "");
+  if (!f.visits) out.push("No visit starts in these logs (they begin with iteration 43), so there is no funnel yet.", "");
+  else {
+    const label: Record<string, string> = { note: "Read the note", asked: "Asked Grandma something", inspect: "Looked at an object", notebook: "Opened the notebook", pin: "Pinned a quote", guessed: "Tried the router", solved: "Solved it", share: "Copied the result" };
+    out.push("| Step | Visits | Share |", "|---|---|---|");
+    for (const st of f.steps) out.push(`| ${label[st.step] ?? st.step} | ${st.visits} | ${pct(st.visits / f.visits)} |`);
+    out.push("", `Of ${f.visits} visits. Median time to the first question: ${f.secondsToFirstQuestion === null ? "—" : `${Math.round(f.secondsToFirstQuestion)} s`} (target under 60 s).`, "");
+    if (f.objects.length) {
+      out.push("Clues found (share of visits that looked at each object; under about a third means the clue needs another route):", "");
+      for (const o of f.objects) out.push(`- ${o.objectId}: ${pct(o.visits / f.visits)}`);
+      out.push("");
+    }
+  }
   out.push("## Puzzles (balancing and par)", "");
   out.push("| Puzzle | Visits | Solved | Out of guesses | Bedtime | Unfinished | Median questions to solve | Par now |", "|---|---|---|---|---|---|---|---|");
   for (const p of s.puzzles) {

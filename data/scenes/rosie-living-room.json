@@ -419,13 +419,17 @@
       ],
       "color": "#7b2d26",
       "collide": false,
-      "inspect_text": "Two dog photos on facing pages: a beagle with one floppy ear chewing a sock, and a cocker spaniel on a porch step. Nobody wrote the names underneath. Tucked in the back is a birth announcement for baby Michael, 1966.",
+      "inspect_text": "Two dog photos on facing pages: a beagle with one floppy ear chewing a sock, and a cocker spaniel on a porch step. Nobody wrote the names underneath. A later page shows a little apartment window labeled 'Cherry St., our first home — moved out summer '64', and the next a front porch labeled 'Summer '69', with a mailbox reading 41 and the last digit hidden by a rosebush. Tucked in the back is a birth announcement for baby Michael, 1966.",
       "fact_ids": [
         "f_dog1",
         "f_dog1_breed",
         "f_dog1_habit",
         "f_dog2",
-        "f_michael_born"
+        "f_michael_born",
+        "f_apt",
+        "f_house",
+        "f_linda_born",
+        "f_apt_number"
       ]
     },
     {
@@ -446,7 +450,7 @@
       ],
       "color": "#e6e0d0",
       "collide": false,
-      "inspect_text": "A black-and-white wedding photo on church steps. Grandpa is squinting. The frame is engraved 'Moon River', and on the back, in Grandpa's handwriting: 'My Sparrow, June 1961'.",
+      "inspect_text": "A black-and-white wedding photo on church steps. Grandpa is squinting. The frame is engraved 'Moon River', and on the back, in Grandpa's handwriting: 'To my little songbird. Married the June after the pierogi.'",
       "fact_ids": [
         "f_wedding",
         "f_nickname",
@@ -620,7 +624,7 @@
       ],
       "color": "#f2efe6",
       "collide": false,
-      "inspect_text": "A spare wooden house number sign, painted a little crooked: 412. It must have come off the mailbox.",
+      "inspect_text": "A spare wooden house number from the mailbox, painted a little crooked. The paint has flaked: the first digit is a 4 and the last is a 2, but the middle one is gone.",
       "fact_ids": [
         "f_house_number",
         "f_house"

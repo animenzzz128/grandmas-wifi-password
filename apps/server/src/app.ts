@@ -10,6 +10,7 @@ import type { z } from "zod";
 import {
   AskRequest,
   CreateRunRequest,
+  EventRequest,
   GuessRequest,
   ItemRequest,
   fill,
@@ -59,6 +60,8 @@ export interface AppDeps {
   actionsPerMinute?: number;
   /** Questions per minute from everyone together (default 120). */
   serverAsksPerMinute?: number;
+  /** Sites allowed to show the game in a frame, e.g. ["https://itch.io", "https://*.itch.zone"]. Default: none. */
+  embedOrigins?: string[];
   /** Clock for the Daily Grandma (tests). */
   now?: () => Date;
 }
@@ -179,8 +182,11 @@ export function createApp(deps: AppDeps) {
         workerSrc: ["'self'", "blob:"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
-        frameAncestors: ["'none'"],
+        // Nobody may frame the game, unless EMBED_ORIGINS lists who may (an itch.io page; design plan F2).
+        frameAncestors: deps.embedOrigins?.length ? deps.embedOrigins : ["'none'"],
       },
+      // X-Frame-Options can only say "same site" or "no one", so it's left off when embedding is allowed.
+      xFrameOptions: deps.embedOrigins?.length ? false : "SAMEORIGIN",
       // Voice input needs the microphone on this site only.
       permissionsPolicy: { microphone: ["self"], camera: [], geolocation: [] },
     }),
@@ -254,7 +260,7 @@ export function createApp(deps: AppDeps) {
     limitRuns(clientIp(c));
     const req = await body(c, CreateRunRequest);
     let world: GrandmaWorld | undefined;
-    let recipe: Recipe;
+    let recipe!: Recipe;
     let daily: number | undefined;
     if (req.daily) {
       const t = today();
@@ -263,16 +269,44 @@ export function createApp(deps: AppDeps) {
     } else {
       world = data.worlds.get(req.grandmaId ?? "rosie") ?? [...data.worlds.values()][0];
       if (!world) throw new HttpError(404, "No Grandmas available.");
-      recipe = world.recipes.find((r) => r.difficulty === (req.difficulty ?? "easy")) ?? world.recipes[0]!;
+    }
+    const id = randomUUID();
+    if (!req.daily) {
+      const w = world!;
+      // Each difficulty has several puzzles; a visit gets one at random, avoiding the one just played (design plan D1).
+      const pinned = req.recipeId ? recipeById(w, req.recipeId) : undefined;
+      if (req.recipeId && !pinned) throw new HttpError(404, "No such puzzle.");
+      const pool = w.recipes.filter((r) => r.difficulty === (req.difficulty ?? "easy"));
+      const last = req.after ? store.get(req.after)?.recipeId : undefined;
+      const fresh = pool.filter((r) => r.id !== last);
+      recipe = pinned ?? (fresh.length ? pick(fresh, rng(hashString(id))) : pool[0]) ?? w.recipes[0]!;
     }
     const sceneId = data.sceneForWorld.get(world.id);
     if (!sceneId) throw new HttpError(404, `No room for ${world.id}.`);
-    const id = randomUUID();
     // Everyone gets the same greeting on the same daily.
     const greeting = pick(lines.greeting, rng(hashString(daily ? `daily:${daily}` : id)));
     const run = createRunState({ id, world, recipe, sceneId, greeting, relaxed: req.relaxed, daily });
     store.save(run);
+    // The top of the play funnel (design plan E3): when each visit started, and which puzzle.
+    store.log({ ts: new Date().toISOString(), runId: id, worldId: world.id, recipeId: recipe.id, kind: "start", input: "", stamina: run.stamina, status: run.status, ...(daily ? { daily } : {}) });
     return c.json(view(run, world, recipe));
+  });
+
+  /** Browser-only steps of the play funnel: read the note, inspect an object, pin, open the notebook, share. */
+  app.post("/api/runs/:id/event", async (c) => {
+    limitActions(clientIp(c));
+    const req = await body(c, EventRequest);
+    const { run, world, recipe } = loadRun(c.req.param("id"));
+    const scene = data.scenes.get(run.sceneId);
+    const objectId = req.kind === "inspect" && scene?.interactables.some((i) => i.id === req.objectId) ? req.objectId : undefined;
+    const key = `${req.kind}:${objectId ?? ""}`;
+    // Each event once per visit, so repeating one can't grow the log.
+    if (!(run.events ?? []).includes(key)) {
+      run.events = [...(run.events ?? []), key];
+      store.save(run);
+      store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "event", event: req.kind, ...(objectId ? { objectId } : {}), input: "", stamina: run.stamina, status: run.status, ...(run.daily ? { daily: run.daily } : {}) });
+    }
+    return c.body(null, 204);
   });
 
   async function talk(c: Context, runId: string, input: TurnInput, voice?: { confidence: number }): Promise<AskResponse> {
@@ -441,7 +475,7 @@ export function createApp(deps: AppDeps) {
     store.save(run);
     // Log only whether the guess was right, not the text, so logs never hold the password.
     store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "guess", input: correct ? "(correct)" : "(wrong)", reply: line, stamina: run.stamina, status: run.status, ...(run.daily ? { daily: run.daily } : {}) });
-    const res: GuessResponse = { correct, line, partsCorrect: partial?.partsCorrect, partsTotal: partial?.partsTotal, run: view(run, world, recipe) };
+    const res: GuessResponse = { correct, line, partsCorrect: partial?.partsCorrect, partsTotal: partial?.partsTotal, partsRight: partial?.partsRight, run: view(run, world, recipe) };
     return c.json(res);
   }
 

@@ -11,6 +11,14 @@ import { noteText, stars } from "./run.ts";
 
 export const MoodSchema = z.enum(["happy", "nostalgic", "teasing", "confused", "sleepy", "suspicious", "worried"]);
 
+/** Things players do that only the browser sees, for the play funnel (design plan E3). Names only, never text. */
+export const PlayEvent = z.enum(["note", "inspect", "pin", "notebook", "share"]);
+export const EventRequest = z.strictObject({
+  kind: PlayEvent,
+  /** Which object, for "inspect". */
+  objectId: z.string().max(64).optional(),
+});
+
 export const CreateRunRequest = z.strictObject({
   grandmaId: z.string().optional(),
   difficulty: Difficulty.optional(),
@@ -18,6 +26,10 @@ export const CreateRunRequest = z.strictObject({
   relaxed: z.boolean().optional(),
   /** Today's Daily Grandma (same Grandma and note for everyone); grandmaId and difficulty are ignored. */
   daily: z.boolean().optional(),
+  /** A specific puzzle (tests, the eval's AI player). Without it, a visit gets one of the difficulty's puzzles. */
+  recipeId: z.string().max(64).optional(),
+  /** The visit just finished: the next one avoids its puzzle when there's another ("Visit again"). */
+  after: z.string().max(64).optional(),
 });
 
 export const AskRequest = z.strictObject({
@@ -128,9 +140,10 @@ export const ItemResponse = z.strictObject({ line: z.string(), run: RunView });
 export const GuessResponse = z.strictObject({
   correct: z.boolean(),
   line: z.string(),
-  /** For slot guesses: how many parts were right (never which). */
+  /** For slot guesses: how many parts were right; on Easy and Medium also which ones. */
   partsCorrect: z.number().int().optional(),
   partsTotal: z.number().int().optional(),
+  partsRight: z.array(z.boolean()).optional(),
   run: RunView,
 });
 export const HealthResponse = z.strictObject({
@@ -143,6 +156,7 @@ export const HealthResponse = z.strictObject({
 export const ErrorResponse = z.strictObject({ error: z.string() });
 
 export type CreateRunRequest = z.infer<typeof CreateRunRequest>;
+export type EventRequest = z.infer<typeof EventRequest>;
 export type AskRequest = z.infer<typeof AskRequest>;
 export type ShowRequest = z.infer<typeof ShowRequest>;
 export type ItemRequest = z.infer<typeof ItemRequest>;

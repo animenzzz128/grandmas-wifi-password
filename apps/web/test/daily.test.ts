@@ -22,13 +22,14 @@ describe("daily record", () => {
     expect(saveDailyRecord({ number: 1, solved: true, stars: 1, questions: 9 }, full)).toBe(false);
   });
 
-  it("counts a streak of solved days, ending today or yesterday", () => {
+  it("counts days played in a row, ending today or yesterday; an unsolved day doesn't break it (plan D3)", () => {
     const rec = (number: number, solved = true) => ({ number, solved, stars: solved ? 2 : 0, questions: 8 });
     const all = { 4: rec(4), 5: rec(5, false), 6: rec(6), 7: rec(7) };
-    expect(dailyStreak(all, 7)).toBe(2);
-    expect(dailyStreak(all, 8)).toBe(2); // today not played yet
+    expect(dailyStreak(all, 7)).toBe(4);
+    expect(dailyStreak(all, 8)).toBe(4); // today not played yet
     expect(dailyStreak(all, 9)).toBe(0); // missed a day
-    expect(dailyStreak({ ...all, 8: rec(8, false) }, 8)).toBe(0);
+    expect(dailyStreak({ ...all, 8: rec(8, false) }, 8)).toBe(5);
+    expect(dailyStreak({ 2: rec(2), 4: rec(4) }, 4)).toBe(1); // a gap still ends it
   });
 
   it("formats the countdown to the next Grandma", () => {

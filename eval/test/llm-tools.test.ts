@@ -74,7 +74,7 @@ describe("AI player", () => {
       { thought: "Married, not engaged", action: "ask", text: "When did you get married?" },
       { thought: "Try it", action: "guess", parts: ["Biscuit", "1961"] },
     ]);
-    const r = await playOnce({ app: newApp(), client, model: "claude-sonnet-5-5", difficulty: "easy" });
+    const r = await playOnce({ app: newApp(), client, model: "claude-sonnet-5-5", difficulty: "easy", recipeId: "r_easy" });
     expect(r).toMatchObject({ solved: true, questions: 2, guesses: 1 });
     expect(client.calls[1]!.user).toContain("You looked at the photo album: Two dog photos");
     expect(client.calls[3]!.user).toMatch(/Grandma: .*(1961|'61)/); // she may slip first: "1962… no, '61"
@@ -82,7 +82,7 @@ describe("AI player", () => {
 
   it("gives up after three wrong guesses", async () => {
     const client = fakeClient([{ thought: "guess", action: "guess", parts: ["Rex", "1900"] }]);
-    const r = await playOnce({ app: newApp(), client, model: "m", difficulty: "easy" });
+    const r = await playOnce({ app: newApp(), client, model: "m", difficulty: "easy", recipeId: "r_easy" });
     expect(r).toMatchObject({ solved: false, guesses: 3 });
   });
 

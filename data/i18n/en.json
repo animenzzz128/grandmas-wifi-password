@@ -36,7 +36,7 @@
     "result.password": "The password was {password}",
     "result.copy": "Copy result",
     "result.copied": "Copied!",
-    "result.again": "Visit again",
+    "result.again": "Back to the start",
     "result.card": "👵 {name} · {difficulty}\n🔑 {outcome}\n{cups} 😴×{naps} 🍪×{cookies}\n{stars}",
     "result.cardSolved": "Solved in {n} questions",
     "result.cardFailed": "Gave up after {n} questions",
@@ -202,7 +202,11 @@
     "settings.key.speak": "Speak",
     "settings.cameraAssist": "Turn to face Grandma while talking",
     "settings.highContrast": "High contrast",
-    "bark.yawn": "Oh, pardon me, sweetheart. All this remembering is making me sleepy."
+    "bark.yawn": "Oh, pardon me, sweetheart. All this remembering is making me sleepy.",
+    "router.partRight": "Part {n} is right.",
+    "router.partWrong": "Part {n} isn’t.",
+    "router.noneRight": "No part is right yet.",
+    "result.another": "Try another {difficulty} puzzle"
   },
   "grandma": {
     "greeting": [

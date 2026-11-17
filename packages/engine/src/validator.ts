@@ -50,6 +50,9 @@ export function validationContext(world: GrandmaWorld, recipe: Recipe, currentYe
   return { password: recipe.password, hiddenYears: hiddenYears(world, recipe), currentYear, separate: recipe.separate ?? [], recipe };
 }
 
+/** Everyday words that say nothing about which memory a sentence is about (stems, as `tokens` makes them). */
+const GENERIC_WORDS = new Set(["came", "along", "home", "year", "first", "little", "still", "since", "every", "time", "back", "went", "made", "took", "told", "brought", "never", "always", "once", "ever"]);
+
 /**
  * Which of these facts a reply tells, read from its text: a sentence with the fact's year (or its number, for a
  * fact that is a number) and one of the fact's own words. "In 1964 we bought the house on Maple" tells f_house.
@@ -65,7 +68,8 @@ export function factsToldIn(world: GrandmaWorld, reply: string, ids: readonly st
     if (typeof n === "number") return sentences.some((s) => s.nums.has(n));
     const year = fact.year;
     if (year === undefined) return false;
-    const keys = [...factKeywords(world, fact)].filter((k) => !/^\d+$/.test(k));
+    // Only telling words count: "We got married in 1961" doesn't tell the 1961 honeymoon ("Walt got soaked").
+    const keys = [...factKeywords(world, fact)].filter((k) => !/^\d+$/.test(k) && k.length >= 4 && !GENERIC_WORDS.has(k));
     return sentences.some((s) => s.nums.has(year) && keys.some((k) => s.words.has(k)));
   });
 }

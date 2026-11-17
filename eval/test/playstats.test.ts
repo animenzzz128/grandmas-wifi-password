@@ -77,3 +77,37 @@ describe("play stats from turn logs", () => {
     expect(renderPlayStats(playStats(entries))).toContain("No model turns");
   });
 });
+
+describe("play funnel (design plan E3)", () => {
+  it("counts how far visits got, the time to the first question and which clues were found", () => {
+    const log: LogEntry[] = [
+      e("x", "start", "playing"),
+      e("x", "event", "playing", { event: "note" }),
+      e("x", "ask", "playing", { grandmaMode: "mock" }), // 2 s after the start (one log line a second here)
+      e("x", "event", "playing", { event: "inspect", objectId: "sled" }),
+      e("x", "event", "playing", { event: "pin" }),
+      e("x", "guess", "solved"),
+      e("x", "event", "solved", { event: "share" }),
+      e("y", "start", "playing"),
+      e("y", "event", "playing", { event: "note" }),
+      e("y", "event", "playing", { event: "inspect", objectId: "photo_album" }),
+      e("y", "event", "playing", { event: "inspect", objectId: "sled" }),
+      // An older visit without a start line: not in the funnel.
+      e("z", "ask", "playing", { grandmaMode: "mock" }),
+    ];
+    const s = playStats(log);
+    const step = (name: string) => s.funnel.steps.find((x) => x.step === name)!.visits;
+    expect(s.funnel.visits).toBe(2);
+    expect([step("note"), step("asked"), step("inspect"), step("pin"), step("guessed"), step("solved"), step("share")]).toEqual([2, 1, 2, 1, 1, 1, 1]);
+    expect(s.funnel.secondsToFirstQuestion).toBe(2);
+    expect(s.funnel.objects).toEqual([
+      { objectId: "sled", visits: 2 },
+      { objectId: "photo_album", visits: 1 },
+    ]);
+    expect(s.turns).toBe(2); // start and event lines are not questions
+    const md = renderPlayStats(s);
+    expect(md).toContain("## Play funnel");
+    expect(md).toContain("Median time to the first question: 2 s");
+    expect(md).toContain("- sled: 100.0%");
+  });
+});

@@ -4,7 +4,7 @@
  */
 import type { Difficulty, GrandmaWorld, Recipe } from "./world.ts";
 import { RULES } from "./rules.ts";
-import { progressFacts, slotParts } from "./world.ts";
+import { progressFacts, slotAnswers } from "./world.ts";
 
 export type RunStatus = "playing" | "solved" | "failed" | "bedtime";
 
@@ -48,6 +48,8 @@ export interface RunState {
   daily?: number;
   /** Fallback replies so far that cost nothing (capped at RULES.maxFreeFallbacks). */
   freeFallbacks?: number;
+  /** Play events already logged for this visit ("inspect:sled"), so each is logged once (design plan E3). */
+  events?: string[];
   status: RunStatus;
   createdAt: string;
   endedAt?: string;
@@ -155,16 +157,19 @@ export interface PartsResult {
   correct: boolean;
   partsCorrect: number;
   partsTotal: number;
+  /** Easy and Medium only: which parts were right (Hard says how many, not which). Design plan A5. */
+  partsRight?: boolean[];
 }
 
 /**
  * Guess by slots, the way the note is laid out ([name] + [year] + !). The game assembles the password, so
- * case, spaces and punctuation never cost a guess. A wrong guess says how many parts were right, not which
- * (partial confirmation, as in Golden Idol / Obra Dinn).
+ * case, spaces and punctuation never cost a guess. A wrong guess says how many parts were right (partial
+ * confirmation, as in Golden Idol / Obra Dinn), and on Easy and Medium which ones (design plan A5).
  */
 export function checkGuessParts(state: RunState, world: GrandmaWorld, recipe: Recipe, parts: readonly string[], now = new Date()): PartsResult {
-  const expected = slotParts(world, recipe);
-  const partsCorrect = expected.filter((e, i) => parts[i] !== undefined && norm(parts[i]!) === norm(e)).length;
+  const expected = slotAnswers(world, recipe);
+  const right = expected.map((ok, i) => parts[i] !== undefined && ok.some((e) => norm(parts[i]!) === norm(e)));
+  const partsCorrect = right.filter(Boolean).length;
   const correct = partsCorrect === expected.length && parts.length === expected.length;
   state.guesses.push(parts.join(" + "));
   if (correct) {
@@ -177,7 +182,8 @@ export function checkGuessParts(state: RunState, world: GrandmaWorld, recipe: Re
       state.endedAt = now.toISOString();
     }
   }
-  return { correct, partsCorrect, partsTotal: expected.length };
+  const which = recipe.difficulty === "easy" || recipe.difficulty === "medium";
+  return { correct, partsCorrect, partsTotal: expected.length, ...(which ? { partsRight: right } : {}) };
 }
 
 /**

@@ -13,13 +13,18 @@ const STOPWORDS = new Set(
   ).split(" "),
 );
 
-/** Very light stemming: enough for "dogs" ~ "dog", "married" ~ "marri". */
+/**
+ * Very light stemming: enough for "dogs" ~ "dog", "married" ~ "marri", and "sledding" ~ "sled" (a doubled
+ * consonant left by "-ing"/"-ed" is undone, except l, s and z: "falling" stays "fall"; review 44, F5).
+ */
 export function stem(word: string): string {
   let w = word.toLowerCase();
+  let cut = false;
   if (w.length > 4 && w.endsWith("ies")) w = w.slice(0, -3) + "y";
-  else if (w.length > 4 && w.endsWith("ed")) w = w.slice(0, -2);
-  else if (w.length > 5 && w.endsWith("ing")) w = w.slice(0, -3);
+  else if (w.length > 4 && w.endsWith("ed")) [w, cut] = [w.slice(0, -2), true];
+  else if (w.length > 5 && w.endsWith("ing")) [w, cut] = [w.slice(0, -3), true];
   else if (w.length > 3 && w.endsWith("s") && !w.endsWith("ss")) w = w.slice(0, -1);
+  if (cut && /([b-df-hj-km-np-rtv-y])\1$/.test(w)) w = w.slice(0, -1);
   return w;
 }
 
@@ -29,9 +34,11 @@ const SYNONYMS: Record<string, string[]> = {
   puppy: ["dog", "pet"],
   pet: ["dog", "cat"],
   cat: ["pet"],
-  marri: ["wedd", "wedding"],
-  marry: ["wedd", "wedding"],
-  wedd: ["marri"],
+  marri: ["wedding"],
+  marry: ["wedding"],
+  wed: ["marri"],
+  win: ["won"],
+  won: ["win"],
   meet: ["met"],
   met: ["meet"],
   husband: ["grandpa", "walt"],
@@ -43,7 +50,8 @@ const SYNONYMS: Record<string, string[]> = {
   street: ["home", "apartment", "avenue", "house"],
   live: ["home", "apartment", "house", "street"],
   liv: ["home", "apartment", "house", "street"],
-  house: ["home", "street", "avenue"],
+  // Not "street"/"avenue": then "What's your house number?" ranked the Maple house over its number (F7).
+  house: ["home"],
   address: ["number", "street", "avenue"],
   number: ["address"],
   job: ["work", "operator", "cook"],
@@ -58,7 +66,7 @@ const SYNONYMS: Record<string, string[]> = {
   tv: ["television", "color"],
   television: ["tv"],
   crooked: ["number", "mailbox"],
-  snow: ["snowstorm", "winter", "sledd"],
+  snow: ["snowstorm", "winter", "sledding"],
   winter: ["snow", "snowstorm"],
 };
 
@@ -69,8 +77,12 @@ export function tokens(text: string): string[] {
     .map(stem);
 }
 
+/** "the year we said 'I do'": both words are stopwords, but together they mean the wedding (F11). */
+const I_DO = /(said|say|saying)\s+['"‘“]?i do\b|['"‘“]i do['"’”]/i;
+
 export function expandedTokens(text: string): Set<string> {
   const out = new Set<string>();
+  if (I_DO.test(text)) for (const w of ["wedding", "marri"]) out.add(stem(w));
   for (const t of tokens(text)) {
     out.add(t);
     for (const s of SYNONYMS[t] ?? []) out.add(stem(s));

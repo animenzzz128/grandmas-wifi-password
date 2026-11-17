@@ -63,12 +63,13 @@ export interface PlayResult {
 }
 
 /** Play one visit to the end. `app` is the real HTTP app (in-process); `client` drives the player. */
-export async function playOnce(args: { app: ReturnType<typeof createApp>; client: ParseClient; model: string; difficulty: string; maxSteps?: number }): Promise<PlayResult> {
+export async function playOnce(args: { app: ReturnType<typeof createApp>; client: ParseClient; model: string; difficulty: string; recipeId?: string; maxSteps?: number }): Promise<PlayResult> {
   const post = async (path: string, payload: unknown) => {
     const res = await args.app.request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
     return JSON.parse(await res.text()) as unknown;
   };
-  let run = RunView.parse(await post("/api/runs", { difficulty: args.difficulty }));
+  // Without a recipeId each visit gets one of the difficulty's puzzles, so a batch of runs covers them all.
+  let run = RunView.parse(await post("/api/runs", { difficulty: args.difficulty, ...(args.recipeId ? { recipeId: args.recipeId } : {}) }));
   const scene = PublicScene.parse(JSON.parse(await (await args.app.request(`/api/scenes/${run.sceneId}`)).text()));
   const transcript = [`Grandma: ${run.greeting}`];
   const tokens = { input: 0, output: 0 };

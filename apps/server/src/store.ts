@@ -13,7 +13,10 @@ export interface TurnLog {
   runId: string;
   worldId: string;
   recipeId: string;
-  kind: "ask" | "show" | "item" | "guess";
+  kind: "ask" | "show" | "item" | "guess" | "start" | "event";
+  /** For kind "event": what the player did (an event name, never text) and on which object. */
+  event?: string;
+  objectId?: string;
   input: string;
   reply?: string;
   factIds?: string[];

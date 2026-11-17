@@ -293,3 +293,47 @@ A designer's review of the build against the GDD, the project skill's rubric and
 - Layout fix found while checking: the "Talking to Grandma" label covered the last chat line; it now has its own space, and the chips sit in the layout rather than floating over the chat.
 - Checks: 173 tests, validate, golden, build. Browser: first-visit flow, chips, lessons, reactions, camera, settings, contrast.
 - **Not done here:** A5 per-slot router feedback, phase B (puzzle content), D1 (more recipes) and the music style all wait for the team. Phase E needs the course key; phase F needs a deploy go-ahead. No person has played or listened to these changes, and the rubric hasn't been re-scored independently.
+
+### Iteration 43 (11/16): the rest of the design plan (A5, B, D, E3, F prep)
+Done at Jacky's request ("继续做剩下的"); every content change below is a draft for the team to review.
+- **A5 Which part was right:** on Easy and Medium a wrong router try now says which part was right ("Part 1 is right. Part 2 isn't."), and the box turns green with a ✓ or red. Hard still only says how many. Tested; checked in the browser.
+- **B The room gives hops, not answers:**
+  - The wedding photo no longer says "June 1961" or "My Sparrow". It says "To my little songbird. Married the June after the pierogi", which still needs the proposal year (and rules out the 1960 decoy) and which bird.
+  - The house-number sign lost its middle digit ("4…2"). The album gained two pages: "Cherry St., our first home, moved out summer '64" rules Cherry Street out for 1969, and a "Summer '69" porch whose mailbox reads "41" with the last digit hidden. Sign plus porch photo give 412.
+  - The reading glasses now matter. Medium's smudge hides "painted crooked", which separates 412 from 27; Hard's hides "snowstorm". Easy has none.
+  - New tests: no object's text contains a whole answer part (the old data failed this); every answer part has a room object that brings up its memory; the smudges hide the deciding words. `rosie.chains.md` updated.
+- **D More puzzles:**
+  - Five new recipes from Rosie's existing memories: Easy Niagara1963 and Buttons1972; Medium Marge1958 and Buttons27; Hard Biscuit1949! (new anchor "the year Biscuit came home", 1949 hidden from the model: she was nine, born 1940).
+  - That makes 3/3/2 puzzles. A visit gets a random one of its difficulty; "Try another {difficulty} puzzle" on the result card never repeats the one just played. The daily cycles through all 8, never the same two days running.
+  - Each new puzzle has a chain map and an API walkthrough with the offline Grandma; 38,400 offline replies across all 8 puzzles were rejected 0 times.
+  - The probe found a false positive in iteration 34's text-based memory check ("We **got** married in 1961" counted as the 1961 honeymoon because "Walt got soaked"); short and everyday words no longer count.
+  - Tests and the AI player can pin a puzzle with `recipeId`. The daily streak now counts days played, not days solved (a bad day doesn't wipe it out).
+- **E3 Play funnel:** each visit logs a "start" line. The browser reports note opened, object inspected, notebook opened, quote pinned and result copied: names only, never text, each once per visit, rate-limited. `npm run stats` shows the funnel, the median time to the first question (target under 60 s) and the share of visits that found each clue. Tested; checked end to end in the dev build.
+- **F prep:**
+  - `EMBED_ORIGINS` lets listed sites frame the game (an itch.io embed); the default stays "nobody". Tested.
+  - `docs/09-demo-and-launch-kit.md`: a 3-minute demo script with fallbacks, an itch.io page draft (with AI disclosure and accessibility list), shot lists for the cover, screenshots and a 45-second trailer, and a launch checklist.
+- Checks: 188 tests, validate, golden, schema, build; browser: varied visits, "Try another", router marks, funnel events.
+- **Still not done:**
+  - E1/E2: the live model, streaming and the real eval need the course key.
+  - F: deploying and publishing are the team's (Fly account, key, page).
+  - Nobody has played the new puzzles or listened to the music; the new clue texts, puzzles and nudges are drafts for the team.
+
+### Iteration 44 (11/16): independent re-score, retrieval and router fixes
+- **Re-score** (`docs/10-design-rescore.md`): an independent review agent, offline only, scored nine of the ten rubric dimensions at about 5.9 on average. The pass bar is 6. There was no P0. The weakest dimensions were deduction depth (4) and conversation craft (4).
+- **Fixed in this round:**
+  - **F1:** a full name at the router ("Niagara Falls", "Marge Novak") now counts for a first-word part. The password is unchanged.
+  - **F3–F7 and F11, the offline Grandma's retrieval** (it is also the live fallback):
+    - "year" no longer scores.
+    - A question about "you" prefers her own memories.
+    - A typed name counts extra.
+    - "sledding" now matches "sled".
+    - Showing an object prefers its memory on this note's chain.
+    - "house" no longer means street.
+    - "said 'I do'" means the wedding.
+    - The reviewer's probes went, for example, from 0/12 to 12/12 for "When were you born?" → 1940, "Tell me about the sled" → Michael's arm, and "What's your house number?" → 412. Regression tests were added.
+  - **F10:** a Medium 3 nudge put Biscuit in the 1969 house; it now says "Our dog".
+  - **Browser:** the "play on a computer" warning showed on a desktop whose window was narrow at load. It now checks for a mouse or trackpad.
+  - **Browser:** suggested questions spoke in Grandma's voice ("the bird Grandpa named me after"). They now use the player's pronouns, with quotes kept as they are. Tested on all eight notes.
+  - A test I wrote through a shell script had `\b` turned into a backspace character, so it could never fail. It was fixed and now also asserts that it saw chips.
+- **Left for the team:** F2 (four puzzles fall to their own wording), F8 (Hard 2 has one route), F9 (par). Proposals are in `docs/10`.
+- **Checks:** typecheck, 194 tests, validate, golden.

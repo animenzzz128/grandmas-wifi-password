@@ -25,6 +25,8 @@ export interface Config {
   asksPerMinute: number;
   /** Daily model spend limit in USD (UTC day); past it Grandma goes offline until midnight UTC. */
   dailyBudgetUsd: number;
+  /** EMBED_ORIGINS: space-separated sites allowed to frame the game (an itch.io embed). Empty: none. */
+  embedOrigins: string[];
   dataDir: string;
   varDir: string;
   webDist: string;
@@ -52,6 +54,7 @@ export function readConfig(env: Env = process.env, dotenv: Env = {}, argv: reado
     apiBaseUrl: get("GRANDMA_API_BASE_URL") || "https://api.anthropic.com",
     asksPerMinute: Number(get("RATE_LIMIT_ASKS_PER_MIN") || 30),
     dailyBudgetUsd: Number(get("GRANDMA_DAILY_BUDGET_USD") || 5),
+    embedOrigins: (get("EMBED_ORIGINS") ?? "").split(/\s+/).filter((o) => /^https:\/\/[a-z0-9.*-]+(:\d+)?$/i.test(o)),
     dataDir: join(REPO_ROOT, "data"),
     varDir: get("VAR_DIR") || join(REPO_ROOT, "var"),
     webDist: join(REPO_ROOT, "apps/web/dist"),

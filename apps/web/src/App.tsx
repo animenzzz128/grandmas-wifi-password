@@ -11,8 +11,11 @@ import { hasVisited } from "./firsts.ts";
 const loadGame = () => import("./Game.tsx");
 const Game = lazy(loadGame);
 
-/** Touch-only or very narrow screens: the game needs a keyboard and mouse (walk, look, type). */
-const needsKeyboard = () => typeof window !== "undefined" && (window.matchMedia?.("(pointer: coarse)").matches || window.innerWidth < 700);
+/**
+ * Touch-only devices: the game needs a keyboard and mouse (walk, look, type). Asks whether any fine pointer
+ * exists, not the window width: a narrow desktop window or a touch-screen laptop with a trackpad can still play.
+ */
+const needsKeyboard = () => typeof window !== "undefined" && window.matchMedia?.("(any-pointer: fine)").matches === false;
 
 /** "12 of 30 visits today solved it, in 9 questions (median)". */
 export function dailyStatsLine(s: { finished: number; solved: number; medianQuestions?: number }): string {

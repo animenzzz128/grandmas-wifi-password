@@ -24,6 +24,14 @@
         },
         "daily": {
           "type": "boolean"
+        },
+        "recipeId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "after": {
+          "type": "string",
+          "maxLength": 64
         }
       },
       "additionalProperties": false
@@ -836,6 +844,12 @@
           "type": "integer",
           "minimum": -9007199254740991,
           "maximum": 9007199254740991
+        },
+        "partsRight": {
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          }
         },
         "run": {
           "type": "object",

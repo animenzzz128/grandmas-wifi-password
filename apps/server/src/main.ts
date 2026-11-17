@@ -22,7 +22,7 @@ const brain =
       })
     : new MockBrain();
 const store = new RunStore(config.varDir);
-const app = createApp({ data, brain, store, asksPerMinute: config.asksPerMinute });
+const app = createApp({ data, brain, store, asksPerMinute: config.asksPerMinute, embedOrigins: config.embedOrigins });
 
 // In production the server also serves the built web client (npm run build first).
 if (existsSync(config.webDist)) {

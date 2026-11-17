@@ -79,7 +79,7 @@ export function retrieveFacts(
   const picked = new Set<string>();
   const text = input.kind === "ask" ? input.text : [input.object.label, input.object.inspectText, input.text ?? ""].join(" ");
   if (input.kind === "show") input.object.factIds.forEach((id) => picked.add(id));
-  for (const s of scoreFacts(world, expandedTokens(text))) {
+  for (const s of scoreFacts(world, expandedTokens(text), text)) {
     if (picked.size >= k) break;
     picked.add(s.fact.id);
   }

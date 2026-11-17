@@ -204,3 +204,7 @@ details.controls summary { cursor: pointer; text-decoration: underline; }
 .contrast .line.grandma { color: #ffe08a; }
 .contrast .line.system { color: #9fd3ff; }
 .contrast .sticky { color: #000; border: 2px solid #000; }
+
+/* A part the last try got right (Easy/Medium; plan A5). The tick keeps it readable without colour. */
+.router-card input.right { border-color: #3fa34d; background: #eaf7ec; }
+.router-card .slot:has(input.right)::after { content: "✓"; color: #3fa34d; font-weight: 700; margin-left: 4px; }

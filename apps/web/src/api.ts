@@ -31,10 +31,18 @@ export function errorMessage(status: number, serverMessage: unknown): string {
 }
 
 export const api = {
+  /**
+   * A browser-only step of the play funnel (design plan E3): the event name and object only, never text.
+   * Fire and forget: a lost event must never bother the player.
+   */
+  event: (runId: string, kind: "note" | "inspect" | "pin" | "notebook" | "share", objectId?: string) => {
+    void fetch(`/api/runs/${runId}/event`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(objectId ? { kind, objectId } : { kind }) }).catch(() => undefined);
+  },
   health: () => request(HealthResponse, "/api/health"),
   scene: (id: string) => request(PublicScene, `/api/scenes/${id}`),
   daily: () => request(DailyInfo, "/api/daily"),
-  createRun: (difficulty: "easy" | "medium" | "hard", relaxed = false) => request(RunView, "/api/runs", { difficulty, relaxed }),
+  createRun: (difficulty: RunView["difficulty"], relaxed = false, after?: string) =>
+    request(RunView, "/api/runs", { difficulty, relaxed, ...(after ? { after } : {}) }),
   createDaily: (relaxed = false) => request(RunView, "/api/runs", { daily: true, relaxed }),
   ask: (runId: string, text: string, voice?: { confidence: number }) => request(AskResponse, `/api/runs/${runId}/ask`, voice ? { text, voice } : { text }),
   show: (runId: string, objectId: string, text?: string) => request(AskResponse, `/api/runs/${runId}/show`, { objectId, text }),

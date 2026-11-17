@@ -41,10 +41,14 @@ export function saveDailyRecord(rec: DailyRecord, storage: Store = defaultStorag
 }
 
 /** Days solved in a row, ending today (or yesterday, if today isn't played yet). */
+/**
+ * Days in a row the player has visited the daily, ending today or yesterday. Played, not solved: a bad day
+ * shouldn't wipe out a long streak (forgiving streaks; design plan D3).
+ */
 export function dailyStreak(records: Record<number, DailyRecord>, today: number): number {
   let n = records[today] ? today : today - 1;
   let streak = 0;
-  while (records[n]?.solved) {
+  while (records[n]) {
     streak++;
     n--;
   }

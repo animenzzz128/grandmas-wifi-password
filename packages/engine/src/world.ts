@@ -168,6 +168,21 @@ export function slotParts(world: GrandmaWorld, recipe: Recipe): string[] {
   });
 }
 
+/**
+ * What the router accepts for each slot: the password part, and for a "first word" part the whole name too.
+ * Typing "Niagara Falls" or "Marge Novak" shows the player worked it out; the router keeps the first word
+ * (review 44, F1). The password itself (slotParts) doesn't change.
+ */
+export function slotAnswers(world: GrandmaWorld, recipe: Recipe): string[][] {
+  const parts = slotParts(world, recipe);
+  return recipe.slots.map((slot, i) => {
+    const fact = factById(world, slot.fact_id)!;
+    if (slot.field !== "object" || slot.transform !== "first_word") return [parts[i]!];
+    const whole = objectValue(world, fact);
+    return whole === parts[i] ? [parts[i]!] : [parts[i]!, whole];
+  });
+}
+
 /** Every fact on this recipe's inference chains: slot facts, separate groups, anchor facts. */
 export function chainFacts(world: GrandmaWorld, recipe: Recipe): Set<string> {
   const ids = new Set<string>(recipe.slots.map((s) => s.fact_id));

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useProgress } from "@react-three/drei";
 import { useGame } from "../store.ts";
+import { api } from "../api.ts";
 import type { Carrying } from "../store.ts";
 import { t } from "../strings.ts";
 import { babble, chime, snore, startClock, startMusic, stopClock, stopMusic, toggleMute } from "../audio.ts";
@@ -678,6 +679,8 @@ function RouterCard() {
   const { guess, openPanel, busy } = useGame();
   const [parts, setParts] = useState<string[]>(() => Array.from({ length: run.slots }, () => ""));
   const [feedback, setFeedback] = useState<string | null>(null);
+  /** Easy/Medium: which boxes the last try got right (green) or wrong (red); cleared when that box changes. */
+  const [marks, setMarks] = useState<(boolean | null)[]>(() => parts.map(() => null));
   const ready = parts.every((p) => p.trim());
   return (
     <div className="card router-card">
@@ -690,13 +693,16 @@ function RouterCard() {
           const res = await guess(parts.map((p) => p.trim()));
           if (!res || res.correct) return;
           setFeedback(t("router.partial", { n: res.partsCorrect ?? 0, total: res.partsTotal ?? run.slots }));
+          setMarks(res.partsRight ?? parts.map(() => false));
         }}
       >
         {parts.map((p, i) => (
           <span key={i} className="slot">
             {i > 0 && <span className="plus">+</span>}
             <input
-              className={feedback ? "wrong" : ""}
+              className={marks[i] === true ? "right" : marks[i] === false ? "wrong" : ""}
+              aria-invalid={marks[i] === false ? true : undefined}
+              aria-label={`${t("router.slot", { n: i + 1 })}${marks[i] === true ? ` (${t("router.partRight", { n: i + 1 })})` : ""}`}
               value={p}
               maxLength={40}
               autoFocus={i === 0}
@@ -706,6 +712,7 @@ function RouterCard() {
                 next[i] = e.target.value;
                 setParts(next);
                 setFeedback(null);
+                setMarks((m) => m.map((x, j) => (j === i ? null : x)));
               }}
             />
           </span>
@@ -781,9 +788,16 @@ function ResultCard() {
             {t("result.copyManual")}
           </p>
         )}
-        <button autoFocus onClick={() => copy(card, preRef.current)}>
+        <button
+          autoFocus
+          onClick={() => {
+            copy(card, preRef.current);
+            api.event(run.runId, "share");
+          }}
+        >
           {copied === "yes" ? t("result.copied") : t("result.copy")}
         </button>
+        <button onClick={() => void useGame.getState().another()}>{t("result.another", { difficulty: t(`difficulty.${run.difficulty}`) })}</button>
         <button className="ghost" onClick={leave}>
           {t("result.again")}
         </button>

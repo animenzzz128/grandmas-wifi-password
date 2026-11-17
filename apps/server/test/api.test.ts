@@ -15,7 +15,13 @@ import { RunStore } from "../src/store.ts";
 const data = loadGameData(readConfig({}, {}).dataDir);
 const newApp = () => createApp({ data, brain: new MockBrain(), store: new RunStore(null), asksPerMinute: 1000 });
 
+/**
+ * POST helper. A new visit by difficulty is pinned to that difficulty's original puzzle (r_easy, r_medium,
+ * r_hard) so these tests stay about known answers; visits otherwise get a random puzzle (tested separately).
+ */
 async function post(app: ReturnType<typeof newApp>, path: string, payload: unknown) {
+  const p = payload as { difficulty?: string; daily?: boolean; recipeId?: string };
+  if (path === "/api/runs" && p.difficulty && !p.daily && !p.recipeId) payload = { ...p, recipeId: `r_${p.difficulty}` };
   const res = await app.request(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
   return { status: res.status, text: await res.text() };
 }
@@ -316,7 +322,7 @@ describe("Daily Grandma (GDD §5)", () => {
     await post(app, `/api/runs/${run.runId}/guess`, { parts: ["x", "1"] });
     const lines = readdirSync(join(dir, "logs")).flatMap((f) => readFileSync(join(dir, "logs", f), "utf8").trim().split("\n"));
     const logs = lines.map((l) => JSON.parse(l) as { daily?: number });
-    expect(logs.length).toBe(2);
+    expect(logs.length).toBe(3); // the visit's start, the question and the guess
     expect(logs.every((l) => l.daily === 8)).toBe(true);
   });
 
@@ -407,7 +413,11 @@ describe("security review fixes (iteration 35)", () => {
     const app = createApp({ data, brain: new MockBrain(), store: new RunStore(dir), asksPerMinute: 1000 });
     const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "easy" })).text));
     const item = async (name: string) => ItemResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/item`, { item: name })).text));
-    const logLines = () => readdirSync(join(dir, "logs")).flatMap((f) => readFileSync(join(dir, "logs", f), "utf8").split("\n")).filter(Boolean);
+    // Turn lines only: every visit also logs one "start" line for the play funnel (iteration 43).
+    const logLines = () =>
+      readdirSync(join(dir, "logs"))
+        .flatMap((f) => readFileSync(join(dir, "logs", f), "utf8").split("\n"))
+        .filter((l) => l && !l.includes('"kind":"start"'));
     // At full tea she turns the cookie down (iteration 40): nothing changes, nothing is logged, the cookie is kept.
     const full = await item("cookie");
     expect(full.run.cookies).toBe(1);
@@ -540,5 +550,108 @@ describe("security review P3 fixes (iteration 37)", () => {
     } finally {
       RunStore.MAX_LIVE = saved;
     }
+  });
+});
+
+describe("more puzzles per difficulty (design plan D, iteration 43)", () => {
+  const walkthroughs: Record<string, { steps: [string, RegExp][]; parts: string[] }> = {
+    r_easy_2: {
+      steps: [
+        ["Where did you go on your honeymoon?", /Niagara/],
+        ["When was my mom born?", /1963|'63/],
+      ],
+      parts: ["niagara", "1963"],
+    },
+    r_easy_3: {
+      steps: [
+        ["Which dog was your favorite?", /Buttons/],
+        ["When did you win the blue ribbon for your pie?", /1972/],
+      ],
+      parts: ["buttons", "1972"],
+    },
+    r_medium_2: {
+      steps: [
+        ["Who do you go bowling with on Tuesdays?", /Marge/],
+        ["When did you meet Grandpa at the county fair?", /1958/],
+      ],
+      parts: ["marge", "1958"],
+    },
+    r_medium_3: {
+      steps: [
+        ["When did you get the color TV for the moon landing?", /1969|'69/],
+        ["Which dog came along in 1968?", /Buttons/],
+        ["What number was the Cherry Street apartment?", /27/],
+      ],
+      parts: ["buttons", "27"],
+    },
+    r_hard_2: {
+      steps: [
+        ["Who stole all the socks?", /Biscuit/],
+        ["How old were you when your first dog came home?", /nine/],
+        ["What year were you born?", /1940/],
+      ],
+      parts: ["biscuit", "1949"],
+    },
+  };
+
+  for (const [recipeId, w] of Object.entries(walkthroughs)) {
+    it(`${recipeId}: the chain reaches the answer with the offline Grandma`, async () => {
+      const app = newApp();
+      const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { recipeId })).text));
+      for (const [q, must] of w.steps) {
+        const res = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, { text: q })).text));
+        expect(res.reply, q).toMatch(must);
+        if (recipeId === "r_hard_2") expect(res.reply, "the hidden year").not.toMatch(/1949|'49/);
+      }
+      const right = GuessResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/guess`, { parts: w.parts })).text));
+      expect(right.correct).toBe(true);
+    });
+  }
+
+  it("a visit gets one of its difficulty's puzzles, and 'Visit again' avoids the one just played", async () => {
+    const app = createApp({ data, brain: new MockBrain(), store: new RunStore(null), asksPerMinute: 1000, runsPerMinute: 1000 });
+    const start = async (payload: object) =>
+      RunView.parse(await (await app.request("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) })).json());
+    const notes = new Set<string>();
+    for (let i = 0; i < 30; i++) notes.add((await start({ difficulty: "easy" })).note.text);
+    expect(notes.size).toBe(3);
+    for (let i = 0; i < 10; i++) {
+      const first = await start({ difficulty: "medium" });
+      const again = await start({ difficulty: "medium", after: first.runId });
+      expect(again.note.text).not.toBe(first.note.text);
+    }
+    expect((await app.request("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ recipeId: "r_nope" }) })).status).toBe(404);
+  });
+
+  it("the daily plays every puzzle once per cycle, and never the same one two days running", async () => {
+    const dailyNote = async (day: Date) => {
+      const app = createApp({ data, brain: new MockBrain(), store: new RunStore(null), asksPerMinute: 1000, now: () => day });
+      return RunView.parse(JSON.parse((await post(app, "/api/runs", { daily: true })).text)).note.text;
+    };
+    // Daily #1 is 2026-11-13 (DAILY_EPOCH); with 8 puzzles, days 1–8 are the first cycle.
+    const notes: string[] = [];
+    for (let d = 0; d < 24; d++) notes.push(await dailyNote(new Date(Date.UTC(2026, 10, 13 + d, 12))));
+    for (let cycle = 0; cycle < 3; cycle++) expect(new Set(notes.slice(cycle * 8, cycle * 8 + 8)).size).toBe(8);
+    for (let d = 1; d < notes.length; d++) expect(notes[d]).not.toBe(notes[d - 1]);
+  });
+});
+
+describe("embedding on an itch.io page (design plan F2)", () => {
+  it("nobody may frame the game by default", async () => {
+    const res = await newApp().request("/api/health");
+    expect(res.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+    expect(res.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+  });
+
+  it("the listed sites may, when EMBED_ORIGINS says so", async () => {
+    const app = createApp({ data, brain: new MockBrain(), store: new RunStore(null), asksPerMinute: 1000, embedOrigins: ["https://itch.io", "https://*.itch.zone"] });
+    const res = await app.request("/api/health");
+    expect(res.headers.get("content-security-policy")).toContain("frame-ancestors https://itch.io https://*.itch.zone");
+    expect(res.headers.get("x-frame-options")).toBeNull();
+  });
+
+  it("reads EMBED_ORIGINS, keeping only https origins", () => {
+    expect(readConfig({ EMBED_ORIGINS: "https://itch.io  https://*.itch.zone http://evil.example javascript:alert(1)" }, {}).embedOrigins).toEqual(["https://itch.io", "https://*.itch.zone"]);
+    expect(readConfig({}, {}).embedOrigins).toEqual([]);
   });
 });

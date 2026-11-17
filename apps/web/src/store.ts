@@ -79,6 +79,8 @@ interface GameState {
 
   init(): Promise<void>;
   start(difficulty: "easy" | "medium" | "hard"): Promise<void>;
+  /** From the result card: a new visit at the same difficulty, with a different puzzle (design plan D4). */
+  another(): Promise<void>;
   /** Visit today's Daily Grandma. */
   startDaily(): Promise<void>;
   /** Fetch today's Daily Grandma again (after a visit, or when the day rolls over). */
@@ -91,7 +93,7 @@ interface GameState {
   giveCookie(): Promise<void>;
   take(item: Carrying): void;
   /** Returns how the guess went, or null if it couldn't be sent. */
-  guess(parts: string[]): Promise<{ correct: boolean; partsCorrect?: number; partsTotal?: number } | null>;
+  guess(parts: string[]): Promise<{ correct: boolean; partsCorrect?: number; partsTotal?: number; partsRight?: boolean[] } | null>;
   openPanel(panel: Panel): void;
   focusChat(): void;
   setFocus(id: string | null): void;
@@ -126,6 +128,9 @@ export const useGame = create<GameState>((set, get) => {
   }
 
   let seq = 0;
+  /** "Part 1 is right, part 2 isn't." (Easy and Medium; design plan A5.) */
+  const partsLine = (right: readonly boolean[]) =>
+    right.every((r) => !r) ? t("router.noneRight") : right.map((r, i) => t(r ? "router.partRight" : "router.partWrong", { n: i + 1 })).join(" ");
   /** Objects Grandma has already reacted to this visit. */
   const barked = new Set<string>();
   const push = (...lines: LogLine[]) => set((s) => ({ log: [...s.log, ...lines.map((l) => ({ ...l, seq: ++seq }))].slice(-60) }));
@@ -192,6 +197,13 @@ export const useGame = create<GameState>((set, get) => {
     async start(difficulty) {
       markVisited();
       await act(async () => enter(await api.createRun(difficulty, useSettings.getState().relaxed)));
+    },
+
+    async another() {
+      const run = get().run;
+      if (!run) return;
+      window.speechSynthesis?.cancel();
+      await act(async () => enter(await api.createRun(run.difficulty, useSettings.getState().relaxed, run.runId)));
     },
 
     async startDaily() {
@@ -292,12 +304,16 @@ export const useGame = create<GameState>((set, get) => {
       if (!res) return null;
       if (!res.correct) {
         const tried = t("router.tried", { guess: parts.join(" + ") });
-        const count = res.partsTotal ? ` ${t("router.partial", { n: res.partsCorrect ?? 0, total: res.partsTotal })}` : "";
+        const count = res.partsRight
+          ? ` ${partsLine(res.partsRight)}`
+          : res.partsTotal
+            ? ` ${t("router.partial", { n: res.partsCorrect ?? 0, total: res.partsTotal })}`
+            : "";
         push({ who: "system", text: `${tried}${count}` });
       }
       push({ who: "grandma", text: res.line, mood: res.correct ? "happy" : "confused" });
       set({ run: res.run, panel: res.run.status === "playing" ? get().panel : null });
-      return { correct: res.correct, partsCorrect: res.partsCorrect, partsTotal: res.partsTotal };
+      return { correct: res.correct, partsCorrect: res.partsCorrect, partsTotal: res.partsTotal, partsRight: res.partsRight };
     },
 
     pin(text) {
@@ -305,6 +321,8 @@ export const useGame = create<GameState>((set, get) => {
       const next = addPin(pins, text);
       if (next === pins) return false;
       set({ pins: next });
+      const run = get().run;
+      if (run) api.event(run.runId, "pin");
       return true;
     },
 
@@ -313,6 +331,9 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     openPanel(panel) {
+      const run0 = get().run;
+      if (run0 && panel && (panel.type === "note" || panel.type === "notebook")) api.event(run0.runId, panel.type);
+      if (run0 && panel?.type === "inspect") api.event(run0.runId, "inspect", panel.objectId);
       set({ panel, noteSeen: get().noteSeen || panel?.type === "note" });
       if (panel?.type === "inspect") {
         const obj = get().scene?.interactables.find((i) => i.id === panel.objectId);
