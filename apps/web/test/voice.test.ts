@@ -39,8 +39,8 @@ describe("Grandma's spoken voice", () => {
 
   it("reads a line aloud with a warm voice, slower when nostalgic, and never talks over herself", async () => {
     const { speak } = await import("../src/voice.ts");
-    speak("Oh, the summer of 1968...", "nostalgic");
-    speak("Now, what was I saying?", "happy");
+    speak(["Oh, the summer of 1968..."], "nostalgic");
+    speak(["Now, what was I saying?"], "happy");
     expect(synth.cancelled).toBe(2);
     expect(synth.spoken).toHaveLength(2);
     const [nostalgic, happy] = synth.spoken;
@@ -51,12 +51,12 @@ describe("Grandma's spoken voice", () => {
   it("drives the talking flag from the speech events", async () => {
     const { speak, stopSpeaking } = await import("../src/voice.ts");
     const { useGame } = await import("../src/store.ts");
-    speak("Hello, dear.", "happy");
+    speak(["Hello, dear."], "happy");
     synth.spoken[0]!.onstart!();
     expect(useGame.getState().grandmaSpeaking).toBe(true);
     synth.spoken[0]!.onend!();
     expect(useGame.getState().grandmaSpeaking).toBe(false);
-    speak("Again.", "happy");
+    speak(["Again."], "happy");
     synth.spoken[1]!.onstart!();
     stopSpeaking();
     expect(useGame.getState().grandmaSpeaking).toBe(false);

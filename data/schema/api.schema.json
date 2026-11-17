@@ -1080,6 +1080,13 @@
             "budget",
             "kill"
           ]
+        },
+        "voice": {
+          "type": "string",
+          "enum": [
+            "elevenlabs",
+            "browser"
+          ]
         }
       },
       "required": [

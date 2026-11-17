@@ -87,7 +87,7 @@
     "grandma.dozing": "z z z",
     "settings.retro": "Retro filter (palette and dither)",
     "settings.voice": "Grandma's voice",
-    "settings.voice.spoken": "Spoken (your browser's voice)",
+    "settings.voice.spoken": "Spoken",
     "settings.voice.blips": "Babble blips",
     "settings.voice.off": "Silent",
     "settings.micHint": "{speak} or 🎤 lets you ask out loud. Chrome sends what you say to Google's speech service to turn it into text.",

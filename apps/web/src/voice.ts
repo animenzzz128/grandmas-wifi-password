@@ -1,12 +1,14 @@
 /**
- * Voice conversation with the browser's own speech APIs (no keys, no extra service):
- * - speak(): Grandma reads her lines aloud (speechSynthesis), a little slower and lower, tuned by mood.
+ * Voice conversation:
+ * - speak(): Grandma reads her lines aloud. When the server has her ElevenLabs voice (iteration 53), that's
+ *   what plays; otherwise, or if it fails, the browser's own voice (speechSynthesis), slower and lower by mood.
  * - listen(): the player asks by voice (SpeechRecognition). In Chrome the audio goes to Google's speech
  *   service; Settings says so. Only starts on a key press or click, never by itself.
  * Text is always on screen too, so nothing depends on hearing or speaking.
  */
 import { useGame } from "./store.ts";
-import { isMuted } from "./audio.ts";
+import { isMuted, playVoiceClip } from "./audio.ts";
+import { api } from "./api.ts";
 import { useSettings } from "./settings.ts";
 
 const synth: SpeechSynthesis | undefined = typeof window !== "undefined" ? window.speechSynthesis : undefined;
@@ -35,9 +37,38 @@ const PROSODY: Record<string, { rate: number; pitch: number }> = {
   sleepy: { rate: 0.78, pitch: 0.85 },
 };
 
-export function speak(text: string, mood = "happy") {
-  if (!synth || isMuted()) return;
-  synth.cancel(); // never talk over herself
+/** The clip playing now (ElevenLabs), and which speak() call is current, so a late answer can't talk over a newer one. */
+let playing: { stop(): void } | null = null;
+let turn = 0;
+
+/** Grandma says her new lines (several lines can arrive at once: a reply, a nap, a nudge). */
+export function speak(lines: string[], mood = "happy") {
+  if (isMuted() || !lines.length) return;
+  stopSpeaking();
+  const mine = ++turn;
+  const { health, run } = useGame.getState();
+  if (health?.voice === "elevenlabs" && run) {
+    useGame.setState({ grandmaSpeaking: true }); // she's drawing breath while the audio arrives
+    void api.voice(run.runId, lines, mood).then(async (mp3) => {
+      if (mine !== turn) return;
+      const clip = mp3 ? await playVoiceClip(mp3).catch(() => null) : null;
+      if (mine !== turn) return clip?.stop();
+      if (!clip) return speakWithBrowser(lines.join(" "), mood); // no key, over budget, offline: the old voice
+      playing = clip;
+      await clip.ended;
+      if (mine === turn) {
+        playing = null;
+        useGame.setState({ grandmaSpeaking: false });
+      }
+    });
+    return;
+  }
+  speakWithBrowser(lines.join(" "), mood);
+}
+
+function speakWithBrowser(text: string, mood: string) {
+  if (!synth) return useGame.setState({ grandmaSpeaking: false });
+  // speak() has already stopped anything she was saying (stopSpeaking), so she never talks over herself.
   const u = new SpeechSynthesisUtterance(text);
   const voice = pickVoice();
   if (voice) u.voice = voice;
@@ -51,6 +82,9 @@ export function speak(text: string, mood = "happy") {
 }
 
 export function stopSpeaking() {
+  turn++;
+  playing?.stop();
+  playing = null;
   synth?.cancel();
   useGame.setState({ grandmaSpeaking: false });
 }

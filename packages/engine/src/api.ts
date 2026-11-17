@@ -152,6 +152,17 @@ export const HealthResponse = z.strictObject({
   model: z.string().optional(),
   /** Why the real Grandma is offline right now: today's budget is spent, or an operator switched her off. */
   degraded: z.enum(["budget", "kill"]).optional(),
+  /** Grandma's spoken voice: ElevenLabs through the server, or the player's browser voice. */
+  voice: z.enum(["elevenlabs", "browser"]).optional(),
+});
+
+/**
+ * Ask the server to say lines aloud. Each line must be one Grandma said in this visit (or one of her canned
+ * reactions), so the voice can't be used to read out anything else.
+ */
+export const VoiceRequest = z.strictObject({
+  lines: z.array(z.string().min(1).max(1200)).min(1).max(6),
+  mood: z.string().max(20).optional(),
 });
 export const ErrorResponse = z.strictObject({ error: z.string() });
 
@@ -167,6 +178,7 @@ export type AskResponse = z.infer<typeof AskResponse>;
 export type ItemResponse = z.infer<typeof ItemResponse>;
 export type GuessResponse = z.infer<typeof GuessResponse>;
 export type HealthResponse = z.infer<typeof HealthResponse>;
+export type VoiceRequest = z.infer<typeof VoiceRequest>;
 export type DailyInfo = z.infer<typeof DailyInfo>;
 
 export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe, opts: { hidePassword?: boolean } = {}): RunView {

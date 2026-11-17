@@ -41,11 +41,13 @@ import {
   spendStamina,
   toPublicScene,
   toRunView,
+  VoiceRequest,
 } from "@gwp/engine";
 import type { AskResponse, GrandmaWorld, GuessResponse, ItemResponse, Recipe, RunState, TurnInput } from "@gwp/engine";
 import type { GameData } from "./data.ts";
 import type { GrandmaBrain } from "./grandma.ts";
 import type { RunStore } from "./store.ts";
+import { VoiceUnavailable } from "./voice.ts";
 
 export interface AppDeps {
   data: GameData;
@@ -62,6 +64,10 @@ export interface AppDeps {
   serverAsksPerMinute?: number;
   /** Sites allowed to show the game in a frame, e.g. ["https://itch.io", "https://*.itch.zone"]. Default: none. */
   embedOrigins?: string[];
+  /** Grandma's spoken voice (ElevenLabs). Without it the client uses the browser's voice. */
+  voice?: { say(text: string, mood: string): Promise<Uint8Array> };
+  /** Per-IP voice requests per minute (default 40). */
+  voicePerMinute?: number;
   /** Clock for the Daily Grandma (tests). */
   now?: () => Date;
 }
@@ -220,7 +226,26 @@ export function createApp(deps: AppDeps) {
 
   app.get("/api/health", (c) => {
     const degraded = (brain as { degraded?: "budget" | "kill" }).degraded;
-    return c.json({ ok: true, grandmaMode: brain.mode, model: brain.model, ...(degraded ? { degraded } : {}) });
+    return c.json({ ok: true, grandmaMode: brain.mode, model: brain.model, ...(degraded ? { degraded } : {}), voice: deps.voice ? "elevenlabs" : "browser" });
+  });
+
+  // Grandma's lines, spoken (iteration 53). Only lines she said in this visit, or her canned reactions.
+  const reactions = new Set(Object.entries(data.strings.ui).filter(([k]) => k.startsWith("bark.")).map(([, v]) => v));
+  const limitVoice = rateLimiter(deps.voicePerMinute ?? 40, "Grandma needs a sip of tea before she says more.");
+  app.post("/api/runs/:id/voice", async (c) => {
+    if (!deps.voice) throw new HttpError(404, "Grandma's voice isn't set up here.");
+    limitVoice(clientIp(c));
+    const req = await body(c, VoiceRequest);
+    const { run } = loadRun(c.req.param("id"));
+    const said = new Set(run.history.filter((t) => t.role === "grandma").map((t) => t.text));
+    if (!req.lines.every((l) => said.has(l) || reactions.has(l))) throw new HttpError(400, "Grandma never said that.");
+    try {
+      const audio = await deps.voice.say(req.lines.join(" "), req.mood ?? "happy");
+      return c.body(audio as unknown as ArrayBuffer, 200, { "content-type": "audio/mpeg", "cache-control": "private, max-age=86400" });
+    } catch (err) {
+      if (err instanceof VoiceUnavailable) throw new HttpError(429, "Grandma's voice is resting. Her words are on screen.");
+      throw err;
+    }
   });
 
   app.get("/api/scenes/:id", (c) => {

@@ -266,7 +266,7 @@ function AudioDirector() {
         const text = fresh.map((l) => l.text).join(" ");
         const mood = fresh[0]!.mood;
         const mode = useSettings.getState().voice;
-        if (mode === "spoken") speak(text, mood);
+        if (mode === "spoken") speak(fresh.map((l) => l.text), mood);
         else if (mode === "blips") babble(text, mood);
       }
     }

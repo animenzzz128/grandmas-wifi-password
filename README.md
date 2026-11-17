@@ -71,6 +71,21 @@ Open http://localhost:5173. Click to look around, WASD to walk, E to interact, E
 - **LLM mode:** copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` (use the course key). Grandma then runs on Claude Haiku 5.5. **Never commit `.env`.**
 - Only the key in this repo's `.env` is used. A key that other tools put in your shell environment is ignored on purpose, so the game never spends money on the wrong account. (For a deployment, set `GRANDMA_MODE=llm` plus the key as a secret.)
 
+**Grandma's voice**
+- **Without setup:** she speaks with the player's browser voice (Settings: Spoken / Babble blips / Silent).
+- **Her own voice (ElevenLabs):**
+  1. Make an ElevenLabs account and API key.
+  2. Put `ELEVENLABS_API_KEY=...` in `.env`.
+  3. Design her voice:
+     - **Free plan:** on the ElevenLabs website, open Voices > Voice Design, paste the description and sample text from `tools/design-grandma-voice.mjs`, save the preview you like, and copy its voice ID.
+     - **Paid plan:** run `node tools/design-grandma-voice.mjs` (three previews into `var/voice-design/`), listen, then run `--save <id>`.
+  4. Put `ELEVENLABS_VOICE_ID=...` in `.env` and restart.
+- **API key permissions:** Text to Speech; for the design script also Voice Generation and Voices (write).
+- **Account plan:** speaking with your own designed voice through the API works on the free plan (checked 2026-11-17). Creating a voice through the API, and using Voice Library voices through the API, need a paid plan.
+- **Cost guard:** she only voices lines she actually said in that visit. Each line is cached in `var/voice/`. `VOICE_DAILY_CHARS` (default 3,000 a day) caps new speech. Past the cap, or if ElevenLabs fails, the browser voice takes over.
+- **Privacy:** only Grandma's lines go to ElevenLabs, never what the player typed.
+- **Port clash:** if another program holds port 8787, set `API_PORT` in `.env`; the dev proxy follows it. The server warns at startup when this happens.
+
 **Other scripts**
 | Command | What it does |
 |---|---|

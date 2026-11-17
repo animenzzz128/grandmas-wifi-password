@@ -474,3 +474,22 @@ Jacky found the blanket too thick.
 - **Measured:** hands 7.5 mm above the blanket, 6.2 cm apart; arms 9.2 cm inside the armrests.
 - **Checks:** screenshots from the front and a low three-quarter view, where holes would show (none); 222 tests; typecheck; build.
 
+### Iteration 53 (11/17): Grandma's voice from ElevenLabs
+Jacky found her voice too "AI". It was the browser's speech voice (Windows Zira or Aria), which can't be run through audio effects. Of the options offered (ElevenLabs; Kokoro in the browser plus an aging filter; a retro mumble), Jacky chose ElevenLabs.
+- **Server** (`apps/server/src/voice.ts`, `POST /api/runs/:id/voice`) speaks through ElevenLabs text-to-speech (default `eleven_flash_v2_5`, MP3 at 64 kbps).
+  - **Only her own words:** every line must be one Grandma said in that visit, or one of her canned `bark.*` reactions. Anything else is a 400, so nobody can spend the budget on their own text.
+  - **Mood:** sets stability, style and speed (slower and steadier when sleepy or nostalgic).
+  - **Cost:** lines are cached on disk by voice, model, mood and text, so repeats are free. A daily character cap applies (`VOICE_DAILY_CHARS`, default 3,000). A failed call doesn't count against it. Stage directions like *sips tea* are dropped.
+  - **Off by default:** it needs `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`. The key is read from the repo's `.env` only, like the Anthropic key (or from the environment with `GRANDMA_VOICE=elevenlabs` on purpose).
+  - **Health** reports `voice: "elevenlabs" | "browser"`.
+- **Client** (`voice.ts`, `audio.ts`): plays the clip on the voice channel, so the voice volume setting applies, and drives her talking animation from it. A newer line cancels an older one that is still loading. If there's no key, the cap is reached or a request fails, the browser voice takes over.
+- **Her voice:** `tools/design-grandma-voice.mjs` uses ElevenLabs Voice Design ("late seventies, Buffalo, faint Polish-American accent, warm and teasing, slightly thin and wavering"). It writes three previews to `var/voice-design/`; `--save <id>` keeps one and prints the `.env` line. Correction after the first real calls: creating a voice through the API needs a paid plan (403 "feature_not_available" on free), so on the free plan she's designed on the ElevenLabs website and only her voice ID goes in `.env`. Text-to-speech through the API does work on free (a test line returned audio). Voice Library voices need a paid plan for API use.
+- **Found along the way:** another program on this laptop, Grok Bot, listens on 127.0.0.1:8787, so in dev every API call reached it ("Not found.").
+  - Fixed locally with `API_PORT=8788` in a new git-ignored `.env`, made from `.env.example`.
+  - The server now checks its own port at startup and warns if something else answers.
+- **Checks:** typecheck, 229 tests (7 new for the voice route: health, real lines only, cache, cap, failures, config), build.
+  - In the browser, a stand-in clip played through the voice channel with the talking flag on and then off, and the browser voice wasn't used.
+  - With no voice on the server, the request got a 404 and the browser voice spoke instead.
+- **Verified with a real key (11/17, free plan):** Jacky designed the voice on the ElevenLabs website and put its ID in `.env`. Through the game server, a new line took 0.4–0.7 s and a repeated line came from the cache in about 4 ms. In the browser, the greeting played as her recorded voice and the browser voice stayed silent. Jacky listened to two sample lines and approved the voice. The test used about 300 characters, about 150 of the free plan's 10,000 monthly credits on Flash.
+- **Dev port:** Vite now follows `PORT` (default 5173), so the preview can run on another port when 5173 is busy.
+

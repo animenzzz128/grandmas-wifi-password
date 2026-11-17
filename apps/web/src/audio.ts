@@ -44,6 +44,22 @@ useSettings.subscribe(() => {
   for (const ch of ["sfx", "voice", "music"] as const) channels[ch]?.gain.setTargetAtTime(level(ch), ctx?.currentTime ?? 0, 0.05);
 });
 
+/**
+ * Plays recorded speech (Grandma's ElevenLabs voice) on the voice channel, so its volume setting applies.
+ * Resolves when it ends or is stopped; returns a stop function right away. Null if sound is off.
+ */
+export async function playVoiceClip(mp3: ArrayBuffer): Promise<{ stop(): void; ended: Promise<void> } | null> {
+  const c = audio();
+  if (!c) return null;
+  const buffer = await c.decodeAudioData(mp3);
+  const src = c.createBufferSource();
+  src.buffer = buffer;
+  src.connect(channel(c, "voice"));
+  const ended = new Promise<void>((resolve) => (src.onended = () => resolve()));
+  src.start();
+  return { stop: () => src.stop(), ended };
+}
+
 export function isMuted(): boolean {
   return muted;
 }

@@ -49,4 +49,13 @@ export const api = {
   cookie: (runId: string) => request(ItemResponse, `/api/runs/${runId}/item`, { item: "cookie" }),
   glasses: (runId: string) => request(ItemResponse, `/api/runs/${runId}/item`, { item: "glasses" }),
   guess: (runId: string, parts: string[]) => request(GuessResponse, `/api/runs/${runId}/guess`, { parts }),
+  /** Grandma's lines as speech (MP3), or null if the server can't say them now (the caller falls back). */
+  voice: async (runId: string, lines: string[], mood?: string): Promise<ArrayBuffer | null> => {
+    try {
+      const res = await fetch(`/api/runs/${runId}/voice`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ lines, mood }) });
+      return res.ok ? await res.arrayBuffer() : null;
+    } catch {
+      return null;
+    }
+  },
 };

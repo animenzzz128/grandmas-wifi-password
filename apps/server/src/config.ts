@@ -27,6 +27,8 @@ export interface Config {
   dailyBudgetUsd: number;
   /** EMBED_ORIGINS: space-separated sites allowed to frame the game (an itch.io embed). Empty: none. */
   embedOrigins: string[];
+  /** Grandma's spoken voice (ElevenLabs). Off unless both a key and a voice id are set. */
+  voice: { apiKey: string; voiceId: string; model: string; dailyChars: number } | undefined;
   dataDir: string;
   varDir: string;
   webDist: string;
@@ -55,6 +57,13 @@ export function readConfig(env: Env = process.env, dotenv: Env = {}, argv: reado
     asksPerMinute: Number(get("RATE_LIMIT_ASKS_PER_MIN") || 30),
     dailyBudgetUsd: Number(get("GRANDMA_DAILY_BUDGET_USD") || 5),
     embedOrigins: (get("EMBED_ORIGINS") ?? "").split(/\s+/).filter((o) => /^https:\/\/[a-z0-9.*-]+(:\d+)?$/i.test(o)),
+    // Same rule as the Anthropic key: the repo's .env, or the environment only when deploying on purpose.
+    voice: (() => {
+      const key = dotenv.ELEVENLABS_API_KEY || (get("GRANDMA_VOICE") === "elevenlabs" ? env.ELEVENLABS_API_KEY : undefined);
+      const voiceId = get("ELEVENLABS_VOICE_ID");
+      if (!key || !voiceId || get("GRANDMA_VOICE") === "browser") return undefined;
+      return { apiKey: key, voiceId, model: get("ELEVENLABS_MODEL") || "eleven_flash_v2_5", dailyChars: Number(get("VOICE_DAILY_CHARS") || 3000) };
+    })(),
     dataDir: join(REPO_ROOT, "data"),
     varDir: get("VAR_DIR") || join(REPO_ROOT, "var"),
     webDist: join(REPO_ROOT, "apps/web/dist"),
