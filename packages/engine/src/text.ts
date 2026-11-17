@@ -100,6 +100,17 @@ export function factKeywords(world: GrandmaWorld, fact: Fact): Set<string> {
   return new Set(tokens(parts.join(" ")));
 }
 
+/**
+ * Take hidden years out of a memory or story so the sentence still reads: "married in June of 1961 at…"
+ * becomes "married in June at…", "the county fair in 1958, Walt…" becomes "the county fair, Walt…". Only a
+ * bare year left over becomes "that year". Used by the offline Grandma and the model's prompt alike.
+ */
+export function scrubYears(text: string, hidden: ReadonlySet<number>): string {
+  let t = text;
+  for (const y of hidden) t = t.replace(new RegExp(`,?\\s(?:in|of)\\s${y}\\b`, "g"), "").replaceAll(String(y), "that year");
+  return t;
+}
+
 export function normalizeForMatch(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, "");
 }

@@ -62,17 +62,31 @@ describe("world", () => {
     expect(() => parseWorld(bad)).toThrow(/f_nope/);
   });
 
-  it("hides the anchored year from the model in hard mode only", () => {
+  it("hides each anchored year from the model, only in its own puzzle", () => {
     expect([...hiddenYears(world, hard)]).toEqual([1977]);
-    expect(hiddenYears(world, easy).size).toBe(0);
+    // Since iteration 47 (f2-year-hops) Easy's year is a hop too: "the June after Walt proposed".
+    expect([...hiddenYears(world, easy)]).toEqual([1961]);
+    expect(hiddenYears(world, recipeById(world, "r_medium")!).size).toBe(0);
     const block = buildWorldBlock(world, hard);
     expect(block).not.toContain("1977");
     expect(block).toContain("the winter Michael broke his arm sledding");
     expect(buildWorldBlock(world, easy)).toContain("1977");
+    expect(buildWorldBlock(world, easy)).toContain("the June after Walt proposed");
+    expect(buildWorldBlock(world, hard)).toContain("1961");
   });
 
   it("never puts a password in the prompt", () => {
     for (const r of world.recipes) expect(buildWorldBlock(world, r)).not.toContain(r.password);
+  });
+
+  it("never puts a puzzle's hidden year in its prompt, in any column, memory or story", () => {
+    for (const r of world.recipes) {
+      const block = buildWorldBlock(world, r);
+      for (const y of hiddenYears(world, r)) expect(block, `${r.id} ${y}`).not.toMatch(new RegExp(`${y}|'${String(y).slice(2)}\\b`));
+    }
+    // And it still reads: the year leaves the sentence, not a hole.
+    expect(buildWorldBlock(world, easy)).toContain("We got married in June at St. Stanislaus church, the June after Walt proposed.");
+    expect(buildWorldBlock(world, recipeById(world, "r_medium_2")!)).toContain("At the county fair, Walt spent three dollars");
   });
 });
 
@@ -240,9 +254,22 @@ describe("mock Grandma", () => {
       const input = { kind: "show" as const, object: { id: o.id, label: o.label, inspectText: o.inspect_text!, factIds: o.fact_ids! } };
       return mockGrandmaReply({ world, recipe: recipeById(world, recipeId)!, input, seed: "s", recentFactIds: [] }).fact_ids_used[0];
     };
-    expect(show("r_easy_2", "photo_album")).toBe("f_linda_born");
+    // Easy 2's year is behind an anchor ("the year before we moved to Maple Avenue"): the album gives the move.
+    expect(show("r_easy_2", "photo_album")).toBe("f_house");
     expect(show("r_easy_2", "wedding_photo")).toBe("f_honeymoon");
     expect(show("r_easy", "photo_album")).toBe("f_dog1");
+    // Hard's snowstorm is behind an anchor: the sled gives the link (Michael's arm), not the riddle back.
+    expect(show("r_hard", "sled")).toBe("f_michael_arm");
+  });
+
+  it("doesn't tell the memory she just told when another fits almost as well", () => {
+    const ask = (text: string, recent: string[]) =>
+      mockGrandmaReply({ world, recipe: easy, input: { kind: "ask", text }, seed: "s", recentFactIds: recent }).fact_ids_used[0];
+    const first = ask("When did you get married?", []);
+    expect(first).toBe("f_wedding");
+    expect(ask("When did you get married?", [first!])).not.toBe("f_wedding");
+    // A clear best match is still told again (nothing else fits): she doesn't drift off on a direct question.
+    expect(ask("Who is the sock thief?", ["f_dog1_habit"])).toBe("f_dog1_habit");
   });
 });
 
@@ -445,23 +472,25 @@ describe("self-corrections (GDD §3.2)", () => {
     expect(resolveSelfCorrections("It was 1960… no, '61.", allowed)).toBe("It was 1960… no, '61.");
     expect(resolveSelfCorrections("It was 1960… no, '61.")).toBe("It was 1961."); // client side: any pair
   });
+  // The wedding's "1962… no, '61" moved to the Maple house in iteration 47: Easy now hides 1961, and a
+  // hidden year can't have a self-correction (checkWorld).
   it("lets the validator accept a marked slip and reject an unmarked one", () => {
-    const easy = recipeById(world, "r_easy")!;
-    const vctx = validationContext(world, easy, 2026);
-    const out = (reply: string) => ({ reply, fact_ids_used: ["f_wedding"], distractor_ids: [], mood: "nostalgic" as const });
-    expect(validateReply(world, out("We got married in June of 1962… no, '61 at St. Stanislaus church."), vctx)).toEqual([]);
-    expect(validateReply(world, out("We got married in June of 1959… no, '61 at St. Stanislaus church."), vctx).join()).toMatch(/1959/);
-    expect(validateReply(world, out("We got married in June of 1962 at St. Stanislaus church."), vctx).join()).toMatch(/1962/);
+    const medium = recipeById(world, "r_medium")!;
+    const vctx = validationContext(world, medium, 2026);
+    const out = (reply: string) => ({ reply, fact_ids_used: ["f_house"], distractor_ids: [], mood: "nostalgic" as const });
+    expect(validateReply(world, out("In 1965… no, '64 we bought the house on Maple Avenue."), vctx)).toEqual([]);
+    expect(validateReply(world, out("In 1962… no, '64 we bought the house on Maple Avenue."), vctx).join()).toMatch(/1962/);
+    expect(validateReply(world, out("In 1965 we bought the house on Maple Avenue."), vctx).join()).toMatch(/1965/);
   });
   it("the mock slips only on marked memories and always lands on the right year", () => {
-    const easy = recipeById(world, "r_easy")!;
+    const medium = recipeById(world, "r_medium")!;
     const slips = new Set<string>();
     for (let i = 0; i < 40; i++) {
-      const r = mockGrandmaReply({ world, recipe: easy, input: { kind: "ask", text: "When did you get married?" }, seed: `s${i}`, recentFactIds: [] });
+      const r = mockGrandmaReply({ world, recipe: medium, input: { kind: "ask", text: "When did you buy the house on Maple Avenue?" }, seed: `s${i}`, recentFactIds: [] });
       const m = r.reply.match(/(\d{4})… no, '(\d\d)/);
       if (m) slips.add(`${m[1]}->${m[2]}`);
     }
-    expect([...slips]).toEqual(["1962->61"]);
+    expect([...slips]).toEqual(["1965->64"]);
   });
 });
 

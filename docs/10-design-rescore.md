@@ -10,7 +10,7 @@
 - the live LLM Grandma (no course key), so dimension 4 is the offline Grandma only;
 - real players;
 - the sound mix (nobody listened);
-- visual cohesion (dimension 8), which wasn't re-scored.
+- visual cohesion (dimension 8) was scored afterwards from my own browser screenshots (iteration 45), so it carries low confidence.
 
 The AI player (`eval:player`) wasn't run, because it needs an LLM for the player.
 
@@ -36,11 +36,11 @@ Pass bar: no P0, average at least 6, no dimension below 4.
 | 5 | Fairness and feedback | 6 | Partial confirmation, cost breakdown, nudges, notebook. But "Niagara Falls" was a wrong guess (F1) and two nudges led nowhere offline. | medium |
 | 6 | Controls and input | 7 | Esc in every mode, guarded typing, keys can be rebound. | medium |
 | 7 | Onboarding and clarity | 6 | One-button first visit, checklist, chips, first-time lessons. The first 60 s haven't been timed with a real person. | low |
-| 8 | Visual cohesion | — | Not re-scored. | — |
+| 8 | Visual cohesion | 6 | One warm palette under the retro filter, soft shadows, clue glints. Grandma reads but is small from across the room. The blocky fridge and TV still differ from the softer furniture. (Iteration 45, my screenshots.) | low |
 | 9 | Audio | 7 | Blips, chimes, clock, music loop, snore, three volume channels. The mix is unheard. | low |
 | 10 | Robustness and safety | 7 | No hidden year in about 1,000 probe replies; budget and kill switch; rate limits. Weak spot: the fallback brain. | medium |
 
-**Average of the nine scored: about 5.9.** Pass bar not met: the average is just under 6.
+**Average of all ten: 5.9.** Pass bar not met: the average is just under 6. These are the scores before the iteration-44 fixes. Dimensions 4 and 5 should rise, but nobody independent has re-scored them yet.
 
 ## Findings and what iteration 44 did
 
@@ -73,7 +73,49 @@ These change puzzle content, so per the plan's ground rules they wait for your y
 - **Hard 2:** add a second route for "nine" (a photo caption) and a decoy year (for example, Buttons's 1968).
 - **Par:** set par per recipe from the measured minimum plus a margin, once the content is settled.
 
+## Measured proposal: `f2-year-hops` (iteration 46; **adopted in iteration 47** at Jacky's request)
+
+**Adopted 2026-11-16 (iteration 47).** The patch is now in `data/grandmas/rosie.json`, and its probes are in `eval/data/probes.v1.json`. Doing it for real turned up four more things:
+- **The model's prompt** removed a hidden year from the year column, but not from the memory's own text. Hard never had a year in those texts, so nobody noticed. Fixed: memories and stories lose hidden years cleanly in the prompt too. A new test checks that no puzzle's prompt contains its hidden year.
+- **The offline Grandma's "I don't recall" reply** skipped that clean-up. Fixed.
+- **The self-correction** moved from the wedding to the Maple house ("1965… no, '64"), so the offline Grandma still has one.
+- **Two texts were reworded so they read well without the year:** the switchboard memory, which shares 1958 with Medium 2's hidden year, and the fair story.
+
+Afterwards: 200 tests pass, the golden transcripts were re-recorded (diff reviewed), all 28 routes work, and **2 of 8** puzzles fall to direct questions.
+
+The section below describes the proposal as it was measured.
+
+`eval/data/proposals/f2-year-hops.json` is a patch the probe tool applies in memory; `data/` is not changed. In four puzzles the year becomes one hop. Grandma says a phrase instead of the year, as on Hard, and the year is hidden from her for that puzzle only:
+
+| Puzzle | Year | She says | One more question gives |
+|---|---|---|---|
+| Easy (Biscuit1961) | 1961 | "the June after Walt proposed" (the wedding photo says the same) | the proposal: Christmas Eve 1960 |
+| Easy 2 (Niagara1963) | 1963 | "the year before we moved to Maple Avenue" | the move: 1964 (also from showing her the album) |
+| Easy 3 (Buttons1972) | 1972 | "two summers after I started cooking at Lincoln Elementary" | that job: 1970 |
+| Medium 2 (Marge1958) | 1958 | "the summer I turned eighteen" | her birth year: 1940 |
+
+**Measured** (`npm run eval:probe -- --patch eval/data/proposals/f2-year-hops.json`):
+- The data cross-checks pass.
+- All 28 routes work in every run.
+- Puzzles that fall to direct questions go from **6/8 to 2/8**.
+
+The two that still fall are Medium (Maple412) and Medium 3 (Buttons27):
+- On Medium, she still lives on Maple Avenue, and the number is behind the reading glasses. Its deduction is the decoy (Cherry Street / 27), not a hop.
+- On Medium 3, there are only two dogs.
+
+Changing those two needs a different idea, for example a third dog, or keeping the house number out of her memory so it lives only in the room. That's left for the team.
+
+**Costs of the proposal:**
+- The wedding loses its "1962… no, '61" self-correction. A hidden year can't have one, and the data check enforces this; the TV keeps its self-correction.
+- Easy becomes "one riddle phrase + one hop", which is what the 11-12 review asked for.
+
+**Made along the way, live now:**
+- The offline Grandma drops a hidden year cleanly ("married in June at…", not "in June of that year"). Today no memory text contains a hidden year, so this changes nothing yet.
+- Showing an object prefers the memory the note asks about, unless that part is behind an anchor (the sled still gives Michael's arm).
+- When the best memory is the one she just told and another fits almost as well, she tells the other. Asking about the job her last answer mentioned gets the job. **Side effect to judge:** asking the same question twice gets a related memory the second time; the first answer stays in the log and notebook.
+
 ## Next
 
-- If the team accepts F2, F8 and F9, re-run the review's question probes (12 runs per question through the server API; worth porting into `eval/` as a script) and re-score.
+- The review's question probes are now `npm run eval:probe` (iteration 45). With retrieval fixed, Grandma answers direct questions more reliably, so more puzzles fall to them: **6 of 8** (all but the two Hards), against 4 in the review. Some of those questions already contain a hop's answer ("What number was the Cherry Street apartment?"), but F2 is clearly the next thing to decide.
+- If the team accepts F2, F8 and F9, re-run `npm run eval:probe`. The target is that no puzzle falls to direct questions alone. Then re-score.
 - Score dimension 8 in a person-led session, and dimensions 4 and 9 once the key arrives and someone listens.

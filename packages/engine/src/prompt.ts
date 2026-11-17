@@ -6,7 +6,7 @@
 import type { GrandmaWorld, Recipe } from "./world.ts";
 import { hiddenYears, objectValue } from "./world.ts";
 import { scoreFacts } from "./mock.ts";
-import { expandedTokens, hashString, rng } from "./text.ts";
+import { expandedTokens, hashString, rng, scrubYears } from "./text.ts";
 import type { Turn } from "./run.ts";
 
 export interface ShownObject {
@@ -99,7 +99,9 @@ export function buildWorldBlock(world: GrandmaWorld, recipe: Recipe, onlyFactIds
     if (only && !only.has(f.id)) continue;
     const year = f.year !== undefined && !hidden.has(f.year) ? String(f.year) : "-";
     const slip = f.misremembers !== undefined && year !== "-" ? ` (you sometimes say ${f.misremembers} first, then correct yourself: "${f.misremembers}… no, '${year.slice(2)}")` : "";
-    lines.push(`${f.id} | ${year} | ${f.salience} | ${f.text}${slip}`);
+    // The memory's own words lose a hidden year too ("married in June of 1961" → "married in June"),
+    // not just the year column: since iteration 47 hidden-year memories can carry their year in the text.
+    lines.push(`${f.id} | ${year} | ${f.salience} | ${scrubYears(f.text, hidden)}${slip}`);
   }
   const anchors = world.anchors ?? [];
   if (anchors.length) {
@@ -114,7 +116,7 @@ export function buildWorldBlock(world: GrandmaWorld, recipe: Recipe, onlyFactIds
     for (const s of stories) {
       if (only && !s.fact_ids.some((id) => only.has(id))) continue;
       let text = s.text;
-      for (const y of hidden) text = text.replaceAll(String(y), "that year");
+      text = scrubYears(text, hidden);
       lines.push(`- ${s.title} [${s.fact_ids.join(", ")}]: ${text}`);
     }
   }

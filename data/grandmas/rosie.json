@@ -245,7 +245,7 @@
       "predicate": "met_spouse_at",
       "object": "county_fair",
       "year": 1958,
-      "text": "I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear.",
+      "text": "I met your grandpa at the Erie County Fair in 1958, the summer I turned eighteen. He lost three dollars trying to win me a stuffed bear.",
       "tags": [
         "romance"
       ],
@@ -273,8 +273,7 @@
       "predicate": "wedding_year",
       "object": "walt",
       "year": 1961,
-      "misremembers": 1962,
-      "text": "We got married in June of 1961 at St. Stanislaus church.",
+      "text": "We got married in June of 1961 at St. Stanislaus church, the June after Walt proposed.",
       "tags": [
         "romance",
         "milestone"
@@ -327,7 +326,7 @@
       "predicate": "job",
       "object": "phone_co",
       "year": 1958,
-      "text": "My first job was a switchboard operator at the telephone exchange, starting in 1958.",
+      "text": "My first job was a switchboard operator at the telephone exchange. I started there in 1958.",
       "tags": [
         "work"
       ],
@@ -382,6 +381,7 @@
       "predicate": "second_home_street",
       "object": "maple_ave",
       "year": 1964,
+      "misremembers": 1965,
       "text": "In 1964 we bought the house on Maple Avenue, and we've been there ever since.",
       "tags": [
         "home"
@@ -414,7 +414,7 @@
       "predicate": "born",
       "object": "cherry_st",
       "year": 1963,
-      "text": "Your mom Linda was born in 1963, when we were still in the Cherry Street apartment.",
+      "text": "Your mom Linda was born in 1963 at the Cherry Street apartment, the year before we moved to Maple Avenue.",
       "tags": [
         "family",
         "milestone"
@@ -523,7 +523,7 @@
       "predicate": "won",
       "object": "blue ribbon for cherry pie",
       "year": 1972,
-      "text": "I won the blue ribbon for my cherry pie at the county fair in 1972.",
+      "text": "I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary.",
       "tags": [
         "cooking",
         "milestone"
@@ -677,6 +677,42 @@
         "f_dog1"
       ],
       "source": "family"
+    },
+    {
+      "id": "a_wedding",
+      "phrase": "the June after Walt proposed",
+      "resolves_to_year": 1961,
+      "via_fact_ids": [
+        "f_engaged"
+      ],
+      "source": "family"
+    },
+    {
+      "id": "a_linda_moved",
+      "phrase": "the year before we moved to Maple Avenue",
+      "resolves_to_year": 1963,
+      "via_fact_ids": [
+        "f_house"
+      ],
+      "source": "family"
+    },
+    {
+      "id": "a_pie",
+      "phrase": "two summers after I started cooking at Lincoln Elementary",
+      "resolves_to_year": 1972,
+      "via_fact_ids": [
+        "f_job2"
+      ],
+      "source": "family"
+    },
+    {
+      "id": "a_met",
+      "phrase": "the summer I turned eighteen",
+      "resolves_to_year": 1958,
+      "via_fact_ids": [
+        "f_birth"
+      ],
+      "source": "family"
     }
   ],
   "stories": [
@@ -687,7 +723,7 @@
         "f_met_walt",
         "f_nickname"
       ],
-      "text": "At the 1958 county fair Walt spent three dollars on the ring toss for a stuffed bear, lost every throw, and bought me a candy apple instead. I talked the whole way home, and that's when he started calling me Sparrow."
+      "text": "At the county fair in 1958, Walt spent three dollars on the ring toss for a stuffed bear, lost every throw, and bought me a candy apple instead. I talked the whole way home, and that's when he started calling me Sparrow."
     },
     {
       "id": "s_pierogi",
@@ -723,7 +759,8 @@
         {
           "fact_id": "f_wedding",
           "field": "year",
-          "transform": "none"
+          "transform": "none",
+          "requires_anchor": "a_wedding"
         }
       ],
       "format": {
@@ -739,6 +776,10 @@
         [
           "f_dog1",
           "f_wedding"
+        ],
+        [
+          "f_wedding",
+          "f_engaged"
         ]
       ],
       "nudges": [
@@ -847,7 +888,8 @@
         {
           "fact_id": "f_linda_born",
           "field": "year",
-          "transform": "none"
+          "transform": "none",
+          "requires_anchor": "a_linda_moved"
         }
       ],
       "format": {
@@ -863,6 +905,10 @@
         [
           "f_honeymoon",
           "f_linda_born"
+        ],
+        [
+          "f_linda_born",
+          "f_house"
         ]
       ],
       "nudges": [
@@ -883,7 +929,8 @@
         {
           "fact_id": "f_pie",
           "field": "year",
-          "transform": "none"
+          "transform": "none",
+          "requires_anchor": "a_pie"
         }
       ],
       "format": {
@@ -899,6 +946,10 @@
         [
           "f_dog2",
           "f_pie"
+        ],
+        [
+          "f_pie",
+          "f_job2"
         ]
       ],
       "nudges": [
@@ -919,7 +970,8 @@
         {
           "fact_id": "f_met_walt",
           "field": "year",
-          "transform": "none"
+          "transform": "none",
+          "requires_anchor": "a_met"
         }
       ],
       "format": {
@@ -939,6 +991,10 @@
         [
           "f_bowling",
           "f_met_walt"
+        ],
+        [
+          "f_met_walt",
+          "f_birth"
         ]
       ],
       "nudges": [

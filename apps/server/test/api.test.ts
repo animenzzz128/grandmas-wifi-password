@@ -206,14 +206,17 @@ describe("solvability walkthroughs (data/grandmas/rosie.chains.md, mock Grandma)
     easy: {
       steps: [
         ["Who stole all the socks?", /Biscuit/],
-        ["When did you get married?", /1961|'61/], // she may slip first: "1962… no, '61" (GDD §3.2)
+        // Since iteration 47 the year is one hop: "the June after Walt proposed", then the proposal.
+        ["When did you get married?", /the June after Walt proposed/],
+        ["When did Walt propose?", /1960/], // 1960 + 1 = 1961
       ],
       parts: ["biscuit", "1961"],
     },
     medium: {
       steps: [
         ["When did you get the color TV?", /1969|'69/],
-        ["When did you buy the house on Maple Avenue?", /Maple Avenue.*1964|1964.*Maple Avenue/],
+        // She may slip first: "In 1965… no, '64 we bought the house" (GDD §3.2; moved here in iteration 47).
+        ["When did you buy the house on Maple Avenue?", /(1964|'64).*Maple Avenue/],
         ["What number did Grandpa paint on the mailbox?", /412/],
       ],
       parts: ["Maple", "412"],
@@ -555,24 +558,28 @@ describe("security review P3 fixes (iteration 37)", () => {
 
 describe("more puzzles per difficulty (design plan D, iteration 43)", () => {
   const walkthroughs: Record<string, { steps: [string, RegExp][]; parts: string[] }> = {
+    // Since iteration 47 (f2-year-hops) each of these years is one hop: she says a phrase, never the year.
     r_easy_2: {
       steps: [
         ["Where did you go on your honeymoon?", /Niagara/],
-        ["When was my mom born?", /1963|'63/],
+        ["When was my mom born?", /the year before we moved to Maple Avenue/],
+        ["When did you move to Maple Avenue?", /1964|'64/], // 1964 − 1 = 1963
       ],
       parts: ["niagara", "1963"],
     },
     r_easy_3: {
       steps: [
         ["Which dog was your favorite?", /Buttons/],
-        ["When did you win the blue ribbon for your pie?", /1972/],
+        ["When did you win the blue ribbon for your pie?", /two summers after I started cooking at Lincoln Elementary/],
+        ["When did you start cooking at Lincoln Elementary?", /1970/], // 1970 + 2 = 1972
       ],
       parts: ["buttons", "1972"],
     },
     r_medium_2: {
       steps: [
         ["Who do you go bowling with on Tuesdays?", /Marge/],
-        ["When did you meet Grandpa at the county fair?", /1958/],
+        ["When did you meet Grandpa at the county fair?", /the summer I turned eighteen/],
+        ["What year were you born?", /1940/], // 1940 + 18 = 1958
       ],
       parts: ["marge", "1958"],
     },
@@ -601,7 +608,8 @@ describe("more puzzles per difficulty (design plan D, iteration 43)", () => {
       for (const [q, must] of w.steps) {
         const res = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, { text: q })).text));
         expect(res.reply, q).toMatch(must);
-        if (recipeId === "r_hard_2") expect(res.reply, "the hidden year").not.toMatch(/1949|'49/);
+        const hidden = { r_hard_2: /1949|'49/, r_easy_2: /1963|'63/, r_easy_3: /1972|'72/, r_medium_2: /1958|'58/ }[recipeId];
+        if (hidden) expect(res.reply, "the hidden year").not.toMatch(hidden);
       }
       const right = GuessResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/guess`, { parts: w.parts })).text));
       expect(right.correct).toBe(true);

@@ -24,6 +24,7 @@
     "eval:player": "tsx eval/src/player.ts",
     "eval:qgen": "tsx eval/src/qgen.ts",
     "eval:golden": "tsx eval/src/golden.ts",
+    "eval:probe": "tsx eval/src/probe.ts",
     "stats": "tsx eval/src/playstats.ts"
   },
   "devDependencies": {

@@ -72,12 +72,15 @@ describe("AI player", () => {
       { thought: "Look first", action: "inspect", objectId: "photo_album" },
       { thought: "Who is the sock thief?", action: "ask", text: "Who stole all the socks?" },
       { thought: "Married, not engaged", action: "ask", text: "When did you get married?" },
-      { thought: "Try it", action: "guess", parts: ["Biscuit", "1961"] },
+      { thought: "The June after the proposal", action: "ask", text: "When did Walt propose?" },
+      { thought: "1960 + 1", action: "guess", parts: ["Biscuit", "1961"] },
     ]);
     const r = await playOnce({ app: newApp(), client, model: "claude-sonnet-5-5", difficulty: "easy", recipeId: "r_easy" });
-    expect(r).toMatchObject({ solved: true, questions: 2, guesses: 1 });
+    expect(r).toMatchObject({ solved: true, questions: 3, guesses: 1 });
     expect(client.calls[1]!.user).toContain("You looked at the photo album: Two dog photos");
-    expect(client.calls[3]!.user).toMatch(/Grandma: .*(1961|'61)/); // she may slip first: "1962… no, '61"
+    // Since iteration 47 Easy's year is one hop: the player sees the phrase, then the proposal year.
+    expect(client.calls[3]!.user).toMatch(/Grandma: .*the June after Walt proposed/);
+    expect(client.calls[4]!.user).toMatch(/Grandma: .*1960/);
   });
 
   it("gives up after three wrong guesses", async () => {

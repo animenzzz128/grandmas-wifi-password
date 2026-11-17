@@ -78,10 +78,17 @@ function Art({ item, highlight = false }: { item: Item; highlight?: boolean }) {
 }
 
 /** Invisible box the crosshair ray hits: the same for every object, however detailed its art. */
+/**
+ * Hit boxes live on their own layer, and the look ray tests only that layer: one box per object instead of
+ * every triangle of every model. Raycasting Grandma's skinned body re-poses all its vertices in JavaScript,
+ * which cost 5–10 ms a frame whenever you looked at her (iteration 48). The camera doesn't render this layer.
+ */
+export const HITBOX_LAYER = 1;
+
 function HitBox({ size }: { size: Vec3 }) {
   const s = size.map((v) => Math.max(v, 0.14)) as Vec3;
   return (
-    <mesh>
+    <mesh layers={HITBOX_LAYER}>
       <boxGeometry args={s} />
       <meshBasicMaterial visible={false} />
     </mesh>

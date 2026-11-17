@@ -44,6 +44,8 @@ void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
 
 export function RetroFilter({ levels = 14 }: { levels?: number }) {
   const { gl, scene, camera, size } = useThree();
+  // The pixel ratio can change mid-visit (adaptive resolution in GameCanvas), not just the window size.
+  const dpr = useThree((s) => s.viewport.dpr);
   const target = useMemo(() => new WebGLRenderTarget(1, 1, { magFilter: NearestFilter, minFilter: NearestFilter }), []);
   const { post, cam, mat } = useMemo(() => {
     const mat = new ShaderMaterial({
@@ -62,7 +64,7 @@ export function RetroFilter({ levels = 14 }: { levels?: number }) {
     const pr = gl.getPixelRatio();
     target.setSize(Math.max(1, Math.floor(size.width * pr)), Math.max(1, Math.floor(size.height * pr)));
     mat.uniforms.uSize!.value.set(target.width, target.height);
-  }, [gl, size, target, mat]);
+  }, [gl, size, dpr, target, mat]);
   useEffect(() => () => target.dispose(), [target]);
 
   // Priority 1 takes over rendering from R3F: scene → target → filtered quad on screen.

@@ -20,6 +20,7 @@ import { PLAYER_RADIUS } from "@gwp/engine";
 import type { PublicScene } from "@gwp/engine";
 import { useGame } from "../store.ts";
 import { useSettings } from "../settings.ts";
+import { HITBOX_LAYER } from "./Room.tsx";
 
 const WALK_SPEED = 2.6; // m/s
 const SPRINT_SPEED = 4.2; // m/s with Shift
@@ -106,7 +107,12 @@ export function Player({ scene, interactRef }: { scene: PublicScene; interactRef
   const look = useRef({ dx: 0, dy: 0, yaw: scene.spawn.yaw, pitch: 0 });
   const vel = useRef({ x: 0, z: 0 });
   const boxes = useMemo(() => colliders(scene), [scene]);
-  const ray = useMemo(() => new Raycaster(), []);
+  // Only the hit-box layer: one box per object, never model triangles (see HITBOX_LAYER).
+  const ray = useMemo(() => {
+    const r = new Raycaster();
+    r.layers.set(HITBOX_LAYER);
+    return r;
+  }, []);
   const center = useMemo(() => new Vector2(0, 0), []);
   const setFocus = useGame((s) => s.setFocus);
   const setNearGrandma = useGame((s) => s.setNearGrandma);

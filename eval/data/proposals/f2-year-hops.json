@@ -1,0 +1,178 @@
+{
+  "id": "f2-year-hops",
+  "status": "Adopted into data/grandmas/rosie.json on 2026-11-16 (iteration 47) at Jacky Yao's request. Kept as the record of what changed; applying it again would add the anchors twice.",
+  "notes": "PROPOSAL for the team (review 44, F2), drafted with Claude Code under Jacky Yao's direction; not applied to data/. In the four puzzles where both parts fall to direct questions (Easy, Easy 2, Easy 3, Medium 2), the year becomes one hop: Grandma says a phrase instead of the year, the way Hard already works, and the player works the year out from one more memory. Each memory keeps its year for the other puzzles.",
+  "facts": {
+    "f_wedding": {
+      "text": "We got married in June of 1961 at St. Stanislaus church, the June after Walt proposed.",
+      "misremembers": null
+    },
+    "f_linda_born": {
+      "text": "Your mom Linda was born in 1963 at the Cherry Street apartment, the year before we moved to Maple Avenue."
+    },
+    "f_pie": {
+      "text": "I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary."
+    },
+    "f_met_walt": {
+      "text": "I met your grandpa at the Erie County Fair in 1958, the summer I turned eighteen. He lost three dollars trying to win me a stuffed bear."
+    }
+  },
+  "anchors_add": [
+    {
+      "id": "a_wedding",
+      "phrase": "the June after Walt proposed",
+      "resolves_to_year": 1961,
+      "via_fact_ids": [
+        "f_engaged"
+      ],
+      "source": "family"
+    },
+    {
+      "id": "a_linda_moved",
+      "phrase": "the year before we moved to Maple Avenue",
+      "resolves_to_year": 1963,
+      "via_fact_ids": [
+        "f_house"
+      ],
+      "source": "family"
+    },
+    {
+      "id": "a_pie",
+      "phrase": "two summers after I started cooking at Lincoln Elementary",
+      "resolves_to_year": 1972,
+      "via_fact_ids": [
+        "f_job2"
+      ],
+      "source": "family"
+    },
+    {
+      "id": "a_met",
+      "phrase": "the summer I turned eighteen",
+      "resolves_to_year": 1958,
+      "via_fact_ids": [
+        "f_birth"
+      ],
+      "source": "family"
+    }
+  ],
+  "recipes": {
+    "r_easy": {
+      "anchor_slots": {
+        "1": "a_wedding"
+      },
+      "separate_add": [
+        [
+          "f_wedding",
+          "f_engaged"
+        ]
+      ]
+    },
+    "r_easy_2": {
+      "anchor_slots": {
+        "1": "a_linda_moved"
+      },
+      "separate_add": [
+        [
+          "f_linda_born",
+          "f_house"
+        ]
+      ]
+    },
+    "r_easy_3": {
+      "anchor_slots": {
+        "1": "a_pie"
+      },
+      "separate_add": [
+        [
+          "f_pie",
+          "f_job2"
+        ]
+      ]
+    },
+    "r_medium_2": {
+      "anchor_slots": {
+        "1": "a_met"
+      },
+      "separate_add": [
+        [
+          "f_met_walt",
+          "f_birth"
+        ]
+      ]
+    }
+  },
+  "reach_remove": [
+    {
+      "recipe": "r_easy_2",
+      "show": "photo_album"
+    },
+    {
+      "recipe": "r_easy_3",
+      "show": "blue_ribbon"
+    },
+    {
+      "recipe": "r_easy_3",
+      "ask": "What year did you win the blue ribbon?"
+    }
+  ],
+  "reach_add": [
+    {
+      "recipe": "r_easy",
+      "ask": "When did you get married?",
+      "expect": "the June after Walt proposed"
+    },
+    {
+      "recipe": "r_easy",
+      "ask": "When did Walt propose?",
+      "expect": "1960"
+    },
+    {
+      "recipe": "r_easy",
+      "show": "wedding_photo",
+      "expect": "the June after Walt proposed"
+    },
+    {
+      "recipe": "r_easy_2",
+      "ask": "When was my mom born?",
+      "expect": "the year before we moved to Maple Avenue"
+    },
+    {
+      "recipe": "r_easy_2",
+      "ask": "When did you move to Maple Avenue?",
+      "expect": "1964"
+    },
+    {
+      "recipe": "r_easy_2",
+      "show": "photo_album",
+      "expect": "1964"
+    },
+    {
+      "recipe": "r_easy_3",
+      "ask": "When did you win the blue ribbon?",
+      "expect": "two summers after I started cooking"
+    },
+    {
+      "recipe": "r_easy_3",
+      "ask": "When did you start cooking at Lincoln Elementary?",
+      "expect": "1970",
+      "after": [
+        "f_pie"
+      ]
+    },
+    {
+      "recipe": "r_easy_3",
+      "show": "blue_ribbon",
+      "expect": "two summers after I started cooking"
+    },
+    {
+      "recipe": "r_medium_2",
+      "ask": "When did you meet grandpa?",
+      "expect": "the summer I turned eighteen"
+    },
+    {
+      "recipe": "r_medium_2",
+      "ask": "What year were you born?",
+      "expect": "1940"
+    }
+  ]
+}

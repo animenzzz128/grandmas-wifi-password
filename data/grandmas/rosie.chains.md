@@ -11,7 +11,9 @@ Rules in code that protect the chains:
 
 ## Easy: `the sock thief + the year we said 'I do'` → Biscuit1961
 
-Self-corrections (GDD §3.2): she sometimes says "1962… no, '61" for the wedding and "1970… no, '69" for the color TV (`misremembers` in rosie.json). She always ends on the true year; the walkthrough tests accept either form.
+Self-corrections (GDD §3.2): she sometimes says "1965… no, '64" for the Maple house and "1970… no, '69" for the color TV (`misremembers` in rosie.json). She always ends on the true year; the walkthrough tests accept either form. (The wedding's "1962… no, '61" went in iteration 47: Easy now hides 1961, and a hidden year can't have one.)
+
+Year hops (iteration 47, `eval/data/proposals/f2-year-hops.json`, adopted at Jacky's request): in Easy, Easy 2, Easy 3 and Medium 2 the year is hidden from Grandma for that puzzle (`requires_anchor`), and she says a phrase instead. Before this, 6 of 8 puzzles fell to direct questions alone; now 2 (`npm run eval:probe`).
 
 Separate (`Recipe.separate`, added 11/13 after a review): the dog and the wedding are never told in one reply, so one answer can't hand over both parts.
 
@@ -20,10 +22,11 @@ Slot 1 "the sock thief" (1 hop)
   routes: photo album (a beagle chewing a sock, no names) → show it or ask about the beagle → Biscuit
           Grandma: "Biscuit stole every sock"; "my first dog was Biscuit, a beagle"
   competing answer: Buttons (the cocker spaniel, Grandma's favorite)
-Slot 2 "the year we said 'I do'" (1 hop)
-  routes: Grandma: married June 1961 · honeymoon story
-          wedding photo back: "Married the June after the pierogi" → ask about the pierogi proposal (Christmas Eve 1960) → June 1961
-  competing answer: 1960 (the pierogi proposal: engaged, not married). The photo itself rules it out ("the June after")
+Slot 2 "the year we said 'I do'" (1 hop, 1961 hidden from the model: anchor a_wedding)
+  hop 1 the wedding → Grandma: "the June after Walt proposed" · wedding photo back: "Married the June after the pierogi"
+  hop 2 the proposal → Grandma: "Walt proposed on Christmas Eve, 1960, with a ring hidden in a pierogi" → June 1961
+  competing answer: 1960 (the proposal itself: engaged, not married). "The June after" rules it out
+  separate: [f_wedding, f_engaged]
 ```
 
 ## Medium: `the street we lived on the year we got the color TV + the number Grandpa painted crooked` → Maple412
@@ -70,11 +73,12 @@ cycles through all eight. Every map below is checked by an API walkthrough with 
 Slot 1 honeymoon (1 hop)
   routes: Grandma: "Our honeymoon was at Niagara Falls" · wedding photo (brings up the honeymoon when shown)
   competing answer: Cherry Street (the first home "after the wedding"), Presque Isle (Stan's cabin)
-Slot 2 the year mom was born (1 hop)
-  routes: Grandma: "Your mom Linda was born in 1963, when we were still in the Cherry Street apartment"
-          album: the Cherry Street page (brings up Linda's birth when shown)
-  competing answer: 1966 (Michael)
-  separate: [f_honeymoon, f_linda_born]
+Slot 2 the year mom was born (1 hop, 1963 hidden from the model: anchor a_linda_moved)
+  hop 1 mom's birth → Grandma: "born at the Cherry Street apartment, the year before we moved to Maple Avenue"
+  hop 2 the move → Grandma: "In 1964 we bought the house on Maple Avenue" (she may say "1965… no, '64")
+          album: "Cherry St., our first home — moved out summer '64" (showing it brings up the move) → 1963
+  competing answer: 1966 (Michael), 1964 (the move itself)
+  separate: [f_honeymoon, f_linda_born], [f_linda_born, f_house]
 ```
 
 ### Easy 3: `my favorite dog + the year I won the blue ribbon` → Buttons1972
@@ -83,10 +87,11 @@ Slot 2 the year mom was born (1 hop)
 Slot 1 favorite dog (1 hop)
   routes: Grandma: "Buttons, our cocker spaniel... she was my favorite" · album: the spaniel on the porch step
   competing answer: Biscuit (the first dog, the sock thief)
-Slot 2 the blue ribbon year (1 hop)
-  routes: Grandma: "I won the blue ribbon for my cherry pie at the county fair in 1972" · the ribbon on the wall
-  competing answer: 1958 (the other county-fair memory: meeting Grandpa)
-  separate: [f_dog2, f_pie]
+Slot 2 the blue ribbon year (1 hop, 1972 hidden from the model: anchor a_pie)
+  hop 1 the ribbon → Grandma: "two summers after I started cooking at Lincoln Elementary" · the ribbon on the wall (shown: the same)
+  hop 2 the job → Grandma: "From 1970 I cooked in the cafeteria at Lincoln Elementary" → 1972
+  competing answer: 1958 (the other county-fair memory: meeting Grandpa), 1970 (the job itself)
+  separate: [f_dog2, f_pie], [f_pie, f_job2]
 ```
 
 ### Medium 2: `the friend I bowl with every Tuesday + the year your grandpa lost three dollars at the fair` → Marge1958
@@ -95,11 +100,12 @@ Slot 2 the blue ribbon year (1 hop)
 Slot 1 the Tuesday friend (1 hop + a name to pick out)
   routes: Grandma: "Every Tuesday is bowling league with Marge"; "Marge Novak has been my best friend"
           bowling trophy: TUESDAY LEAGUE (brings up Marge when shown)
-Slot 2 the three dollars (1 hop + a competing fair memory)
-  routes: Grandma: met Grandpa at the Erie County Fair in 1958, he lost three dollars on a stuffed bear · story s_fair
+Slot 2 the three dollars (1 hop + a competing fair memory, 1958 hidden from the model: anchor a_met)
+  hop 1 the fair → Grandma: met Grandpa at the Erie County Fair "the summer I turned eighteen", he lost three dollars on a stuffed bear · story s_fair
           blue ribbon (brings up the fair)
+  hop 2 her age → Grandma: "I was born in Erie in 1940" → 1958
   competing answer: 1972 (the pie ribbon, also at the fair)
-  separate: [f_marge, f_met_walt], [f_bowling, f_met_walt]
+  separate: [f_marge, f_met_walt], [f_bowling, f_met_walt], [f_met_walt, f_birth]
 ```
 
 ### Medium 3: `the dog we got the year before the men walked on the moon + the number on the door of our first home` → Buttons27

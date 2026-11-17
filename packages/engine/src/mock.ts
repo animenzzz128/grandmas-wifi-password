@@ -7,7 +7,7 @@ import type { Fact, GrandmaWorld, Recipe } from "./world.ts";
 import { chainFacts, containsAllSlots, entityById, factById, hiddenYears } from "./world.ts";
 import type { TurnInput } from "./prompt.ts";
 import type { GrandmaOutput } from "./validator.ts";
-import { expandedTokens, factKeywords, hashString, pick, rng, tokens } from "./text.ts";
+import { expandedTokens, factKeywords, hashString, pick, rng, scrubYears, tokens } from "./text.ts";
 
 const MOOD_BY_TAG: Record<string, GrandmaOutput["mood"]> = {
   funny: "teasing",
@@ -67,17 +67,28 @@ export function mockGrandmaReply(args: {
   let main: Fact | undefined;
   if (input.kind === "show") {
     // The scene lists an object's facts most-relevant first, so Grandma reacts to *that* object, and to the
-    // memory of it that matters for this note when there is one (the album means Linda's birth on Easy 2; F6).
+    // memory of it that matters for this note when there is one: the one the note asks about, else another
+    // link of its chain (the album means Linda's birth on Easy 2, not the Maple house; F6). A part behind
+    // an anchor is the riddle itself, so there the object gives a link instead (the sled: Michael's arm).
     const linked = input.object.factIds.map((id) => factById(world, id)).filter((f): f is Fact => Boolean(f));
     const query = expandedTokens(input.text ?? "");
     const chain = chainFacts(world, args.recipe);
+    const asked = new Set(args.recipe.slots.filter((s) => !s.requires_anchor).map((s) => s.fact_id));
     main =
       (input.text && scoreFacts(world, query, input.text).find((s) => linked.includes(s.fact))?.fact) ||
+      linked.find((f) => asked.has(f.id)) ||
       linked.find((f) => chain.has(f.id)) ||
       linked[0];
   } else {
-    main = scoreFacts(world, expandedTokens(input.text), input.text)[0]?.fact;
+    // She doesn't tell the same memory twice in a row when another fits almost as well: asking about the
+    // job her last answer mentioned ("two summers after I started cooking at Lincoln Elementary") gets the job.
+    const ranked = scoreFacts(world, expandedTokens(input.text), input.text);
+    const top = ranked[0];
+    main = top && args.recentFactIds.includes(top.fact.id) ? (ranked.find((s) => !args.recentFactIds.includes(s.fact.id) && s.score >= top.score - 1) ?? top).fact : top?.fact;
   }
+
+  // Every memory she tells loses its hidden years cleanly ("married in June of 1961 at…" → "in June at…").
+  const scrub = (text: string) => scrubYears(text, hidden);
 
   const tic = pick(world.profile.verbal_tics, rand);
   if (!main) {
@@ -86,7 +97,7 @@ export function mockGrandmaReply(args: {
       rand,
     );
     return {
-      reply: `${tic}. I don't recall anything about that, sweetheart. ${tangent.text}`,
+      reply: `${tic}. I don't recall anything about that, sweetheart. ${scrub(tangent.text)}`,
       fact_ids_used: [tangent.id],
       distractor_ids: [tangent.id],
       mood: "confused",
@@ -106,8 +117,7 @@ export function mockGrandmaReply(args: {
   // Self-corrections (GDD §3.2) use their own random stream, so the rest of the reply stays the same.
   const slip = rng(hashString(`${args.seed}:slip`));
   const say = (f: Fact) => {
-    let t = f.text;
-    for (const y of hidden) t = t.replaceAll(String(y), "that year");
+    let t = scrub(f.text);
     if (f === main && f.misremembers !== undefined && f.year !== undefined && !hidden.has(f.year) && slip() < 0.5) {
       t = t.replace(String(f.year), `${f.misremembers}… no, '${String(f.year).slice(2)}`);
     }

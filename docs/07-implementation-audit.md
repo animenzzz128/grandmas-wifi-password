@@ -337,3 +337,67 @@ Done at Jacky's request ("继续做剩下的"); every content change below is a 
   - A test I wrote through a shell script had `\b` turned into a backspace character, so it could never fail. It was fixed and now also asserts that it saw chips.
 - **Left for the team:** F2 (four puzzles fall to their own wording), F8 (Hard 2 has one route), F9 (par). Proposals are in `docs/10`.
 - **Checks:** typecheck, 194 tests, validate, golden.
+
+### Iteration 45 (11/16): question probes as a tool, visual score
+- Committed iterations 43–44 (190a115) at Jacky's request.
+- **`npm run eval:probe`** (`eval/src/probe.ts`, `eval/data/probes.v1.json`) turns the review's question probes into a free, repeatable tool:
+  - **Reach:** 20 promised routes, 12 runs each, through the validator. Vitest requires all of them in every run, so a retrieval change can't quietly break a nudge or an object route again.
+  - **Direct questions:** the ten most direct questions per puzzle. The report says which answer parts one reply hands over whole, and which puzzles fall to direct questions alone.
+- **Today's probe result:** 20/20 routes work. 6 of 8 puzzles fall to direct questions; only the two Hards hold, because their years are hidden from Grandma. This is review finding F2, now measured; content changes wait for the team.
+- **Visual cohesion (rubric 8):** scored 6 from browser screenshots, with low confidence. The ten-dimension average is 5.9 before the iteration-44 fixes.
+- **Checks:** typecheck, 196 tests, validate, golden.
+
+### Iteration 46 (11/16): a measured proposal for F2
+- **The direct-question bank is now note-only.** Three questions already contained a hop's answer: "in 1968", "in 1969", "the Cherry Street apartment". Even note-only, 6 of 8 puzzles fall to direct questions.
+- **`eval:probe -- --patch`** applies a content proposal in memory:
+  - rewordings, new anchors, slots put behind anchors, and probe changes;
+  - it runs the same cross-checks as `npm run validate`, and reports problems rather than crashing;
+  - it prints before and after.
+- **Proposal `eval/data/proposals/f2-year-hops.json`** (for the team; `data/` is unchanged): the year becomes one hop in Easy, Easy 2, Easy 3 and Medium 2.
+  - **Result:** data checks pass, 28/28 routes work, and falling puzzles go from 6/8 to 2/8.
+  - The data check caught a conflict in my first draft: a hidden year can't have a self-correction, so the wedding loses its "1962… no, '61".
+  - Medium and Medium 3 still fall and need a different idea. Details are in `docs/10`.
+- **Live offline-Grandma changes found by measuring the proposal:**
+  - A hidden year leaves the sentence cleanly. This is a no-op today, and the golden transcripts are unchanged.
+  - Showing an object prefers the memory the note asks about, unless that part is behind an anchor.
+  - She doesn't retell the memory she just told when another fits almost as well. As a result, asking the same question twice gets a related memory.
+- **Tests:** the proposal stays valid (data checks, routes, which puzzles fall); the sled on Hard; no immediate retelling.
+- **Checks:** typecheck, 198 tests, validate, golden.
+
+### Iteration 47 (11/16): F2 year hops adopted
+- At Jacky's request ("Apply it"), `eval/data/proposals/f2-year-hops.json` went into `data/grandmas/rosie.json`, applied by the same code that measured it.
+  - In Easy, Easy 2, Easy 3 and Medium 2 the year is one hop: "the June after Walt proposed", "the year before we moved to Maple Avenue", "two summers after I started cooking at Lincoln Elementary", "the summer I turned eighteen".
+  - Passwords are unchanged. The proposal file stays as a record, marked adopted.
+- **Found while adopting:**
+  - **The model's prompt kept hidden years inside memory texts.** Only the year column was blanked. On Hard this never mattered, because its hidden memories have no year in their text. Fixed with a shared `scrubYears` for the memories, the stories and the offline Grandma. A new test checks that no puzzle's prompt contains its hidden year.
+  - **The offline Grandma's "I don't recall" tangent didn't remove hidden years.** Fixed; the validator test found this.
+  - **The wedding loses its self-correction** (a hidden year can't have one). It moves to the Maple house ("1965… no, '64").
+  - **The switchboard memory and the fair story were reworded** so they read cleanly once the year is removed.
+- **Updated:**
+  - chain maps for the four puzzles;
+  - walkthroughs, which now take the hop and check that the hidden year never appears;
+  - the AI-player test;
+  - golden transcripts: one handwritten conversation rewritten for the new Easy, the rest re-recorded, diff reviewed.
+- **Checks:** typecheck, 200 tests, validate, golden, `eval:probe` (28/28 routes; 2/8 puzzles fall to direct questions, down from 6/8). Browser: Easy now answers "the June after Walt proposed", then the proposal year.
+- **Not verified:** the live model (no key), and people playing the new hops.
+
+### Iteration 48 (11/16): frame rate
+Jacky reported a very low frame rate in the web build. Measured in a debug Chrome on this laptop (Intel Graphics, Meteor Lake) with the playtest CDP driver; the Claude app's preview pane throttles and pauses its own drawing, so its numbers aren't used.
+- **Cause: the look ray tested Grandma's skinned mesh.** Every frame the player's ray tested all interactable models, triangle by triangle. When it reached Grandma, three.js re-posed all 16,220 of her vertices in JavaScript.
+  - Cost: 4.6 ms per frame on this CPU, and more on a slower or battery-throttled one, for as long as you looked at her (most of the game).
+  - In a software-rendered Chrome, looking at her dropped 60 fps to 48, with JavaScript per frame at 6.2 ms (p95 11 ms) against 1.1 ms when looking away.
+- **Fix:** hit boxes live on their own layer (`HITBOX_LAYER`), and the ray tests only that layer: one box per object.
+  - The ray now takes 0.01 ms.
+  - Looking at her: 240 fps on the real GPU, JavaScript p50 0.4 ms.
+  - Targeting re-checked on Grandma, the sticky note, the router, the photo album and the reading glasses.
+- **Other situations measured after the fix:** spawn, a 30-line chat log, a reply typing out, the notebook open, and walking. All had JavaScript p95 under 2 ms, and the Long Animation Frames API found no long frames.
+- **Safety net: adaptive resolution** (`scene/adaptive.ts`).
+  - Over 2-second windows: below 45 fps, step the render scale down 0.05 (floor 0.35); after three windows at 55+ fps, step back up to the default 0.6. It never locks.
+  - `?px=` pins the resolution.
+  - The retro pass now resizes when the pixel ratio changes.
+  - drei's `PerformanceMonitor` was tried first and dropped: it hit its flip-flop limit at once and locked at the minimum.
+  - Tested by throttling the CPU 20× over CDP: 0.6 went down to 0.4, then back to 0.6 about 22 s after the throttle ended.
+  - It helps a weak or software-rendered GPU; a CPU-bound slowdown it can't fix.
+- **Dev only:** `window.__three` (renderer and scene) and `window.__dprLog` for performance checks; both are stripped from the production build.
+- **Checks:** typecheck, 203 tests, build.
+- **Not verified:** the frame rate on other people's machines, and in Firefox or Safari.

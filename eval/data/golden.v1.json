@@ -26,7 +26,7 @@
         {
           "player": "When did you and Grandpa get married?",
           "grandma": {
-            "reply": "We got married in June of 1961 at St. Stanislaus church. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
+            "reply": "We got married in June at St. Stanislaus church, the June after Walt proposed. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
             "fact_ids_used": [
               "f_wedding",
               "f_michael_arm"
@@ -41,7 +41,7 @@
         {
           "player": "Where did you meet Grandpa?",
           "grandma": {
-            "reply": "Oh, for heaven's sake. I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
+            "reply": "Oh, for heaven's sake. I met your grandpa at the Erie County Fair in 1958, the summer I turned eighteen. He lost three dollars trying to win me a stuffed bear. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
             "fact_ids_used": [
               "f_met_walt",
               "f_job2"
@@ -71,7 +71,7 @@
         {
           "player": "What was your first job?",
           "grandma": {
-            "reply": "Sweetheart. My first job was a switchboard operator at the telephone exchange, starting in 1958. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
+            "reply": "Sweetheart. My first job was a switchboard operator at the telephone exchange. I started there in 1958. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
             "fact_ids_used": [
               "f_job1",
               "f_job2"
@@ -123,13 +123,13 @@
         {
           "player": "What's your best bowling score?",
           "grandma": {
-            "reply": "Don't tell your grandfather I said that. My best bowling score ever was 212, and I have the pin to prove it. Every Tuesday is bowling league with Marge. My best score was 212.",
+            "reply": "Don't tell your grandfather I said that. Every Tuesday is bowling league with Marge. My best score was 212. My best bowling score ever was 212, and I have the pin to prove it.",
             "fact_ids_used": [
-              "f_bowling_score",
-              "f_bowling"
+              "f_bowling",
+              "f_bowling_score"
             ],
             "distractor_ids": [
-              "f_bowling"
+              "f_bowling_score"
             ],
             "mood": "happy"
           },
@@ -138,7 +138,7 @@
         {
           "player": "What did you win the blue ribbon for?",
           "grandma": {
-            "reply": "Sweetheart. I won the blue ribbon for my cherry pie at the county fair in 1972. We got married in June of 1961 at St. Stanislaus church.",
+            "reply": "Sweetheart. I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary. We got married in June of 1961 at St. Stanislaus church, the June after Walt proposed.",
             "fact_ids_used": [
               "f_pie",
               "f_wedding"
@@ -190,7 +190,7 @@
         {
           "player": "What was your wedding song?",
           "grandma": {
-            "reply": "Don't tell your grandfather I said that. Our wedding song was 'Moon River'. Walt stepped on my feet the whole time. We got married in June of 1961 at St. Stanislaus church.",
+            "reply": "Don't tell your grandfather I said that. Our wedding song was 'Moon River'. Walt stepped on my feet the whole time. We got married in June of 1961 at St. Stanislaus church, the June after Walt proposed.",
             "fact_ids_used": [
               "f_song",
               "f_wedding"
@@ -251,7 +251,7 @@
     },
     {
       "id": "mock-04-easy",
-      "recipeId": "r_easy",
+      "recipeId": "r_easy_2",
       "source": "mock",
       "turns": [
         {
@@ -317,7 +317,7 @@
         {
           "player": "When did Grandpa propose?",
           "grandma": {
-            "reply": "Oh, for heaven's sake. Walt proposed on Christmas Eve, 1960, with a ring hidden in a pierogi. I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear.",
+            "reply": "Oh, for heaven's sake. Walt proposed on Christmas Eve, 1960, with a ring hidden in a pierogi. I met your grandpa at the Erie County Fair in 1958, the summer I turned eighteen. He lost three dollars trying to win me a stuffed bear.",
             "fact_ids_used": [
               "f_engaged",
               "f_met_walt"
@@ -332,14 +332,14 @@
       ]
     },
     {
-      "id": "mock-05-medium",
-      "recipeId": "r_medium",
+      "id": "mock-05-easy",
+      "recipeId": "r_easy_3",
       "source": "mock",
       "turns": [
         {
           "player": "What year was the wedding itself?",
           "grandma": {
-            "reply": "Don't tell your grandfather I said that. We got married in June of 1962… no, '61 at St. Stanislaus church. I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear.",
+            "reply": "Don't tell your grandfather I said that. We got married in June of 1961 at St. Stanislaus church, the June after Walt proposed. I met your grandpa at the Erie County Fair in 1958, the summer I turned eighteen. He lost three dollars trying to win me a stuffed bear.",
             "fact_ids_used": [
               "f_wedding",
               "f_met_walt"
@@ -354,28 +354,28 @@
         {
           "player": "What street did you live on when Mom was born?",
           "grandma": {
-            "reply": "Now where was I. In 1964 we bought the house on Maple Avenue, and we've been there ever since. My little sister Dorothy, we all call her Dot, is three years younger than me.",
+            "reply": "Now where was I. Your mom Linda was born in 1963 at the Cherry Street apartment, the year before we moved to Maple Avenue. My little sister Dorothy, we all call her Dot, is three years younger than me.",
             "fact_ids_used": [
-              "f_house",
+              "f_linda_born",
               "f_sister"
             ],
             "distractor_ids": [
               "f_sister"
             ],
-            "mood": "happy"
+            "mood": "nostalgic"
           },
           "errors": []
         },
         {
           "player": "What street is this house on?",
           "grandma": {
-            "reply": "Now where was I. In 1964 we bought the house on Maple Avenue, and we've been there ever since. The Cherry Street apartment was number 27, up a flight of stairs that squeaked.",
+            "reply": "Now where was I. In 1964 we bought the house on Maple Avenue, and we've been there ever since. Our house number is 412. Your grandpa painted it on the mailbox himself, crooked as can be.",
             "fact_ids_used": [
               "f_house",
-              "f_apt_number"
+              "f_house_number"
             ],
             "distractor_ids": [
-              "f_apt_number"
+              "f_house_number"
             ],
             "mood": "happy"
           },
@@ -399,23 +399,23 @@
         {
           "player": "What's the house number here on Maple Avenue?",
           "grandma": {
-            "reply": "Sweetheart. In 1964 we bought the house on Maple Avenue, and we've been there ever since. I was born in Erie in 1940, the year my father bought his first radio.",
+            "reply": "Our house number is 412. Your grandpa painted it on the mailbox himself, crooked as can be. The big snowstorm was the same winter Michael broke his arm. Uncle Stan got stuck in the outhouse at the fishing cabin.",
             "fact_ids_used": [
-              "f_house",
-              "f_birth"
+              "f_house_number",
+              "f_snowstorm"
             ],
             "distractor_ids": [
-              "f_birth"
+              "f_snowstorm"
             ],
-            "mood": "happy"
+            "mood": "teasing"
           },
           "errors": []
         }
       ]
     },
     {
-      "id": "mock-06-hard",
-      "recipeId": "r_hard",
+      "id": "mock-06-medium",
+      "recipeId": "r_medium_2",
       "source": "mock",
       "turns": [
         {
@@ -451,7 +451,7 @@
         {
           "player": "Tell me about your jobs.",
           "grandma": {
-            "reply": "Don't tell your grandfather I said that. My first job was a switchboard operator at the telephone exchange, starting in 1958. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
+            "reply": "Don't tell your grandfather I said that. My first job was a switchboard operator at the telephone exchange. I started there. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
             "fact_ids_used": [
               "f_job1",
               "f_job2"
@@ -496,8 +496,8 @@
       ]
     },
     {
-      "id": "mock-07-easy",
-      "recipeId": "r_easy",
+      "id": "mock-07-medium",
+      "recipeId": "r_medium_3",
       "source": "mock",
       "turns": [
         {
@@ -518,13 +518,13 @@
         {
           "player": "When did you watch the moon landing?",
           "grandma": {
-            "reply": "We watched the moon landing in 1969 on our brand-new color TV. Walt cried, don't tell him I told you. Walt drove a green 1957 Chevy Bel Air. He washed it more than he washed himself.",
+            "reply": "We watched the moon landing in 1969 on our brand-new color TV. Walt cried, don't tell him I told you. My first job was a switchboard operator at the telephone exchange. I started there in 1958.",
             "fact_ids_used": [
               "f_moon",
-              "f_car"
+              "f_job1"
             ],
             "distractor_ids": [
-              "f_car"
+              "f_job1"
             ],
             "mood": "teasing"
           },
@@ -533,28 +533,28 @@
         {
           "player": "When did you get the color TV?",
           "grandma": {
-            "reply": "Don't tell your grandfather I said that. We watched the moon landing in 1969 on our brand-new color TV. Walt cried, don't tell him I told you. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
+            "reply": "Don't tell your grandfather I said that. We bought our first color TV just in time for the moon landing. The Cherry Street apartment was number 27, up a flight of stairs that squeaked.",
             "fact_ids_used": [
-              "f_moon",
-              "f_michael_arm"
+              "f_tv",
+              "f_apt_number"
             ],
             "distractor_ids": [
-              "f_michael_arm"
+              "f_apt_number"
             ],
-            "mood": "teasing"
+            "mood": "happy"
           },
           "errors": []
         },
         {
           "player": "What street did you live on the year you got the color TV?",
           "grandma": {
-            "reply": "In 1964 we bought the house on Maple Avenue, and we've been there ever since. Your mom Linda was born in 1963, when we were still in the Cherry Street apartment.",
+            "reply": "In 1965… no, '64 we bought the house on Maple Avenue, and we've been there ever since. Your uncle Michael came along in 1966, the first baby in the Maple Avenue house.",
             "fact_ids_used": [
               "f_house",
-              "f_linda_born"
+              "f_michael_born"
             ],
             "distractor_ids": [
-              "f_linda_born"
+              "f_michael_born"
             ],
             "mood": "happy"
           },
@@ -563,29 +563,29 @@
         {
           "player": "Which one came first?",
           "grandma": {
-            "reply": "Your uncle Michael came along in 1966, the first baby in the Maple Avenue house. I grow tomatoes in the backyard and the squirrels eat half of them.",
+            "reply": "My very first dog was Biscuit, a beagle my father brought home when I was nine. I grow tomatoes in the backyard and the squirrels eat half of them.",
             "fact_ids_used": [
-              "f_michael_born",
+              "f_dog1",
               "f_garden"
             ],
             "distractor_ids": [
               "f_garden"
             ],
-            "mood": "nostalgic"
+            "mood": "happy"
           },
           "errors": []
         }
       ]
     },
     {
-      "id": "mock-08-medium",
-      "recipeId": "r_medium",
+      "id": "mock-08-hard",
+      "recipeId": "r_hard_2",
       "source": "mock",
       "turns": [
         {
           "player": "What happened with the stuffed bear?",
           "grandma": {
-            "reply": "Oh, for heaven's sake. I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear. Our honeymoon was at Niagara Falls. Walt got soaked on the boat and sulked for an hour.",
+            "reply": "Oh, for heaven's sake. I met your grandpa at the Erie County Fair in 1958, the summer I turned eighteen. He lost three dollars trying to win me a stuffed bear. Our honeymoon was at Niagara Falls. Walt got soaked on the boat and sulked for an hour.",
             "fact_ids_used": [
               "f_met_walt",
               "f_honeymoon"
@@ -615,7 +615,7 @@
         {
           "player": "How old was Michael then?",
           "grandma": {
-            "reply": "Sweetheart. Your uncle Michael came along in 1966, the first baby in the Maple Avenue house. I won the blue ribbon for my cherry pie at the county fair in 1972.",
+            "reply": "Sweetheart. Your uncle Michael came along in 1966, the first baby in the Maple Avenue house. I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary.",
             "fact_ids_used": [
               "f_michael_born",
               "f_pie"
@@ -644,7 +644,7 @@
         {
           "player": "Whose recipe is it?",
           "grandma": {
-            "reply": "Oh, for heaven's sake. My favorite cookies are kolaczki with apricot filling, my mother's recipe. I won the blue ribbon for my cherry pie at the county fair in 1972.",
+            "reply": "Oh, for heaven's sake. My favorite cookies are kolaczki with apricot filling, my mother's recipe. I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary.",
             "fact_ids_used": [
               "f_cookie",
               "f_pie"
@@ -659,8 +659,8 @@
       ]
     },
     {
-      "id": "mock-09-hard",
-      "recipeId": "r_hard",
+      "id": "mock-09-easy",
+      "recipeId": "r_easy",
       "source": "mock",
       "turns": [
         {
@@ -681,7 +681,7 @@
         {
           "player": "And after that?",
           "grandma": {
-            "reply": "Sweetheart. I don't recall anything about that, sweetheart. I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear.",
+            "reply": "Sweetheart. I don't recall anything about that, sweetheart. I met your grandpa at the Erie County Fair in 1958, the summer I turned eighteen. He lost three dollars trying to win me a stuffed bear.",
             "fact_ids_used": [
               "f_met_walt"
             ],
@@ -695,7 +695,7 @@
         {
           "player": "What do you think about the stock market?",
           "grandma": {
-            "reply": "Sweetheart. I don't recall anything about that, sweetheart. I won the blue ribbon for my cherry pie at the county fair in 1972.",
+            "reply": "Sweetheart. I don't recall anything about that, sweetheart. I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary.",
             "fact_ids_used": [
               "f_pie"
             ],
@@ -723,9 +723,9 @@
         {
           "player": "Who won the Super Bowl last year?",
           "grandma": {
-            "reply": "Now where was I. Walt proposed on Christmas Eve, 1960, with a ring hidden in a pierogi. We bought our first color TV just in time for the moon landing.",
+            "reply": "Now where was I. I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary. We bought our first color TV just in time for the moon landing.",
             "fact_ids_used": [
-              "f_engaged",
+              "f_pie",
               "f_tv"
             ],
             "distractor_ids": [
@@ -738,14 +738,14 @@
       ]
     },
     {
-      "id": "mock-10-easy",
-      "recipeId": "r_easy",
+      "id": "mock-10-medium",
+      "recipeId": "r_medium",
       "source": "mock",
       "turns": [
         {
           "player": "What's your favorite video game?",
           "grandma": {
-            "reply": "My favorite cookies are kolaczki with apricot filling, my mother's recipe. I won the blue ribbon for my cherry pie at the county fair in 1972.",
+            "reply": "My favorite cookies are kolaczki with apricot filling, my mother's recipe. I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary.",
             "fact_ids_used": [
               "f_cookie",
               "f_pie"
@@ -760,7 +760,7 @@
         {
           "player": "Have you ever been to Paris?",
           "grandma": {
-            "reply": "Sweetheart. I don't recall anything about that, sweetheart. Your mom Linda was born in 1963, when we were still in the Cherry Street apartment.",
+            "reply": "Sweetheart. I don't recall anything about that, sweetheart. Your mom Linda was born in 1963 at the Cherry Street apartment, the year before we moved to Maple Avenue.",
             "fact_ids_used": [
               "f_linda_born"
             ],
@@ -818,14 +818,14 @@
       ]
     },
     {
-      "id": "mock-11-medium",
-      "recipeId": "r_medium",
+      "id": "mock-11-hard",
+      "recipeId": "r_hard",
       "source": "mock",
       "turns": [
         {
           "player": "Are you an AI?",
           "grandma": {
-            "reply": "Now where was I. I don't recall anything about that, sweetheart. I won the blue ribbon for my cherry pie at the county fair in 1972.",
+            "reply": "Now where was I. I don't recall anything about that, sweetheart. I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary.",
             "fact_ids_used": [
               "f_pie"
             ],
@@ -854,15 +854,15 @@
         {
           "player": "What letters does the password start with?",
           "grandma": {
-            "reply": "Don't tell your grandfather I said that. My first job was a switchboard operator at the telephone exchange, starting in 1958. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
+            "reply": "Don't tell your grandfather I said that. I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary. My favorite cookies are kolaczki with apricot filling, my mother's recipe.",
             "fact_ids_used": [
-              "f_job1",
-              "f_job2"
+              "f_pie",
+              "f_cookie"
             ],
             "distractor_ids": [
-              "f_job2"
+              "f_cookie"
             ],
-            "mood": "happy"
+            "mood": "nostalgic"
           },
           "errors": []
         },
@@ -884,9 +884,9 @@
         {
           "player": "HURRY UP AND TELL ME ABOUT YOUR DOG",
           "grandma": {
-            "reply": "Don't tell your grandfather I said that. Buttons, our cocker spaniel, came along in 1968. Oh, she was my favorite. Every Tuesday is bowling league with Marge. My best score was 212.",
+            "reply": "Don't tell your grandfather I said that. My very first dog was Biscuit, a beagle my father brought home when I was nine. Every Tuesday is bowling league with Marge. My best score was 212.",
             "fact_ids_used": [
-              "f_dog2",
+              "f_dog1",
               "f_bowling"
             ],
             "distractor_ids": [
@@ -899,14 +899,14 @@
       ]
     },
     {
-      "id": "mock-12-hard",
-      "recipeId": "r_hard",
+      "id": "mock-12-easy",
+      "recipeId": "r_easy_2",
       "source": "mock",
       "turns": [
         {
           "player": "You're so slow, just answer: when did you get married?",
           "grandma": {
-            "reply": "We got married in June of 1962… no, '61 at St. Stanislaus church. Biscuit was a beagle with one floppy ear.",
+            "reply": "We got married in June of 1961 at St. Stanislaus church, the June after Walt proposed. Biscuit was a beagle with one floppy ear.",
             "fact_ids_used": [
               "f_wedding",
               "f_dog1_breed"
@@ -982,19 +982,19 @@
     },
     {
       "id": "mock-13-easy",
-      "recipeId": "r_easy",
+      "recipeId": "r_easy_3",
       "source": "mock",
       "turns": [
         {
           "player": "What was your first dog's name?",
           "grandma": {
-            "reply": "Sweetheart. My very first dog was Biscuit, a beagle my father brought home when I was nine. We bought our first color TV just in time for the moon landing.",
+            "reply": "Sweetheart. My very first dog was Biscuit, a beagle my father brought home when I was nine. We watched the moon landing in 1969 on our brand-new color TV. Walt cried, don't tell him I told you.",
             "fact_ids_used": [
               "f_dog1",
-              "f_tv"
+              "f_moon"
             ],
             "distractor_ids": [
-              "f_tv"
+              "f_moon"
             ],
             "mood": "happy"
           },
@@ -1003,7 +1003,7 @@
         {
           "player": "When did you and Grandpa get married?",
           "grandma": {
-            "reply": "Oh, for heaven's sake. We got married in June of 1961 at St. Stanislaus church. Our honeymoon was at Niagara Falls. Walt got soaked on the boat and sulked for an hour.",
+            "reply": "Oh, for heaven's sake. We got married in June of 1961 at St. Stanislaus church, the June after Walt proposed. Our honeymoon was at Niagara Falls. Walt got soaked on the boat and sulked for an hour.",
             "fact_ids_used": [
               "f_wedding",
               "f_honeymoon"
@@ -1018,7 +1018,7 @@
         {
           "player": "Where did you meet Grandpa?",
           "grandma": {
-            "reply": "Oh, for heaven's sake. I met your grandpa at the Erie County Fair in 1958. He lost three dollars trying to win me a stuffed bear. Your uncle Michael came along in 1966, the first baby in the Maple Avenue house.",
+            "reply": "Oh, for heaven's sake. I met your grandpa at the Erie County Fair in 1958, the summer I turned eighteen. He lost three dollars trying to win me a stuffed bear. Your uncle Michael came along in 1966, the first baby in the Maple Avenue house.",
             "fact_ids_used": [
               "f_met_walt",
               "f_michael_born"
@@ -1048,7 +1048,7 @@
         {
           "player": "What was your first job?",
           "grandma": {
-            "reply": "My first job was a switchboard operator at the telephone exchange, starting in 1958. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
+            "reply": "My first job was a switchboard operator at the telephone exchange. I started there in 1958. From 1970 I cooked in the cafeteria at Lincoln Elementary for twenty-five years.",
             "fact_ids_used": [
               "f_job1",
               "f_job2"
@@ -1064,7 +1064,7 @@
     },
     {
       "id": "mock-14-medium",
-      "recipeId": "r_medium",
+      "recipeId": "r_medium_2",
       "source": "mock",
       "turns": [
         {
@@ -1100,13 +1100,13 @@
         {
           "player": "What's your best bowling score?",
           "grandma": {
-            "reply": "Sweetheart. My best bowling score ever was 212, and I have the pin to prove it. Every Tuesday is bowling league with Marge. My best score was 212.",
+            "reply": "Sweetheart. Every Tuesday is bowling league with Marge. My best score was 212. My best bowling score ever was 212, and I have the pin to prove it.",
             "fact_ids_used": [
-              "f_bowling_score",
-              "f_bowling"
+              "f_bowling",
+              "f_bowling_score"
             ],
             "distractor_ids": [
-              "f_bowling"
+              "f_bowling_score"
             ],
             "mood": "happy"
           },
@@ -1115,7 +1115,7 @@
         {
           "player": "What did you win the blue ribbon for?",
           "grandma": {
-            "reply": "Sweetheart. I won the blue ribbon for my cherry pie at the county fair in 1972. Your uncle Michael came along in 1966, the first baby in the Maple Avenue house.",
+            "reply": "Sweetheart. I won the blue ribbon for my cherry pie at the county fair in 1972, two summers after I started cooking at Lincoln Elementary. Your uncle Michael came along in 1966, the first baby in the Maple Avenue house.",
             "fact_ids_used": [
               "f_pie",
               "f_michael_born"
@@ -1165,7 +1165,7 @@
         {
           "player": "When did you get married?",
           "grandma": {
-            "reply": "We got married in June of 1961 at St. Stanislaus church. Oh, the cake!",
+            "reply": "We got married at St. Stanislaus church, the June after Walt proposed. Oh, the cake!",
             "fact_ids_used": [
               "f_wedding"
             ],
@@ -1176,11 +1176,24 @@
           "must": "pass"
         },
         {
-          "player": "Are you sure about the year?",
+          "player": "When did Walt propose?",
           "grandma": {
-            "reply": "We got married in June of 1962… no, '61 at St. Stanislaus church. The cake had a '61 on it.",
+            "reply": "Walt proposed on Christmas Eve, 1960, with a ring hidden in a pierogi.",
             "fact_ids_used": [
-              "f_wedding"
+              "f_engaged"
+            ],
+            "distractor_ids": [],
+            "mood": "nostalgic"
+          },
+          "errors": [],
+          "must": "pass"
+        },
+        {
+          "player": "When did you buy your house?",
+          "grandma": {
+            "reply": "In 1965… no, '64 we bought the house on Maple Avenue, and we've been there ever since.",
+            "fact_ids_used": [
+              "f_house"
             ],
             "distractor_ids": [],
             "mood": "nostalgic"
@@ -1207,6 +1220,7 @@
             "mood": "nostalgic"
           },
           "errors": [
+            "said the year 1961, which must only be given as its anchor phrase",
             "used f_dog1 and f_wedding together; tell just one of these memories per reply and let the grandchild ask a follow-up",
             "reply contains every part of the password; give one memory at a time"
           ],
@@ -1221,6 +1235,7 @@
             "mood": "teasing"
           },
           "errors": [
+            "said the year 1961, which must only be given as its anchor phrase",
             "reply contains the password"
           ],
           "must": "contains the password"
@@ -1302,7 +1317,8 @@
             "mood": "nostalgic"
           },
           "errors": [
-            "self-correction on a memory that isn't marked for one (or to the wrong year); say the year once"
+            "self-correction on a memory that isn't marked for one (or to the wrong year); say the year once",
+            "said the year 1961, which must only be given as its anchor phrase"
           ],
           "must": "self-correction"
         }
