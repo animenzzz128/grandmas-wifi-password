@@ -22,7 +22,8 @@ const Prop = z.strictObject({
   collide: z.boolean().default(true),
 });
 
-export const InteractKind = z.enum(["grandma", "clue", "note", "router", "cookie_jar", "glasses"]);
+/** `fixture`: something you open and look into (the fridge), but can't carry. */
+export const InteractKind = z.enum(["grandma", "clue", "note", "router", "cookie_jar", "glasses", "fixture"]);
 export type InteractKind = z.infer<typeof InteractKind>;
 
 const Interactable = Prop.extend({
@@ -79,7 +80,7 @@ export function checkScene(scene: SceneManifest, factIds: Set<string>): string[]
     for (const f of it.fact_ids ?? []) {
       if (!factIds.has(f)) problems.push(`scene ${scene.id}: ${it.id} links unknown fact ${f}`);
     }
-    if (it.kind === "clue" && !it.inspect_text) problems.push(`scene ${scene.id}: clue ${it.id} has no inspect_text`);
+    if ((it.kind === "clue" || it.kind === "fixture") && !it.inspect_text) problems.push(`scene ${scene.id}: ${it.kind} ${it.id} has no inspect_text`);
   }
   for (const kind of ["grandma", "note", "router"] as const) {
     if (!scene.interactables.some((i) => i.kind === kind)) problems.push(`scene ${scene.id}: missing a ${kind}`);

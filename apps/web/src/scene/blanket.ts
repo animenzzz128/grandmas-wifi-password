@@ -38,8 +38,38 @@ export function drapePath(hips: Vector3, knees: Vector3, o: Required<DrapeOption
   return pts;
 }
 
+export const DRAPE_DEFAULTS: Required<DrapeOptions> = { lift: 0.085, back: 0.05, roll: 0.06, hang: 0.24, sag: 0.07 };
+
+/**
+ * Height of the cloth's top at (x, z) over the lap, between its back edge and the knees; null elsewhere (the
+ * roll and the hanging part). Same shape as `drapedBlanket`, so a body can be checked against it.
+ */
+export function drapeSurfaceY(hips: Vector3, knees: Vector3, width: number, opts: DrapeOptions, x: number, z: number): number | null {
+  const o = { ...DRAPE_DEFAULTS, ...opts };
+  const half = width / 2;
+  const edge = Math.abs(x - hips.x) / half;
+  if (edge > 1) return null;
+  const phi1 = Math.atan2(knees.y - hips.y, knees.z - hips.z);
+  const along = (z - hips.z) / Math.cos(phi1); // distance from the hips along the thigh line
+  if (along < -o.back || z > knees.z) return null;
+  return hips.y + o.lift + along * Math.sin(phi1) - o.sag * edge ** 4;
+}
+
+/**
+ * The smallest `lift` that keeps the cloth at least `gap` above every point (the posed thigh vertices), with
+ * the given width and sag. Clipping plan step 4: the blanket is shaped from her legs, not guessed.
+ */
+export function liftToClear(hips: Vector3, knees: Vector3, width: number, opts: DrapeOptions, points: Vector3[], gap: number): number {
+  let lift = 0;
+  for (const p of points) {
+    const y0 = drapeSurfaceY(hips, knees, width, { ...opts, lift: 0 }, p.x, p.z);
+    if (y0 !== null) lift = Math.max(lift, p.y + gap - y0);
+  }
+  return lift;
+}
+
 export function drapedBlanket(hips: Vector3, knees: Vector3, width: number, opts: DrapeOptions = {}) {
-  const o: Required<DrapeOptions> = { lift: 0.085, back: 0.05, roll: 0.06, hang: 0.24, sag: 0.07, ...opts };
+  const o: Required<DrapeOptions> = { ...DRAPE_DEFAULTS, ...opts };
   const step = 0.005;
   const path = drapePath(hips, knees, o, step);
   const length = (path.length - 1) * step;

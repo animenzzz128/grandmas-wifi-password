@@ -588,12 +588,24 @@ describe("the room gives hops, not answers (design plan B, iteration 43)", () =>
   const clues = scene.interactables.filter((i) => i.kind === "clue");
 
   it("no object's text contains a whole answer part", () => {
+    // Everything with text you can read in the room: clues, and since iteration 49 the fridge.
+    const readable = scene.interactables.filter((i) => i.inspect_text);
+    // String.raw: in a plain template literal the regex's word boundary would become a backspace character,
+    // and this test used to pass without checking anything (found in iteration 49).
+    const wordOf = (part: string) => new RegExp(String.raw`\b${part}\b`, "i");
+    let checked = 0;
     for (const recipe of recipes) {
       for (const part of slotParts(world, recipe)) {
-        const word = new RegExp(`\b${part}\b`, "i");
-        for (const obj of clues) expect(word.test(obj.inspect_text ?? ""), `${obj.id} says "${part}" (${recipe.id})`).toBe(false);
+        for (const obj of readable) {
+          expect(wordOf(part).test(obj.inspect_text ?? ""), `${obj.id} says "${part}" (${recipe.id})`).toBe(false);
+          checked++;
+        }
       }
     }
+    expect(checked).toBeGreaterThan(50);
+    // The check itself catches a part when it is there.
+    const [part] = slotParts(world, recipes[0]!);
+    expect(wordOf(part!).test(`it was ${part}, dear`)).toBe(true);
   });
 
   it("every answer part has a room object that brings up its memory", () => {

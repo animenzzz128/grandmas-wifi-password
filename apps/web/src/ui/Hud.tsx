@@ -11,6 +11,7 @@ import { canListen, listen, speak, stopSpeaking } from "../voice.ts";
 import { useSettings } from "../settings.ts";
 import { suggestions } from "../suggest.ts";
 import { SettingsCard } from "./Settings.tsx";
+import { ExamineCard } from "./Examine.tsx";
 import { saveDailyRecord } from "../daily.ts";
 import { revealPlan, typedLength } from "../typeout.ts";
 
@@ -87,12 +88,14 @@ function Crosshair() {
   const carriedLabel = useCarriedLabel();
   const finished = useGame((s) => s.run?.status !== "playing");
   const cookiesLeft = useGame((s) => s.run?.cookies ?? 0);
+  const opened = useGame((s) => s.opened);
   const it = scene?.interactables.find((i) => i.id === focusId);
+  const kind = !it ? "" : it.kind === "cookie_jar" && cookiesLeft <= 0 ? "cookie_jar_empty" : it.kind === "fixture" && !opened.includes(it.id) ? "fixture_open" : it.kind;
   if (panel || talking || finished) return null;
   return (
     <>
       <div className={`crosshair ${it ? "on" : ""}`} />
-      {it && <div className="prompt">{promptFor(it.kind === "cookie_jar" && cookiesLeft <= 0 ? "cookie_jar_empty" : it.kind, it.label, carrying, carriedLabel, near)}</div>}
+      {it && <div className="prompt">{promptFor(kind, it.label, carrying, carriedLabel, near)}</div>}
       {!locked &&
         (learned ? (
           <div className="look-hint">{t("clickToLook")}</div>
@@ -619,39 +622,6 @@ function AskBar() {
   );
 }
 
-function InspectCard({ objectId }: { objectId: string }) {
-  const scene = useGame((s) => s.scene);
-  const run = useGame((s) => s.run)!;
-  const carrying = useGame((s) => s.carrying);
-  const { take, openPanel } = useGame();
-  const it = scene?.interactables.find((i) => i.id === objectId);
-  if (!it) return null;
-  const holdingThis = carrying?.kind === "clue" && carrying.objectId === it.id;
-  const holdingCookie = carrying?.kind === "cookie";
-  return (
-    <div className="card">
-      <h3 id="panel-title" className="cap">{it.label}</h3>
-      <p>{it.inspect_text}</p>
-      {it.kind === "glasses" ? (
-        <button disabled={run.glasses || !run.note.smudged} onClick={() => void useGame.getState().putOnGlasses()}>
-          {run.glasses ? t("glasses.wearing") : run.note.smudged ? t("glasses.putOn") : t("glasses.notNeeded")}
-        </button>
-      ) : it.kind === "cookie_jar" ? (
-        <button disabled={run.cookies <= 0 || holdingCookie} onClick={() => take({ kind: "cookie" })}>
-          {run.cookies <= 0 ? t("cookie.none") : holdingCookie ? t("cookie.holding") : t("cookie.take")}
-        </button>
-      ) : (
-        <button disabled={holdingThis} onClick={() => take({ kind: "clue", objectId: it.id })}>
-          {holdingThis ? t("inspect.holding") : t("inspect.take")}
-        </button>
-      )}
-      <button className="ghost" onClick={() => openPanel(null)}>
-        {t("close")}
-      </button>
-    </div>
-  );
-}
-
 function NoteCard() {
   const run = useGame((s) => s.run)!;
   const openPanel = useGame((s) => s.openPanel);
@@ -832,7 +802,7 @@ export function Hud() {
       <FpsMeter />
       {panel && (
         <div className="panel-wrap" role="dialog" aria-labelledby="panel-title">
-          {panel.type === "inspect" && <InspectCard objectId={panel.objectId} />}
+          {panel.type === "inspect" && <ExamineCard key={panel.objectId} objectId={panel.objectId} />}
           {panel.type === "note" && <NoteCard />}
           {panel.type === "router" && <RouterCard />}
           {panel.type === "notebook" && <NotebookCard />}

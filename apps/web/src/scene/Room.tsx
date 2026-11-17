@@ -15,6 +15,7 @@ import { ART } from "./models.ts";
 import type { Vec3 } from "./models.ts";
 import { ArtBoundary, GltfModel } from "./Model.tsx";
 import { Handmade } from "./handmade.tsx";
+import type { Detail } from "./handmade.tsx";
 import { GrandmaModel } from "./Grandma.tsx";
 import { ceiling, wallpaper, woodFloor } from "./textures.ts";
 
@@ -61,8 +62,8 @@ function GrandmaFigure({ item, highlight }: { item: Item; highlight: boolean }) 
   );
 }
 
-/** The art for one object, with the grey box as a fallback while loading or on error. */
-function Art({ item, highlight = false }: { item: Item; highlight?: boolean }) {
+/** The art for one object, with the grey box as a fallback while loading or on error. Also used by the examine view. */
+export function Art({ item, highlight = false, detail }: { item: Item; highlight?: boolean; detail?: Detail }) {
   const art = ART[item.node];
   const box = item.shape === "figure" ? <GrandmaFigure item={item} highlight={highlight} /> : <Shape item={item} highlight={highlight} />;
   const safe = (node: ReactNode) => (
@@ -73,7 +74,7 @@ function Art({ item, highlight = false }: { item: Item; highlight?: boolean }) {
   if (item.shape === "figure") return safe(<GrandmaModel size={item.size} highlight={highlight} />);
   if (!art) return box;
   if (art.kind === "none") return null;
-  if (art.kind === "handmade") return <Handmade name={art.name} size={item.size} highlight={highlight} />;
+  if (art.kind === "handmade") return safe(<Handmade name={art.name} size={item.size} highlight={highlight} detail={detail} />);
   return safe(<GltfModel spec={art} size={item.size} position={item.position} highlight={highlight} />);
 }
 
@@ -151,6 +152,7 @@ function Shell({ scene }: { scene: PublicScene }) {
 
 export function Room({ scene, interactRef }: { scene: PublicScene; interactRef: React.RefObject<Group | null> }) {
   const focusId = useGame((s) => s.focusId);
+  const opened = useGame((s) => s.opened);
   const { height: H } = scene.room;
   return (
     <group>
@@ -169,7 +171,7 @@ export function Room({ scene, interactRef }: { scene: PublicScene; interactRef: 
         {scene.interactables.map((it) => (
           <Placed key={it.id} item={it} userData={{ interactId: it.id }}>
             <HitBox size={it.size} />
-            <Art item={it} highlight={focusId === it.id} />
+            <Art item={it} highlight={focusId === it.id} detail={it.kind === "fixture" ? { open: opened.includes(it.id) } : undefined} />
             {(it.kind === "clue" || it.kind === "note") && <Glint id={it.id} size={it.size} />}
           </Placed>
         ))}

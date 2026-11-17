@@ -9,6 +9,7 @@ import { hasString, t } from "./strings.ts";
 import { addPin, costWhy, extractNotes } from "./notebook.ts";
 import { useSettings } from "./settings.ts";
 import { firstTime, markVisited } from "./firsts.ts";
+import { fridgeDoor } from "./audio.ts";
 
 export type Panel = { type: "inspect"; objectId: string } | { type: "note" } | { type: "router" } | { type: "notebook" } | { type: "settings" } | null;
 
@@ -67,6 +68,8 @@ interface GameState {
   controlsLearned: boolean;
   /** Clue objects the player has inspected this visit (for the objectives strip). */
   inspected: string[];
+  /** Fixtures standing open (the fridge door). */
+  opened: string[];
   notebook: NoteEntry[];
   /** Quotes the player pinned from the chat (game design §5: highlight to pin). */
   pins: string[];
@@ -97,6 +100,8 @@ interface GameState {
   openPanel(panel: Panel): void;
   focusChat(): void;
   setFocus(id: string | null): void;
+  /** Open or shut a fixture's door (the fridge). */
+  setOpened(id: string, open: boolean): void;
   setLocked(locked: boolean): void;
   setTalking(talking: boolean): void;
   setNearGrandma(near: boolean): void;
@@ -135,6 +140,19 @@ export const useGame = create<GameState>((set, get) => {
   const barked = new Set<string>();
   const push = (...lines: LogLine[]) => set((s) => ({ log: [...s.log, ...lines.map((l) => ({ ...l, seq: ++seq }))].slice(-60) }));
 
+  /**
+   * The first time the player picks something up (or opens it), Grandma reacts: a canned line, no model call,
+   * no tea, no facts. The room and the conversation feed each other (plan C2).
+   */
+  const bark = (objId: string) => {
+    const run = get().run;
+    if (run?.status !== "playing" || barked.has(objId)) return;
+    barked.add(objId);
+    const variants = ["a", "b"].map((v) => `bark.${objId}.${v}`).filter(hasString);
+    const pickIt = variants[(run.runId.length + objId.length + barked.size) % Math.max(1, variants.length)];
+    if (pickIt) push({ who: "grandma", text: t(pickIt), mood: "teasing" });
+  };
+
   /** Add what a text mentions (years, names, places, numbers) to the notebook, without duplicates. */
   const learn = (text: string, from: NoteEntry["from"]) => {
     const found = extractNotes(text, from);
@@ -150,7 +168,7 @@ export const useGame = create<GameState>((set, get) => {
   const enter = async (run: RunView) => {
     const scene = get().scene?.id === run.sceneId ? get().scene : await api.scene(run.sceneId);
     barked.clear();
-    set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy", seq: ++seq }], panel: null, noteSeen: false, carrying: null, talking: false, inspected: [], notebook: [], pins: [], hint: null, mishear: null });
+    set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy", seq: ++seq }], panel: null, noteSeen: false, carrying: null, talking: false, inspected: [], opened: [], notebook: [], pins: [], hint: null, mishear: null });
   };
 
   return {
@@ -174,7 +192,7 @@ export const useGame = create<GameState>((set, get) => {
     hint: null,
     mishear: null,
     controlsLearned: false,
-    inspected: [],
+    inspected: [], opened: [],
     notebook: [],
     pins: [],
     grandmaSpeaking: false,
@@ -339,16 +357,15 @@ export const useGame = create<GameState>((set, get) => {
         const obj = get().scene?.interactables.find((i) => i.id === panel.objectId);
         if (obj?.kind === "clue" && !get().inspected.includes(obj.id)) set({ inspected: [...get().inspected, obj.id] });
         if (obj?.inspect_text) learn(obj.inspect_text, "object");
-        // The first time the player picks something up, Grandma reacts: a canned line, no model call, no tea,
-        // no facts. The room and the conversation feed each other (plan C2).
-        const run = get().run;
-        if (obj && run?.status === "playing" && !barked.has(obj.id)) {
-          barked.add(obj.id);
-          const variants = ["a", "b"].map((v) => `bark.${obj.id}.${v}`).filter(hasString);
-          const pickIt = variants[(run.runId.length + obj.id.length + barked.size) % Math.max(1, variants.length)];
-          if (pickIt) push({ who: "grandma", text: t(pickIt), mood: "teasing" });
-        }
+        if (obj) bark(obj.id);
       }
+    },
+    setOpened(id, open) {
+      const opened = get().opened;
+      if (opened.includes(id) === open) return;
+      set({ opened: open ? [...opened, id] : opened.filter((o) => o !== id) });
+      fridgeDoor(open);
+      if (open) bark(id);
     },
     focusChat() {
       if (!get().inEarshot) return get().showHint(t("talk.tooFar"));

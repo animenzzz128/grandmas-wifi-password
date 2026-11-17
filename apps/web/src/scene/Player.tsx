@@ -21,6 +21,7 @@ import type { PublicScene } from "@gwp/engine";
 import { useGame } from "../store.ts";
 import { useSettings } from "../settings.ts";
 import { HITBOX_LAYER } from "./Room.tsx";
+import { viewer } from "../examine.ts";
 
 const WALK_SPEED = 2.6; // m/s
 const SPRINT_SPEED = 4.2; // m/s with Shift
@@ -48,16 +49,16 @@ interface Box2 {
   maxZ: number;
 }
 
-/** Axis-aligned footprints of everything solid. Rotation is ignored: fine for a grey-box room. */
+/** Axis-aligned footprints of everything solid. Objects turned a quarter turn swap width and depth. */
 function colliders(scene: PublicScene): Box2[] {
   return [...scene.props, ...scene.interactables]
     .filter((i) => i.collide !== false)
-    .map((i) => ({
-      minX: i.position[0] - i.size[0] / 2,
-      maxX: i.position[0] + i.size[0] / 2,
-      minZ: i.position[2] - i.size[2] / 2,
-      maxZ: i.position[2] + i.size[2] / 2,
-    }));
+    .map((i) => {
+      const turned = Math.abs(Math.sin(i.rotation_y ?? 0)) > 0.7;
+      const w = turned ? i.size[2] : i.size[0];
+      const d = turned ? i.size[0] : i.size[2];
+      return { minX: i.position[0] - w / 2, maxX: i.position[0] + w / 2, minZ: i.position[2] - d / 2, maxZ: i.position[2] + d / 2 };
+    });
 }
 
 function blocked(x: number, z: number, boxes: Box2[], scene: PublicScene): boolean {
@@ -231,6 +232,7 @@ export function Player({ scene, interactRef }: { scene: PublicScene; interactRef
           game.focusChat();
           return;
         }
+        if (it.kind === "fixture" && !game.opened.includes(it.id)) return void game.setOpened(it.id, true);
         unlock();
         if (it.kind === "note") game.openPanel({ type: "note" });
         else if (it.kind === "router") game.openPanel({ type: "router" });
@@ -325,6 +327,15 @@ export function Player({ scene, interactRef }: { scene: PublicScene; interactRef
       const d = Math.hypot(camera.position.x - grandmaAt[0], camera.position.z - grandmaAt[2]);
       setNearGrandma(d <= NEAR_GRANDMA);
       setInEarshot(d <= EARSHOT);
+    }
+
+    viewer.x = camera.position.x;
+    viewer.z = camera.position.z;
+    // 3b) Doors left open swing shut once you walk away.
+    const opened = useGame.getState().opened;
+    for (const id of opened) {
+      const it = scene.interactables.find((i) => i.id === id);
+      if (it && Math.hypot(camera.position.x - it.position[0], camera.position.z - it.position[2]) > REACH + 0.8) useGame.getState().setOpened(id, false);
     }
 
     // 4) What are we looking at?

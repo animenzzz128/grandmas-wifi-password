@@ -161,6 +161,20 @@ export function stopClock() {
   clockTimer = null;
 }
 
+/** The fridge door: the seal unsticking and the hum (open), or a soft thump (shut). */
+export function fridgeDoor(open: boolean) {
+  const c = audio();
+  if (!c) return;
+  const t = c.currentTime + 0.02;
+  if (open) {
+    hiss(c, t, { type: "bandpass", freq: 1800, q: 2 }, [0.01, 0.04, 0.12], 0.03); // the seal
+    tone(c, t + 0.05, 60, 0.9, 0.012, "sine"); // the motor hum
+  } else {
+    tone(c, t, 95, 0.12, 0.05, "sine", 70);
+    hiss(c, t, { type: "lowpass", freq: 400 }, [0.005, 0.02, 0.1], 0.04);
+  }
+}
+
 export function chime(kind: "note" | "pin" | "success" | "fail") {
   const c = audio();
   if (!c) return;

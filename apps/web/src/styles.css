@@ -208,3 +208,18 @@ details.controls summary { cursor: pointer; text-decoration: underline; }
 /* A part the last try got right (Easy/Medium; plan A5). The tick keeps it readable without colour. */
 .router-card input.right { border-color: #3fa34d; background: #eaf7ec; }
 .router-card .slot:has(input.right)::after { content: "✓"; color: #3fa34d; font-weight: 700; margin-left: 4px; }
+
+/* Examine card (iteration 49): the object up close on the left, what you notice on the right. */
+.panel-wrap .card.examine-card { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(240px, 1fr); gap: 16px; width: calc(min(980px, 94vw) / var(--text-scale, 1)); max-width: calc(94vw / var(--text-scale, 1)); padding: 12px; }
+.examine-stage { position: relative; min-height: calc(min(56vh, 520px) / var(--text-scale, 1)); border-radius: 6px; overflow: hidden; background: #2a2018; }
+.examine-stage .examine-canvas { position: absolute !important; inset: 0; cursor: grab; touch-action: none; }
+.examine-stage .examine-canvas:active { cursor: grabbing; }
+.examine-hint { position: absolute; left: 8px; bottom: 6px; font-size: 12px; opacity: 0.7; pointer-events: none; }
+.examine-text { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.examine-text p { line-height: 1.45; }
+.examine-tabs { display: flex; align-items: center; gap: 8px; }
+.examine-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+@media (max-width: 720px) {
+  .panel-wrap .card.examine-card { grid-template-columns: 1fr; }
+  .examine-stage { min-height: 40vh; }
+}

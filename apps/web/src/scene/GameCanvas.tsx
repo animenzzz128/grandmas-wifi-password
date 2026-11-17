@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { ADAPT, adapt } from "./adaptive.ts";
 import type { PerspectiveCamera } from "three";
 import { useSettings } from "../settings.ts";
+import { useGame } from "../store.ts";
 import { RetroFilter } from "./RetroFilter.tsx";
 
 const POST_PARAM = new URLSearchParams(location.search).get("post");
@@ -71,8 +72,10 @@ export function GameCanvas({ scene }: { scene: PublicScene }) {
   const retro = useSettings((s) => s.retro) && POST_PARAM !== "0";
   // Adaptive resolution (iteration 48): fewer pixels when the frame rate stays low, back up when it recovers.
   const [dpr, setDpr] = useState(PIXEL_SCALE);
+  // Behind a close-up card the room stops redrawing (the card has its own small canvas; iteration 49).
+  const examining = useGame((s) => s.panel?.type === "inspect");
   return (
-    <Canvas id="game-canvas" dpr={dpr} gl={{ antialias: false, powerPreference: "high-performance" }} camera={{ fov: 70, near: 0.05, far: 40 }} flat>
+    <Canvas id="game-canvas" dpr={dpr} frameloop={examining ? "demand" : "always"} gl={{ antialias: false, powerPreference: "high-performance" }} camera={{ fov: 70, near: 0.05, far: 40 }} flat>
       {!PINNED && <AdaptiveResolution scale={dpr} onScale={setDpr} />}
       <color attach="background" args={[scene.room.fog_color]} />
       <fog attach="fog" args={[scene.room.fog_color, 5, 13]} />

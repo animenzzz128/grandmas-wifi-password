@@ -181,22 +181,6 @@
       "color": "#d8d2c0"
     },
     {
-      "id": "fridge",
-      "node": "Fridge",
-      "shape": "box",
-      "size": [
-        0.8,
-        1.9,
-        0.75
-      ],
-      "position": [
-        -3.55,
-        0.95,
-        -0.35
-      ],
-      "color": "#e9ecea"
-    },
-    {
       "id": "door",
       "node": "FrontDoor",
       "shape": "box",
@@ -629,6 +613,26 @@
         "f_house_number",
         "f_house"
       ]
+    },
+    {
+      "id": "fridge",
+      "node": "Fridge",
+      "kind": "fixture",
+      "label": "fridge",
+      "shape": "box",
+      "size": [
+        0.75,
+        1.9,
+        0.8
+      ],
+      "position": [
+        -3.55,
+        0.95,
+        -0.35
+      ],
+      "rotation_y": 1.5707963267948966,
+      "color": "#e9ecea",
+      "inspect_text": "Inside: a green Jell-O ring, a glass bottle of milk, a jar of dill pickles, apples in the crisper, eggs and butter in the door, and a dish of pierogi under foil with a note in Grandma's handwriting: FOR SUNDAY. On the door, a grandkid's crayon drawing of Grandma with an enormous cup of tea."
     },
     {
       "id": "cookie_jar",

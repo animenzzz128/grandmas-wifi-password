@@ -9,6 +9,7 @@ import { CanvasTexture, DoubleSide, LatheGeometry, NearestFilter, Vector2 } from
 import type { Group, Points } from "three";
 import type { HandmadeName, Vec3 } from "./models.ts";
 import { useHighlight } from "./Model.tsx";
+import { Fridge, WeddingFrame } from "./props.tsx";
 
 const GOLD = "#d4af37";
 const WOOD = "#8a5a35";
@@ -426,7 +427,13 @@ function ReadingGlasses({ size }: { size: Vec3 }) {
   );
 }
 
-const MAKERS: Record<HandmadeName, (props: { size: Vec3 }) => React.ReactNode> = {
+/** Close-up state some props show: an open door, the back of a photo. */
+export interface Detail {
+  open?: boolean;
+  flipped?: boolean;
+}
+
+const MAKERS: Record<HandmadeName, (props: { size: Vec3 } & Detail) => React.ReactNode> = {
   trophy: Trophy,
   ribbon: Ribbon,
   sled: Sled,
@@ -439,15 +446,17 @@ const MAKERS: Record<HandmadeName, (props: { size: Vec3 }) => React.ReactNode> =
   door: Door,
   window: Window,
   moonPlate: MoonPlate,
+  weddingFrame: WeddingFrame,
+  fridge: Fridge,
 };
 
-export function Handmade({ name, size, highlight = false }: { name: HandmadeName; size: Vec3; highlight?: boolean }) {
+export function Handmade({ name, size, highlight = false, detail }: { name: HandmadeName; size: Vec3; highlight?: boolean; detail?: Detail }) {
   const [root, setRoot] = useState<Group | null>(null);
   useHighlight(root, highlight);
   const Make = MAKERS[name];
   return (
     <group ref={setRoot}>
-      <Make size={size} />
+      <Make size={size} {...detail} />
     </group>
   );
 }

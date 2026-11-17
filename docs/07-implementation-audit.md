@@ -401,3 +401,65 @@ Jacky reported a very low frame rate in the web build. Measured in a debug Chrom
 - **Dev only:** `window.__three` (renderer and scene) and `window.__dprLog` for performance checks; both are stripped from the production build.
 - **Checks:** typecheck, 203 tests, build.
 - **Not verified:** the frame rate on other people's machines, and in Firefox or Safari.
+
+### Iteration 49 (11/17): looking at things up close; Grandma's clipping plan
+Jacky asked for real object interaction (a close-up and a description, not a text popup; photos showing Grandma with the people in them; a fridge that opens with food inside) and a plan for Grandma's clipping based on how other games handle it.
+- **Examine card** (`ui/Examine.tsx`): the object in 3D on the left, which you can drag to turn and scroll to zoom, and its text and buttons on the right.
+  - It shows the side you were facing in the room (`facingTurn`). The TV used to show its back.
+  - The room behind stops redrawing while the card is open (`frameloop="demand"`).
+- **Generated photos** (`scene/photos.ts`, `people.ts`, `develop.ts`). Each photo is a small 3D set rendered once off screen, then given an old-print look.
+  - **Wedding photo:** black and white, young Rosie in a gown and veil with a bouquet, and Walt in a suit, on the church steps. It now shows in the frame in the room too. The back has Grandpa's inscription; the frame's brass plate says "Moon River". Front and Back buttons.
+  - **Album:** three spreads with page buttons. The beagle with the sock and the cocker spaniel, uncaptioned. Cherry St. and the Maple porch, with Grandma's captions. An empty photo slot and the birth announcement.
+  - **The porch mailbox shows only "41".** A rose cane covers where the third digit would be. The answer digit is never drawn anywhere a camera can see.
+- **Fridge** (`scene/props.tsx`; new object kind `fixture`). The first E opens the door in the room, with a sound and a line from Grandma; the second E shows the inside up close. Inside: a Jell-O ring, milk, pickles, apples, eggs, butter, and pierogi under foil marked "FOR SUNDAY". A grandkid's drawing is on the door. The door shuts when you walk away or press "Close the fridge". Its text is flavour only: no facts, can't be carried.
+- **Shared body helpers** (`scene/body.ts`): painted clothes, hair colour, chest softening and bone aiming moved out of `Grandma.tsx`, so the people in the photos reuse them. Grandma looks the same (checked in the browser).
+- **Test bug found:** the "no object's text contains an answer part" test built its regex in a template literal, where the word boundary became a backspace, so it never checked anything. Fixed with `String.raw`, extended to the fridge, and now proves it can fail. It passes: no object text leaks an answer.
+- **Grandma's clipping:** the plan is in `docs/11-grandma-clipping-plan.zh.md`. Observed in the browser:
+  - her hands pass through each other on her lap;
+  - the teacup floats beside her hand;
+  - her left arm sinks into the armrest.
+
+  The plan has seven steps, ranked cheapest first. Nothing is implemented yet.
+- **Checks:** typecheck, 211 tests, validate, golden, build (dev hooks stripped). Browser: the wedding front and back, all three album spreads, the fridge (open, look inside, close, shut on walking away), the TV facing the right way.
+- **Not verified:**
+  - Firefox and Safari;
+  - how long the first photo takes to render on a slow machine (once per visit, cached);
+  - keyboard-only turning in the 3D view (the text and buttons carry everything you need).
+
+### Iteration 50 (11/17): Grandma clipping, steps 1, 2 and 5
+Jacky approved steps 1, 2 and 5 of `docs/11-grandma-clipping-plan.zh.md`.
+- **Step 1, the body under the cardigan isn't drawn** (`uncoveredTriangles` in `scene/body.ts`): 2,794 triangles. A rim where the cardigan meets skin is kept, so no gaps open at the neck, cuffs or waist. The legs under the blanket are not hidden yet: the blanket is too narrow (step 4).
+- **Step 2, soft pose limits** (`scene/poseLimits.ts`). Mood, nods, idle sway, dozing and looking at the player now add up first and then pass through tanh limits:
+  - turn ±0.75 rad, split neck 35% and head 65%;
+  - nod down 0.5 and back 0.22; tilt 0.28;
+  - lean forward 0.2 and back 0.1;
+  - neck droop while dozing 0.3.
+- **Step 5, keep-out for the sip.** The cup and fingers must stay at least 1.2 cm in front of her lips (the cup plus its radius) and 3 cm below her glasses; otherwise the wrist target moves forward or down. The whole motion is checked at 11 points.
+  - Tightest point measured: 3.1 cm from her face and 3.5 cm below her glasses.
+  - The old pose already passed. The check is now a guard for future changes.
+- **Dev only:** `__grandma.pose({ yaw, pitch, tilt, sip, talk, glasses })` holds a pose; `__grandma.info` reports the clearances. Stripped from the build.
+- **Checks:**
+  - typecheck, 216 tests (5 new in `clipping.test.ts`), build;
+  - browser screenshots at the extremes (sip at her lips; fully turned, nodding and tilted; the reverse with the talking gesture): no clipping seen.
+- **Not done:** the hands passing through each other, the floating cup, the arm in the armrest and the narrow blanket. These are steps 3 and 4.
+
+### Iteration 51 (11/17): Grandma clipping, steps 3 and 4
+Jacky asked to go on with steps 3 and 4.
+- **Measured first.**
+  - Raycasts against the armchair as fitted: seat top 0.47 m; backrest front face sloping back (−2.10 m at 0.6 m high, −2.20 m at 0.9 m); armrest inner faces ±0.333 m from her centre; armrest tops at 0.94 m.
+  - Her posed vertices: the lowest hip vertex was 9 mm into the seat, her back 8 mm into the backrest.
+  - **Her arms had 13–15 cm of room inside the armrests.** The "arm in the armrest" seen from the side was the very tall armrest hiding it, not clipping. Fixing that is a chair art change and was left alone.
+  - The numbers live in `CHAIR` in `Grandma.tsx`. Measure again if the chair's art or boxes change.
+- **Seat:** she is placed from her posed vertices: hips and thighs 3 mm above the cushion, her back (cardigan included) 5 mm in front of the sloping backrest. The hand-tuned offset is gone.
+- **Blanket** (`blanket.ts`: `drapeSurfaceY`, `liftToClear`):
+  - as wide as her thighs plus 3.5 cm each side;
+  - lifted just enough to clear every thigh vertex from a quarter of the way to the knee by 8 mm;
+  - sides drop 9 cm.
+- **Hands:** two-bone IK (`twoBoneElbow` in `body.ts`) puts each wrist over its own thigh, elbows out and back; left palm down, right palm up. Each hand is then raised until its lowest point is on top of the blanket.
+- **Cup:** its base sits on the middle of the palm, upright along the palm's normal.
+- **Measured** (`__grandma.info.fit`, metres in the room): hands 6 mm above the blanket, 6.2 cm apart (they used to pass through each other), arms 7.8 cm inside the armrests; sip clearance 3.0 cm from her face and 3.1 cm below her glasses.
+- **Checks:** typecheck, 221 tests (5 new), build (dev hooks stripped). Screenshots from the front and side.
+- **Not done:**
+  - the fit gaps aren't an automated test yet, because the glTF body doesn't load under Vitest;
+  - the blanket looks thick, about 13 cm above the thigh line, so that its sides cover the widest part of the thighs;
+  - the tall armrests.

@@ -40,7 +40,9 @@ export type HandmadeName =
   | "houseNumber"
   | "door"
   | "window"
-  | "moonPlate";
+  | "moonPlate"
+  | "weddingFrame"
+  | "fridge";
 
 const kaykit = (name: string) => `/models/kaykit/${name}.gltf`;
 const kenney = (name: string) => `/models/kenney/${name}.glb`;
@@ -61,7 +63,8 @@ export const ART: Record<string, ArtSpec> = {
   Sideboard: { kind: "model", url: kaykit("cabinet_medium"), fit: "stretch" },
   TvStand: { kind: "model", url: kenney("cabinetTelevision"), fit: "stretch", turn: -QUARTER },
   KitchenCounter: { kind: "model", url: kenney("kitchenCabinet"), fit: "stretch", turn: QUARTER, tiles: 3 },
-  Fridge: { kind: "model", url: kenney("kitchenFridge"), fit: "stretch", turn: QUARTER },
+  // Opens (props.tsx); the Kenney fridge is one solid mesh.
+  Fridge: { kind: "handmade", name: "fridge" },
   FloorLamp: { kind: "model", url: kaykit("lamp_standing") },
   FrontDoor: { kind: "handmade", name: "door" },
   Window: { kind: "handmade", name: "window" },
@@ -69,7 +72,8 @@ export const ART: Record<string, ArtSpec> = {
 
   // clues and the things you use
   PhotoAlbum: { kind: "model", url: kaykit("book_single"), fit: "stretch", tint: "#e07a6a" },
-  WeddingPhoto: { kind: "model", url: kaykit("pictureframe_standing_A") },
+  // The photo in it is generated in the game (photos.ts).
+  WeddingPhoto: { kind: "handmade", name: "weddingFrame" },
   BowlingTrophy: { kind: "handmade", name: "trophy" },
   BlueRibbon: { kind: "handmade", name: "ribbon" },
   Sled: { kind: "handmade", name: "sled" },

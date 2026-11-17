@@ -35,11 +35,12 @@ import type { Bone, Material, Object3D } from "three";
 import { useGame } from "../store.ts";
 import { t } from "../strings.ts";
 import { useHighlight } from "./Model.tsx";
-import { drapedBlanket } from "./blanket.ts";
+import { drapeSurfaceY, drapedBlanket, liftToClear } from "./blanket.ts";
+import { limitHead } from "./poseLimits.ts";
+import { BODY_URL, HAIR_URL, aim, clothMaterial, hairMaterial, regionsOf, roll, setRegions, posedPoints, softenChest, twoBoneElbow, uncoveredTriangles } from "./body.ts";
+import type { Outfit } from "./body.ts";
 import type { Vec3 } from "./models.ts";
 
-const BODY_URL = "/models/quaternius/grandma_body.gltf";
-const HAIR_URL = "/models/quaternius/hair_parted.gltf";
 
 /** How tall Grandma would be standing up (the base model is about 1.7 m). */
 const STANDING_HEIGHT = 1.56;
@@ -51,64 +52,75 @@ const THUMB_CURL = 0.6;
 const MOUTH_BELOW_EYES = 0.075;
 /** Where her wrist goes, relative to her lips, when she sips (model space, before scaling). */
 const SIP_WRIST = new Vector3(-0.06, -0.065, 0.06);
+/** The teacup's radius and half its height (model space, before scaling). */
+const CUP_RADIUS = 0.03;
+const CUP_HALF_HEIGHT = 0.0275;
+/** From the middle of her palm to its surface (the cup stands on it). */
+const PALM_THICKNESS = 0.012;
+/** Hands on the lap: how far from hip to knee, and how high the wrist sits above the blanket. */
+const LAP_HAND_ALONG = 0.62;
+const WRIST_ABOVE_LAP = 0.028;
+/** Her fingers rest this far above the blanket's surface (it's soft; just not inside it). */
+const HAND_ON_LAP = 0.003;
+/** The blanket only has to clear her thighs from this fraction of the way from hip to knee. */
+const LAP_FROM = 0.25;
+/**
+ * The blanket: how far it reaches past the outside of her thighs, how far its sides drop, and the smallest
+ * gap it keeps above them (model space).
+ */
+const BLANKET_OVERHANG = 0.035;
+const BLANKET_SAG = 0.09;
+const BLANKET_GAP = 0.008;
 
-const PALETTE = {
-  blouse: "#efe2cc",
-  skirt: "#4f5a7a",
-  stockings: "#c9a58a",
+/**
+ * The armchair as fitted in the room (KayKit "armchair" stretched into the scene's chair boxes), in Grandma's
+ * object space, where the centre of her box is the origin. Measured from the chair's mesh by raycasts in
+ * iteration 51; measure again if the chair's art or boxes change.
+ */
+const CHAIR = {
+  /** Top of the seat cushion. */
+  seatY: -0.605,
+  /** The backrest's front face: z0 at height y0, leaning back `slope` metres per metre up. */
+  back: { y0: -0.475, z0: -0.15, slope: 0.33 },
+  /** Inner faces of the armrests (x, either side). */
+  armInnerX: 0.333,
+};
+/** Gaps kept between her and the chair (metres). */
+const SEAT_GAP = 0.003;
+const BACK_GAP = 0.005;
+/** Smallest gap between her face and the cup or her fingers while she sips (metres). */
+const FACE_GAP = 0.012;
+/** The cup and her hand stay at least this far below her glasses while she sips. */
+const SIP_BROW_GAP = 0.03;
+
+/** Gaps around her resting pose (metres in the room; negative would mean clipping). */
+export interface Fit {
+  /** Her resting hands above the blanket. */
+  lapGap: number;
+  /** Between her two hands. */
+  handGap: number;
+  /** Her arms inside the armrests. */
+  armGap: number;
+  /** How high the blanket had to sit to clear her thighs. */
+  blanketLift: number;
+}
+
+/** How much room the sip leaves (metres; negative means the cup or hand is in her face). */
+export interface SipClearance {
+  face: number;
+  brow: number;
+}
+
+/** How many body triangles the cardigan hides (for the dev checks). */
+let hiddenBodyTriangles = 0;
+
+const GRANDMA_OUTFIT: Outfit = {
+  top: "#efe2cc",
+  bottom: "#4f5a7a",
+  legs: "#c9a58a",
   shoes: "#3a2a22",
   cardigan: "#8e5b7e",
 };
-
-/** Clothing ids: 0 skin (keeps the texture), 1 blouse, 2 skirt, 3 stockings, 4 shoes, 5 cardigan. */
-function regionOf(bone: string): number {
-  if (/^(spine|clavicle|upperarm|lowerarm)/.test(bone)) return 1;
-  if (/^(pelvis|thigh)/.test(bone)) return 2;
-  if (/^calf/.test(bone)) return 3;
-  if (/^(foot|ball)/.test(bone)) return 4;
-  return 0; // head, neck, hands, fingers
-}
-
-/** Paints clothes by `region` attribute; skin keeps the texture but looks a bit older and paler. */
-function clothMaterial(src: MeshStandardMaterial): MeshStandardMaterial {
-  const mat = src.clone();
-  mat.roughness = 0.9;
-  mat.metalness = 0;
-  const c = (hex: string) => ({ value: new Color(hex) });
-  mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, {
-      uBlouse: c(PALETTE.blouse),
-      uSkirt: c(PALETTE.skirt),
-      uStockings: c(PALETTE.stockings),
-      uShoes: c(PALETTE.shoes),
-      uCardigan: c(PALETTE.cardigan),
-    });
-    shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", "#include <common>\nattribute float region;\nvarying float vRegion;")
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvRegion = region;");
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        "#include <common>",
-        "#include <common>\nvarying float vRegion;\nuniform vec3 uBlouse, uSkirt, uStockings, uShoes, uCardigan;",
-      )
-      .replace(
-        "#include <map_fragment>",
-        `#include <map_fragment>
-        float r = floor(vRegion + 0.5);
-        if (r > 0.5) {
-          vec3 cloth = r < 1.5 ? uBlouse : r < 2.5 ? uSkirt : r < 3.5 ? uStockings : r < 4.5 ? uShoes : uCardigan;
-          #ifdef USE_MAP
-            if (r > 4.5) cloth *= 0.88 + 0.12 * step(0.5, fract(vMapUv.x * 70.0)); // knit ribs
-          #endif
-          diffuseColor.rgb = cloth;
-        } else {
-          float l = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(l), 0.3) * 1.45 + vec3(0.05, 0.02, 0.02);
-        }`,
-      );
-  };
-  return mat;
-}
 
 /**
  * The base model is an athletic "superhero" body. Make it a grandma's: soften the chest, paint a
@@ -119,61 +131,11 @@ function dress(mesh: SkinnedMesh) {
   const g = mesh.geometry.clone(); // the loaded model is cached and shared: never edit it in place
   mesh.geometry = g;
   const pos = g.getAttribute("position") as BufferAttribute;
-  const idx = g.getAttribute("skinIndex");
-  const wt = g.getAttribute("skinWeight");
   const n = pos.count;
-  const region = new Float32Array(n);
-  for (let v = 0; v < n; v++) {
-    let best = 0;
-    let bestW = -1;
-    for (let k = 0; k < 4; k++) {
-      const w = wt.getComponent(v, k);
-      if (w > bestW) {
-        bestW = w;
-        best = idx.getComponent(v, k);
-      }
-    }
-    region[v] = regionOf(mesh.skeleton.bones[best]?.name ?? "");
-  }
-
-  // Work in model space (rest pose): +y up, +z forward.
-  const toModel = mesh.matrixWorld.clone();
-  const toMesh = toModel.clone().invert();
-  const p = new Vector3();
-  const model: Vector3[] = [];
-  for (let v = 0; v < n; v++) model.push(p.fromBufferAttribute(pos, v).applyMatrix4(toModel).clone());
-  const boneAt = (name: string) => {
-    const b = mesh.skeleton.getBoneByName(name);
-    if (!b) throw new Error(`grandma: no bone ${name}`);
-    return b;
-  };
-  const yOf = (name: string) => boneAt(name).getWorldPosition(new Vector3()).y;
-
-  // Soften the chest: in front, nothing may stick out much past a straight line from the
-  // collarbone down to the waist.
-  const midZ = (y: number) => {
-    let z = -Infinity;
-    for (const m of model) if (Math.abs(m.x) < 0.03 && Math.abs(m.y - y) < 0.015 && m.z > z) z = m.z;
-    return z;
-  };
-  const yTop = yOf("clavicle_l") - 0.03;
-  const yBot = yOf("spine_01") + 0.03;
-  const zTop = midZ(yTop);
-  const zBot = midZ(yBot);
-  const line = (y: number) => zBot + ((zTop - zBot) * (y - yBot)) / (yTop - yBot) + 0.012;
-  for (let v = 0; v < n; v++) {
-    const m = model[v]!;
-    if (m.y <= yBot || m.y >= yTop || m.z <= 0) continue;
-    const lim = line(m.y);
-    if (m.z <= lim) continue;
-    m.z = lim + (m.z - lim) * 0.1;
-    p.copy(m).applyMatrix4(toMesh);
-    pos.setXYZ(v, p.x, p.y, p.z);
-  }
-  pos.needsUpdate = true;
-  g.computeVertexNormals();
-  g.setAttribute("region", new BufferAttribute(region, 1));
-  const bodyMat = clothMaterial(mesh.material as MeshStandardMaterial);
+  const region = regionsOf(mesh);
+  const { midZ, line, yTop, yBot } = softenChest(mesh);
+  setRegions(mesh, region);
+  const bodyMat = clothMaterial(mesh.material as MeshStandardMaterial, GRANDMA_OUTFIT);
   mesh.material = bodyMat;
 
   // The cardigan: the top's triangles, puffed out a little.
@@ -200,6 +162,11 @@ function dress(mesh: SkinnedMesh) {
   shellGeo.setAttribute("position", new BufferAttribute(shellPos, 3));
   shellGeo.setAttribute("region", new BufferAttribute(new Float32Array(n).fill(5), 1));
   shellGeo.setIndex(keep);
+  // Under the cardigan, don't draw the body at all, so it can never poke through at the shoulders and
+  // elbows (clipping plan step 1). Fewer triangles to draw, too.
+  const uncovered = uncoveredTriangles(tris.array as ArrayLike<number>, region, 1);
+  g.setIndex(uncovered.keep);
+  hiddenBodyTriangles = uncovered.hidden;
   const shell = new SkinnedMesh(shellGeo, bodyMat);
   shell.name = "Cardigan";
   shell.frustumCulled = false;
@@ -212,8 +179,8 @@ function dress(mesh: SkinnedMesh) {
 
   // Four buttons down the front.
   const buttonMat = new MeshStandardMaterial({ color: "#efe2cc", roughness: 0.5 });
-  const spine2 = boneAt("spine_02");
-  const spine3 = boneAt("spine_03");
+  const spine2 = mesh.skeleton.getBoneByName("spine_02")!;
+  const spine3 = mesh.skeleton.getBoneByName("spine_03")!;
   const y3 = spine3.getWorldPosition(new Vector3()).y;
   for (let i = 0; i < 4; i++) {
     const y = yBot + (yTop - yBot) * (0.12 + 0.22 * i);
@@ -223,49 +190,6 @@ function dress(mesh: SkinnedMesh) {
     button.updateMatrixWorld(true);
     (y > y3 ? spine3 : spine2).attach(button);
   }
-}
-
-/** Grey, slightly silvery hair (also used for the eyebrows). */
-function greyHair(m: Material): Material {
-  const mat = (m as MeshStandardMaterial).clone();
-  mat.roughness = 0.7;
-  mat.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      "#include <map_fragment>",
-      `#include <map_fragment>
-      float l = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-      diffuseColor.rgb = clamp(vec3(l) * 1.7 + vec3(0.33, 0.33, 0.35), 0.0, 1.0);`,
-    );
-  };
-  return mat;
-}
-
-/** Rotate `bone` so the direction to `child` points along `dir` (model space). Children follow. */
-function aim(bone: Object3D, child: Object3D, dir: Vector3) {
-  const a = bone.getWorldPosition(new Vector3());
-  const b = child.getWorldPosition(new Vector3());
-  const now = b.sub(a).normalize();
-  const turn = new Quaternion().setFromUnitVectors(now, dir.clone().normalize());
-  const world = bone.getWorldQuaternion(new Quaternion()).premultiply(turn);
-  const parent = bone.parent!.getWorldQuaternion(new Quaternion()).invert();
-  bone.quaternion.copy(parent.multiply(world));
-  bone.updateMatrixWorld(true);
-}
-
-/**
- * Twist `bone` about its own length (the line to `child`) so that `normal` (a world direction that turns
- * with the bone, e.g. the palm) points as close to `want` (model space) as the twist allows.
- */
-function roll(bone: Object3D, child: Object3D, normal: Vector3, want: Vector3) {
-  const axis = child.getWorldPosition(new Vector3()).sub(bone.getWorldPosition(new Vector3())).normalize();
-  const n = normal.clone().projectOnPlane(axis).normalize();
-  const w = want.clone().projectOnPlane(axis).normalize();
-  const angle = Math.atan2(new Vector3().crossVectors(n, w).dot(axis), n.dot(w));
-  const turn = new Quaternion().setFromAxisAngle(axis, angle);
-  const world = bone.getWorldQuaternion(new Quaternion()).premultiply(turn);
-  const parent = bone.parent!.getWorldQuaternion(new Quaternion()).invert();
-  bone.quaternion.copy(parent.multiply(world));
-  bone.updateMatrixWorld(true);
 }
 
 /** A local axis for `bone` that matches the model's X axis right now (for nodding about X). */
@@ -315,6 +239,13 @@ interface Built {
   tea: Mesh;
   /** Her mouth (scaled open while she talks). */
   mouth: Mesh;
+  /** Turning the head itself (the neck takes only part of a look; clipping plan step 2). */
+  headYawAxis: Vector3;
+  /** The tightest the cup and hand get to her face anywhere along the sip. */
+  sipWorst: SipClearance;
+  /** How she fits the chair and her lap (metres, in the room). */
+  fit: Fit;
+  hiddenTriangles: number;
 }
 
 /**
@@ -347,7 +278,7 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
   const dressing: SkinnedMesh[] = [];
   body.traverse((o) => {
     if (o instanceof SkinnedMesh && o.name === "Superhero_Female") dressing.push(o);
-    else if (o instanceof Mesh && /hair/i.test((o.material as Material).name)) o.material = greyHair(o.material as Material);
+    else if (o instanceof Mesh && /hair/i.test((o.material as Material).name)) o.material = hairMaterial(o.material as Material);
     if (o instanceof Mesh) o.frustumCulled = false; // skinned bounds don't follow the pose
   });
   for (const m of dressing) dress(m); // after the traversal: dress() adds a mesh to the tree
@@ -356,7 +287,7 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
   // Hair and glasses are modelled around the rest pose: attach them to the head before posing.
   const hair = hairSrc.clone(true);
   hair.traverse((o) => {
-    if (o instanceof Mesh) o.material = greyHair(o.material as Material);
+    if (o instanceof Mesh) o.material = hairMaterial(o.material as Material);
   });
   hair.updateMatrixWorld(true);
   head.attach(hair);
@@ -420,9 +351,6 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
     aim(bone(`thigh_${side}`), bone(`calf_${side}`), v(0.07 * s, -0.1, 1));
     aim(bone(`calf_${side}`), bone(`foot_${side}`), v(0.02 * s, -1, 0.18));
     aim(bone(`foot_${side}`), bone(`ball_${side}`), v(0.05 * s, -0.35, 1));
-    aim(bone(`upperarm_${side}`), bone(`lowerarm_${side}`), v(0.08 * s, -1, 0.32));
-    aim(bone(`lowerarm_${side}`), bone(`hand_${side}`), v(-0.42 * s, -0.25, 1));
-    aim(bone(`hand_${side}`), bone(`middle_01_${side}`), v(-0.35 * s, -0.4, 1));
     // Relaxed fingers instead of a flat, splayed T-pose hand; the cup hand curls a little more.
     for (const finger of ["index", "middle", "ring", "pinky"]) {
       for (const j of [1, 2, 3]) {
@@ -432,6 +360,9 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
     // The cup hand's thumb wraps the cup instead of sticking up past her nose when she sips.
     if (side === "r") for (const j of [2, 3]) bone(`thumb_0${j}_r`).rotateZ(THUMB_CURL);
   }
+  const spine = bone("spine_02");
+  const neck = bone("neck_01");
+  aim(neck, head, v(0, 1, 0.12)); // a little hunched forward
   body.updateMatrixWorld(true);
   /** Which way a palm faces (world), from the knuckle line and the finger direction. */
   const palm = (side: "l" | "r") => {
@@ -445,23 +376,66 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
     roll(bone(`lowerarm_${side}`), bone(`hand_${side}`), palm(side), want);
     aim(bone(`hand_${side}`), bone(`middle_01_${side}`), point);
   };
-  // The cup hand rests palm up on her lap so the cup sits in it.
-  turnPalm("r", v(0.35, 1, 0), v(0.3, -0.15, 1));
-  const spine = bone("spine_02");
-  const neck = bone("neck_01");
-  aim(neck, head, v(0, 1, 0.12)); // a little hunched forward
 
-  // Crocheted blanket draped over her lap and knees (see blanket.ts).
+  // Crocheted blanket draped over her lap and knees (see blanket.ts), shaped from her posed legs (clipping
+  // plan step 4): wide enough to reach over the outside of her thighs, and lifted just enough to clear them.
   const hipL = bone("thigh_l").getWorldPosition(new Vector3());
   const hipR = bone("thigh_r").getWorldPosition(new Vector3());
   const kneeL = bone("calf_l").getWorldPosition(new Vector3());
   const kneeR = bone("calf_r").getWorldPosition(new Vector3());
   const hips = hipL.clone().add(hipR).multiplyScalar(0.5);
   const knees = kneeL.clone().add(kneeR).multiplyScalar(0.5);
+  // The lap part of the thighs: from a quarter of the way to the knees on. Nearer the hip crease the cloth
+  // tucks into her lap anyway, and the hip bulge there would hold the whole blanket up.
+  const thighLen = hips.distanceTo(knees);
+  const thighPoints = posedPoints(dressing, /^thigh_/).filter((p) => p.z - hips.z > thighLen * LAP_FROM);
+  const legSpan = Math.max(...thighPoints.map((p) => Math.abs(p.x - hips.x)));
+  const blanketWidth = 2 * (legSpan + BLANKET_OVERHANG);
+  const drape = { sag: BLANKET_SAG, lift: 0 };
+  drape.lift = liftToClear(hips, knees, blanketWidth, drape, thighPoints, BLANKET_GAP);
   const blanketMat = new MeshStandardMaterial({ map: grannySquares(), roughness: 0.95, side: DoubleSide });
-  const width = Math.abs(hipL.x - hipR.x) + 0.2;
-  const blanket = new Mesh(drapedBlanket(hips, knees, width), blanketMat);
+  const blanket = new Mesh(drapedBlanket(hips, knees, blanketWidth, drape), blanketMat);
   body.add(blanket);
+  const lapY = (x: number, z: number) => drapeSurfaceY(hips, knees, blanketWidth, drape, x, z) ?? hips.y + drape.lift;
+
+  // Hands rest on the blanket, one on each thigh, placed by two-bone IK (clipping plan step 3). They used to
+  // be aimed by hand-tuned directions and ended up crossed, one through the other. Elbows bend out and back.
+  const boneLength = (from: string, to: string) => bone(from).getWorldPosition(new Vector3()).distanceTo(bone(to).getWorldPosition(new Vector3()));
+  const restHand = (side: "l" | "r", along: number, above: number) => {
+    const s = side === "l" ? 1 : -1;
+    const target = (side === "l" ? hipL : hipR).clone().lerp(side === "l" ? kneeL : kneeR, along);
+    target.y = lapY(target.x, target.z) + above;
+    const shoulder = bone(`upperarm_${side}`).getWorldPosition(new Vector3());
+    const a = boneLength(`upperarm_${side}`, `lowerarm_${side}`);
+    const b = boneLength(`lowerarm_${side}`, `hand_${side}`);
+    const { elbow, wrist } = twoBoneElbow(shoulder, target, a, b, v(0.45 * s, -0.4, -0.5));
+    aim(bone(`upperarm_${side}`), bone(`lowerarm_${side}`), elbow.clone().sub(shoulder));
+    aim(bone(`lowerarm_${side}`), bone(`hand_${side}`), wrist.clone().sub(bone(`lowerarm_${side}`).getWorldPosition(new Vector3())));
+  };
+  // Each hand is placed, then lifted until its lowest point is on top of the blanket (the fingers droop below
+  // the wrist, so a fixed wrist height left them in the cloth).
+  const settle = (side: "l" | "r", place: (above: number) => void) => {
+    const fingers = new RegExp(`^(hand|index|middle|ring|pinky|thumb)(_0\\d)?_${side}$`);
+    let above = WRIST_ABOVE_LAP;
+    for (let i = 0; i < 5; i++) {
+      place(above);
+      body.updateMatrixWorld(true);
+      let gap = Infinity;
+      for (const p of posedPoints(dressing, fingers)) gap = Math.min(gap, p.y - lapY(p.x, p.z));
+      if (gap >= HAND_ON_LAP) break;
+      above += HAND_ON_LAP - gap;
+    }
+  };
+  // Her free (left) hand lies palm down on her left thigh, fingers toward the knee along the thigh.
+  settle("l", (above) => {
+    restHand("l", LAP_HAND_ALONG, above);
+    turnPalm("l", v(0.15, -1, 0.1), v(-0.2, -0.1, 1));
+  });
+  // The cup hand lies palm up on her right thigh, a little nearer her hip, so the cup sits in it.
+  settle("r", (above) => {
+    restHand("r", LAP_HAND_ALONG - 0.1, above);
+    turnPalm("r", v(0.35, 1, 0), v(0.3, -0.1, 1));
+  });
 
   // Her teacup, held in the right hand on her lap; the tea level follows the tea meter.
   const cupMat = new MeshStandardMaterial({ color: "#f3ede2", roughness: 0.35 });
@@ -476,9 +450,15 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
   tea.position.y = -0.0045;
   cup.add(cupBody, cupBase, band, tea);
   const handR = bone("hand_r");
-  // In the palm: between the wrist and the knuckles, resting on the hand.
-  const handPos = handR.getWorldPosition(new Vector3()).lerp(bone("middle_01_r").getWorldPosition(new Vector3()), 0.55);
-  cup.position.set(handPos.x, handPos.y + 0.04, handPos.z);
+  // In the palm (clipping plan step 3): the cup's base sits on the middle of the palm, standing along the
+  // palm's normal tipped toward upright, instead of floating at a guessed height beside the hand.
+  const palmMid = ["hand_r", "index_01_r", "middle_01_r", "pinky_01_r"]
+    .map((n) => bone(n).getWorldPosition(new Vector3()))
+    .reduce((sum, p) => sum.add(p), new Vector3())
+    .multiplyScalar(0.25);
+  const cupUp = palm("r").add(v(0, 2, 0)).normalize();
+  cup.quaternion.setFromUnitVectors(v(0, 1, 0), cupUp);
+  cup.position.copy(palmMid).addScaledVector(cupUp, PALM_THICKNESS + CUP_HALF_HEIGHT);
   cup.updateMatrixWorld(true);
   handR.attach(cup);
 
@@ -493,11 +473,46 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
   const eyeLine = glasses.getWorldPosition(new Vector3());
   const toward = (from: Object3D, target: Vector3) => target.clone().sub(from.getWorldPosition(new Vector3()));
   // Sip: elbow forward, the upturned hand brings the cup up under her lips, tipped toward her.
+  // Keep-out (clipping plan step 5): the cup and the hand must stay in front of her face and below her
+  // glasses. If the pose breaks that, the wrist target moves forward or down until it doesn't.
   const lips = mouth.getWorldPosition(new Vector3());
-  aim(bone("upperarm_r"), bone("lowerarm_r"), v(-0.12, -0.35, 0.9));
-  aim(bone("lowerarm_r"), handR, toward(bone("lowerarm_r"), lips.clone().add(SIP_WRIST)));
-  turnPalm("r", v(0.1, 1, -0.4), v(0.75, 0.2, 0.25));
+  const handPoints = ["hand_r", "middle_01_r", "index_01_r", "middle_03_r", "index_03_r", "thumb_03_r"].map(bone);
+  const clearance = (): SipClearance => {
+    const c = cup.getWorldPosition(new Vector3());
+    let face = c.z - (lips.z + CUP_RADIUS + FACE_GAP);
+    let brow = eyeLine.y - SIP_BROW_GAP - (c.y + CUP_RADIUS);
+    for (const b of handPoints) {
+      const p = b.getWorldPosition(new Vector3());
+      // Only what's level with her face matters (the hand is far below her chin most of the way up).
+      if (p.y > lips.y - 0.05) face = Math.min(face, p.z - (lips.z + FACE_GAP));
+      brow = Math.min(brow, eyeLine.y - SIP_BROW_GAP - p.y);
+    }
+    return { face, brow };
+  };
+  const wrist = lips.clone().add(SIP_WRIST);
+  const sipPose = () => {
+    restore(rest);
+    aim(bone("upperarm_r"), bone("lowerarm_r"), v(-0.12, -0.35, 0.9));
+    aim(bone("lowerarm_r"), handR, toward(bone("lowerarm_r"), wrist));
+    turnPalm("r", v(0.1, 1, -0.4), v(0.75, 0.2, 0.25));
+  };
+  sipPose();
+  for (let i = 0; i < 8; i++) {
+    const c = clearance();
+    if (c.face >= 0 && c.brow >= 0) break;
+    wrist.z += Math.max(0, -c.face) + 0.002;
+    wrist.y -= Math.max(0, -c.brow) + 0.002;
+    sipPose();
+  }
   const sip = snapshot();
+  // Check the whole way up, not just the end: the runtime blends each arm bone from rest to sip.
+  let sipWorst: SipClearance = { face: Infinity, brow: Infinity };
+  for (let k = 0; k <= 10; k++) {
+    armBones.forEach((b, i) => b.quaternion.copy(rest[i]!).slerp(sip[i]!, k / 10));
+    body.updateMatrixWorld(true);
+    const c = clearance();
+    sipWorst = { face: Math.min(sipWorst.face, c.face), brow: Math.min(sipWorst.brow, c.brow) };
+  }
   restore(rest);
   // Talking gesture with the free (left) hand: elbow stays at her side, forearm lifts forward, palm up.
   aim(bone("upperarm_l"), bone("lowerarm_l"), v(0.1, -1, 0.3));
@@ -512,13 +527,39 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
   const glassesPose = snapshot();
   restore(rest);
 
-  // Scale to her height, then put her hips on the seat (object space: seat at y = 0, hips at z = 0).
+  // How her resting hands sit: on top of the blanket, and apart from each other (checked, not assumed).
+  const handsL = posedPoints(dressing, /^(hand|index|middle|ring|pinky|thumb)(_0\d)?_l$/);
+  const handsR = posedPoints(dressing, /^(hand|index|middle|ring|pinky|thumb)(_0\d)?_r$/);
+  let lapGap = Infinity;
+  for (const p of [...handsL, ...handsR]) {
+    const y = drapeSurfaceY(hips, knees, blanketWidth, drape, p.x, p.z);
+    if (y !== null) lapGap = Math.min(lapGap, p.y - y);
+  }
+  let handGap = Infinity;
+  for (const a of handsL) for (const b of handsR) handGap = Math.min(handGap, a.distanceToSquared(b));
+  handGap = Math.sqrt(handGap);
+
+  // Scale to her height, then seat her in the chair from her posed body (clipping plan step 3): the lowest
+  // point of her hips and thighs just on the cushion, her back just in front of the backrest.
   const scale = STANDING_HEIGHT / 1.7;
   const root = new Group();
   root.add(body);
   body.scale.setScalar(scale);
   body.position.set(-hips.x * scale, -hips.y * scale, -hips.z * scale);
   root.updateMatrixWorld(true);
+  const cardigan = body.getObjectByName("Cardigan") as SkinnedMesh | undefined;
+  const torso = [...dressing, ...(cardigan ? [cardigan] : [])];
+  const seatY = CHAIR.seatY + SEAT_GAP - Math.min(...posedPoints(dressing, /^(pelvis|thigh_)/).map((p) => p.y));
+  const backZ = (y: number) => CHAIR.back.z0 - CHAIR.back.slope * (y - CHAIR.back.y0);
+  let seatZ = -Infinity;
+  for (const p of posedPoints(torso, /^(pelvis|spine|thigh_)/)) {
+    const y = seatY + p.y;
+    if (y > CHAIR.seatY && y < CHAIR.seatY + 0.7) seatZ = Math.max(seatZ, backZ(y) + BACK_GAP - p.z);
+  }
+  root.position.set(0, seatY, seatZ);
+  root.updateMatrixWorld(true);
+  const armGap = Math.min(...posedPoints(torso, /^(upperarm|lowerarm|hand|index|middle|ring|pinky|thumb)_/).map((p) => CHAIR.armInnerX - Math.abs(p.x)));
+  const fit: Fit = { lapGap: lapGap * scale, handGap: handGap * scale, armGap, blanketLift: drape.lift * scale };
 
   const X = v(1, 0, 0);
   return {
@@ -537,8 +578,15 @@ function build(bodySrc: Object3D, hairSrc: Object3D): Built {
     arms: { bones: armBones, rest, sip, gesture, glasses: glassesPose },
     tea,
     mouth,
+    headYawAxis: localAxis(head, v(0, 1, 0)),
+    sipWorst,
+    hiddenTriangles: hiddenBodyTriangles,
+    fit,
   };
 }
+
+/** Raw (before limits) head angles and gesture blends to hold, for dev checks. */
+type DebugPose = Partial<{ yaw: number; pitch: number; tilt: number; sip: number; talk: number; glasses: number }>;
 
 const q1 = new Quaternion();
 
@@ -570,6 +618,15 @@ export function GrandmaModel({ size, highlight }: { size: Vec3; highlight: boole
   const pose = useRef({ ...NEUTRAL, yaw: 0 });
   const local = useMemo(() => new Vector3(), []);
 
+  // Dev only: __grandma.pose({ yaw: 2, sip: 1 }) holds a pose for checking clipping (null lets her go);
+  // __grandma.info has the sip clearance and how many body triangles the cardigan hides.
+  const debugPose = useRef<DebugPose | null>(null);
+  if (import.meta.env.DEV) {
+    Object.assign(window, {
+      __grandma: { info: { sipWorst: built.sipWorst, hiddenTriangles: built.hiddenTriangles, fit: built.fit }, pose: (p: DebugPose | null) => void (debugPose.current = p) },
+    });
+  }
+
   useFrame(({ clock, camera }, dt) => {
     const t = clock.getElapsedTime();
     const b = built;
@@ -586,7 +643,7 @@ export function GrandmaModel({ size, highlight }: { size: Vec3; highlight: boole
     local.copy(camera.position);
     b.root.worldToLocal(local);
     const dist = Math.hypot(local.x, local.z);
-    const yawTarget = dist < 5 && local.z > 0 ? Math.max(-0.7, Math.min(0.7, Math.atan2(local.x, local.z))) : 0;
+    const yawTarget = dist < 5 && local.z > 0 ? Math.max(-1.1, Math.min(1.1, Math.atan2(local.x, local.z))) : 0;
 
     const P = pose.current;
     P.lean = damp(P.lean, target.lean, 3, dt);
@@ -605,6 +662,12 @@ export function GrandmaModel({ size, highlight }: { size: Vec3; highlight: boole
     const animated = said?.mood === "happy" || said?.mood === "teasing" || said?.mood === "nostalgic";
     G.talk = damp(G.talk, talking && animated ? 0.65 + Math.sin(t * 3.1) * 0.25 : 0, 4, dt);
     G.glasses = damp(G.glasses, t < G.glassesUntil ? 1 : 0, 3.5, dt);
+    const D = debugPose.current;
+    if (D) {
+      G.sip = D.sip ?? G.sip;
+      G.talk = D.talk ?? G.talk;
+      G.glasses = D.glasses ?? G.glasses;
+    }
     const A = b.arms;
     A.bones.forEach((bone, i) => {
       const right = i < 3;
@@ -630,24 +693,31 @@ export function GrandmaModel({ size, highlight }: { size: Vec3; highlight: boole
     const nod = talking ? Math.sin(t * 7) * 0.035 : 0;
     const think = busy ? Math.sin(t * 5) * 0.06 : 0;
     const idle = Math.sin(t * 0.37) * 0.04;
-    b.spine.quaternion
-      .copy(b.spineBase)
-      .multiply(tmp.setFromAxisAngle(b.spineAxis, breathe + laugh + P.lean + doze.current * 0.12));
+    // Everything adds up here, then goes through soft limits (clipping plan step 2, poseLimits.ts).
+    const limited = limitHead({
+      yaw: D?.yaw ?? P.yaw,
+      pitch: D?.pitch ?? idle + think + nod + P.pitch + doze.current * 0.3 + Math.sin(t * 0.8) * 0.04 * doze.current,
+      tilt: D?.tilt ?? P.tilt,
+      lean: breathe + laugh + P.lean + doze.current * 0.12,
+      doze: doze.current,
+    });
+    b.spine.quaternion.copy(b.spineBase).multiply(tmp.setFromAxisAngle(b.spineAxis, limited.spineLean));
     b.neck.quaternion
       .copy(b.neckBase)
-      .multiply(tmp.setFromAxisAngle(b.neckYawAxis, P.yaw))
-      .multiply(tmp.setFromAxisAngle(b.neckAxis, doze.current * 0.35));
+      .multiply(tmp.setFromAxisAngle(b.neckYawAxis, limited.neckYaw))
+      .multiply(tmp.setFromAxisAngle(b.neckAxis, limited.neckPitch));
     b.head.quaternion
       .copy(b.headBase)
-      .multiply(tmp.setFromAxisAngle(b.headAxis, idle + think + nod + P.pitch + doze.current * 0.3 + Math.sin(t * 0.8) * 0.04 * doze.current))
-      .multiply(tmp.setFromAxisAngle(b.headTiltAxis, P.tilt));
+      .multiply(tmp.setFromAxisAngle(b.headYawAxis, limited.headYaw))
+      .multiply(tmp.setFromAxisAngle(b.headAxis, limited.headPitch))
+      .multiply(tmp.setFromAxisAngle(b.headTiltAxis, limited.headTilt));
   });
 
   const [, h] = size;
   return (
     <group>
-      {/* object space: the item's box is centered on the origin; her seat is its bottom */}
-      <primitive object={built.root} position={[0, -h / 2 + 0.1, -0.1]} />
+      {/* object space: the item's box is centred on the origin; build() seats her in the chair (CHAIR) */}
+      <primitive object={built.root} />
       {busy && (
         <Html position={[0, -h / 2 + 1.12, 0]} center distanceFactor={6}>
           <div className="bubble">…</div>
