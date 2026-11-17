@@ -1,0 +1,13 @@
+{
+  "name": "@gwp/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared, pure TypeScript game logic. No Node or browser APIs here, so the server, eval tools and client can all import it.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.1.0"
+  }
+}

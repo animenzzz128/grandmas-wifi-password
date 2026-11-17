@@ -23,3 +23,7 @@ playtest-data/
 Thumbs.db
 .vscode/
 .idea/
+
+# local runtime data (run store, turn logs)
+var/
+eval/results/

@@ -1,0 +1,13 @@
+# Never ship secrets or local data
+.env
+.env.*
+!.env.example
+var/
+eval/results/
+node_modules/
+apps/web/dist/
+.git/
+.claude/
+prototype/
+docs/screenshots/
+*.log

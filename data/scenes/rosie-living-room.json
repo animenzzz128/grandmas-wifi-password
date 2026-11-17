@@ -1,0 +1,719 @@
+{
+  "id": "rosie-living-room",
+  "world_id": "rosie",
+  "room": {
+    "width": 8,
+    "depth": 6,
+    "height": 2.6,
+    "wall_color": "#c9b38f",
+    "floor_color": "#6b4a2f",
+    "ceiling_color": "#e8dcc4",
+    "fog_color": "#2a2018"
+  },
+  "spawn": {
+    "position": [
+      1.4,
+      1.6,
+      1.3
+    ],
+    "yaw": 0.89
+  },
+  "props": [
+    {
+      "id": "rug",
+      "node": "Rug",
+      "shape": "box",
+      "size": [
+        3.2,
+        0.02,
+        2.2
+      ],
+      "position": [
+        -0.4,
+        0.01,
+        -1
+      ],
+      "color": "#8c3b3b",
+      "collide": false
+    },
+    {
+      "id": "armchair",
+      "node": "Armchair",
+      "shape": "box",
+      "size": [
+        1,
+        0.45,
+        0.9
+      ],
+      "position": [
+        -2.6,
+        0.225,
+        -1.9
+      ],
+      "color": "#7a5c8a"
+    },
+    {
+      "id": "armchair_back",
+      "node": "ArmchairBack",
+      "shape": "box",
+      "size": [
+        1,
+        1.15,
+        0.22
+      ],
+      "position": [
+        -2.6,
+        0.575,
+        -2.4
+      ],
+      "color": "#6a4c7a"
+    },
+    {
+      "id": "armchair_arm_l",
+      "node": "ArmchairArmL",
+      "shape": "box",
+      "size": [
+        0.16,
+        0.7,
+        0.9
+      ],
+      "position": [
+        -3.02,
+        0.35,
+        -1.9
+      ],
+      "color": "#6a4c7a"
+    },
+    {
+      "id": "armchair_arm_r",
+      "node": "ArmchairArmR",
+      "shape": "box",
+      "size": [
+        0.16,
+        0.7,
+        0.9
+      ],
+      "position": [
+        -2.18,
+        0.35,
+        -1.9
+      ],
+      "color": "#6a4c7a"
+    },
+    {
+      "id": "sofa",
+      "node": "Sofa",
+      "shape": "box",
+      "size": [
+        2.4,
+        0.8,
+        0.9
+      ],
+      "position": [
+        1.3,
+        0.4,
+        -2.45
+      ],
+      "color": "#5d7a5a"
+    },
+    {
+      "id": "coffee_table",
+      "node": "CoffeeTable",
+      "shape": "box",
+      "size": [
+        1.4,
+        0.45,
+        0.7
+      ],
+      "position": [
+        -0.2,
+        0.225,
+        -1
+      ],
+      "color": "#8a6440"
+    },
+    {
+      "id": "sideboard",
+      "node": "Sideboard",
+      "shape": "box",
+      "size": [
+        1.8,
+        0.9,
+        0.45
+      ],
+      "position": [
+        -0.9,
+        0.45,
+        -2.75
+      ],
+      "color": "#704d30"
+    },
+    {
+      "id": "tv_stand",
+      "node": "TvStand",
+      "shape": "box",
+      "size": [
+        0.6,
+        0.55,
+        1.4
+      ],
+      "position": [
+        3.65,
+        0.275,
+        -0.6
+      ],
+      "color": "#5a3f28"
+    },
+    {
+      "id": "counter",
+      "node": "KitchenCounter",
+      "shape": "box",
+      "size": [
+        0.7,
+        0.9,
+        2.4
+      ],
+      "position": [
+        -3.62,
+        0.45,
+        1.5
+      ],
+      "color": "#d8d2c0"
+    },
+    {
+      "id": "door",
+      "node": "FrontDoor",
+      "shape": "box",
+      "size": [
+        1,
+        2.1,
+        0.06
+      ],
+      "position": [
+        2.8,
+        1.05,
+        2.97
+      ],
+      "color": "#4a3324",
+      "collide": false
+    },
+    {
+      "id": "lamp",
+      "node": "FloorLamp",
+      "shape": "cylinder",
+      "size": [
+        0.3,
+        1.6,
+        0.3
+      ],
+      "position": [
+        -3.3,
+        0.8,
+        -2.6
+      ],
+      "color": "#d9b45a"
+    },
+    {
+      "id": "window",
+      "node": "Window",
+      "shape": "box",
+      "size": [
+        1.6,
+        1,
+        0.04
+      ],
+      "position": [
+        1.3,
+        1.6,
+        -2.98
+      ],
+      "color": "#9cc3d6",
+      "collide": false
+    },
+    {
+      "id": "plant",
+      "node": "Plant",
+      "shape": "cylinder",
+      "size": [
+        0.5,
+        0.9,
+        0.5
+      ],
+      "position": [
+        3.35,
+        0.45,
+        -2.6
+      ],
+      "color": "#4f7a3a"
+    },
+    {
+      "id": "coat_rack",
+      "node": "CoatRack",
+      "shape": "cylinder",
+      "size": [
+        0.45,
+        1.8,
+        0.45
+      ],
+      "position": [
+        3.6,
+        0.9,
+        1.55
+      ],
+      "color": "#5a3f28"
+    },
+    {
+      "id": "doormat",
+      "node": "Doormat",
+      "shape": "box",
+      "size": [
+        1,
+        0.02,
+        0.6
+      ],
+      "position": [
+        2.8,
+        0.01,
+        2.55
+      ],
+      "color": "#8a6a3a",
+      "collide": false
+    },
+    {
+      "id": "wall_frame_large",
+      "node": "WallFrameLarge",
+      "shape": "box",
+      "size": [
+        0.7,
+        0.5,
+        0.05
+      ],
+      "position": [
+        3.97,
+        1.75,
+        -0.6
+      ],
+      "rotation_y": -1.5707963267948966,
+      "color": "#6a4a2a",
+      "collide": false
+    },
+    {
+      "id": "wall_frame_small",
+      "node": "WallFrameSmall",
+      "shape": "box",
+      "size": [
+        0.3,
+        0.3,
+        0.04
+      ],
+      "position": [
+        -1.7,
+        1.7,
+        -2.97
+      ],
+      "color": "#6a4a2a",
+      "collide": false
+    },
+    {
+      "id": "radio",
+      "node": "Radio",
+      "shape": "box",
+      "size": [
+        0.2,
+        0.2,
+        0.32
+      ],
+      "position": [
+        -3.62,
+        1,
+        1.7
+      ],
+      "color": "#7a4a2a",
+      "collide": false
+    },
+    {
+      "id": "table_lamp",
+      "node": "TableLamp",
+      "shape": "cylinder",
+      "size": [
+        0.26,
+        0.5,
+        0.26
+      ],
+      "position": [
+        -1.68,
+        1.15,
+        -2.78
+      ],
+      "color": "#d9b45a",
+      "collide": false
+    },
+    {
+      "id": "ceiling_lamp",
+      "node": "CeilingLamp",
+      "shape": "box",
+      "size": [
+        0.5,
+        0.25,
+        0.5
+      ],
+      "position": [
+        -0.5,
+        2.475,
+        -0.8
+      ],
+      "color": "#efe6d2",
+      "collide": false
+    }
+  ],
+  "interactables": [
+    {
+      "id": "grandma",
+      "node": "Grandma",
+      "kind": "grandma",
+      "label": "Grandma",
+      "shape": "figure",
+      "size": [
+        0.55,
+        1.25,
+        0.55
+      ],
+      "position": [
+        -2.6,
+        1.075,
+        -1.95
+      ],
+      "color": "#b7a2c9"
+    },
+    {
+      "id": "photo_album",
+      "node": "PhotoAlbum",
+      "kind": "clue",
+      "label": "photo album",
+      "shape": "box",
+      "size": [
+        0.38,
+        0.08,
+        0.3
+      ],
+      "position": [
+        -0.4,
+        0.49,
+        -1
+      ],
+      "color": "#7b2d26",
+      "collide": false,
+      "inspect_text": "Two dog photos on facing pages: a beagle with one floppy ear chewing a sock, and a cocker spaniel on a porch step. Nobody wrote the names underneath. A later page shows a little apartment window labeled 'Cherry St., our first home — moved out summer '64', and the next a front porch labeled 'Summer '69', with a mailbox reading 41 and the last digit hidden by a rosebush. Tucked in the back is a birth announcement for baby Michael, 1966.",
+      "fact_ids": [
+        "f_dog1",
+        "f_dog1_breed",
+        "f_dog1_habit",
+        "f_dog2",
+        "f_michael_born",
+        "f_apt",
+        "f_house",
+        "f_linda_born",
+        "f_apt_number"
+      ]
+    },
+    {
+      "id": "wedding_photo",
+      "node": "WeddingPhoto",
+      "kind": "clue",
+      "label": "wedding photo",
+      "shape": "box",
+      "size": [
+        0.3,
+        0.38,
+        0.05
+      ],
+      "position": [
+        -1.35,
+        1.09,
+        -2.75
+      ],
+      "color": "#e6e0d0",
+      "collide": false,
+      "inspect_text": "A black-and-white wedding photo on church steps. Grandpa is squinting. The frame is engraved 'Moon River', and on the back, in Grandpa's handwriting: 'To my little songbird. Married the June after the pierogi.'",
+      "fact_ids": [
+        "f_wedding",
+        "f_nickname",
+        "f_song",
+        "f_honeymoon",
+        "f_engaged"
+      ]
+    },
+    {
+      "id": "bowling_trophy",
+      "node": "BowlingTrophy",
+      "kind": "clue",
+      "label": "bowling trophy",
+      "shape": "cylinder",
+      "size": [
+        0.12,
+        0.32,
+        0.12
+      ],
+      "position": [
+        -0.45,
+        1.06,
+        -2.75
+      ],
+      "color": "#d4af37",
+      "collide": false,
+      "inspect_text": "A little gold bowling pin trophy. The plaque says: TUESDAY LEAGUE, HIGH GAME, 212.",
+      "fact_ids": [
+        "f_bowling",
+        "f_bowling_score",
+        "f_marge"
+      ]
+    },
+    {
+      "id": "blue_ribbon",
+      "node": "BlueRibbon",
+      "kind": "clue",
+      "label": "blue ribbon",
+      "shape": "box",
+      "size": [
+        0.22,
+        0.34,
+        0.02
+      ],
+      "position": [
+        -0.2,
+        1.65,
+        -2.97
+      ],
+      "color": "#2f5fb3",
+      "collide": false,
+      "inspect_text": "A faded blue ribbon pinned to the wall: ERIE COUNTY FAIR, FIRST PRIZE, PIES.",
+      "fact_ids": [
+        "f_pie",
+        "f_met_walt"
+      ]
+    },
+    {
+      "id": "sled",
+      "node": "Sled",
+      "kind": "clue",
+      "label": "old sled",
+      "shape": "box",
+      "size": [
+        1,
+        0.14,
+        0.42
+      ],
+      "position": [
+        1.6,
+        0.07,
+        2.6
+      ],
+      "color": "#a0522d",
+      "inspect_text": "An old wooden sled lying by the door. One runner is cracked, and someone carved MIKEY into the seat.",
+      "fact_ids": [
+        "f_michael_arm",
+        "f_snowstorm",
+        "f_michael_born"
+      ]
+    },
+    {
+      "id": "fishing_rod",
+      "node": "FishingRod",
+      "kind": "clue",
+      "label": "fishing rod",
+      "shape": "cylinder",
+      "size": [
+        0.05,
+        1.9,
+        0.05
+      ],
+      "position": [
+        3.75,
+        0.95,
+        2.7
+      ],
+      "color": "#3d5c3d",
+      "collide": false,
+      "inspect_text": "Grandpa's fishing rod and a dented tackle box with a sticker: LAKE ERIE OR BUST.",
+      "fact_ids": [
+        "f_walt_hobby",
+        "f_stan_cabin",
+        "f_stan"
+      ]
+    },
+    {
+      "id": "tv",
+      "node": "TV",
+      "kind": "clue",
+      "label": "old TV",
+      "shape": "box",
+      "size": [
+        0.55,
+        0.55,
+        0.75
+      ],
+      "position": [
+        3.65,
+        0.83,
+        -0.6
+      ],
+      "color": "#3b2a1e",
+      "collide": false,
+      "inspect_text": "A big wood-paneled color TV. Next to it on the cabinet stands a commemorative plate: APOLLO 11 · JULY 20, 1969.",
+      "fact_ids": [
+        "f_tv",
+        "f_moon"
+      ]
+    },
+    {
+      "id": "moon_plate",
+      "node": "MoonPlate",
+      "kind": "clue",
+      "label": "moon-landing plate",
+      "shape": "box",
+      "size": [
+        0.22,
+        0.24,
+        0.05
+      ],
+      "position": [
+        3.68,
+        0.67,
+        -1.12
+      ],
+      "rotation_y": -1.5707963267948966,
+      "color": "#e8e4da",
+      "collide": false,
+      "inspect_text": "A commemorative plate: APOLLO 11 · JULY 20, 1969. Grandpa bought it the same summer as the TV, so they could watch it together.",
+      "fact_ids": [
+        "f_moon",
+        "f_tv"
+      ]
+    },
+    {
+      "id": "house_number",
+      "node": "HouseNumberSign",
+      "kind": "clue",
+      "label": "house number sign",
+      "shape": "box",
+      "size": [
+        0.36,
+        0.16,
+        0.03
+      ],
+      "position": [
+        2,
+        1.75,
+        2.97
+      ],
+      "color": "#f2efe6",
+      "collide": false,
+      "inspect_text": "A spare wooden house number from the mailbox, painted a little crooked. The paint has flaked: the first digit is a 4 and the last is a 2, but the middle one is gone.",
+      "fact_ids": [
+        "f_house_number",
+        "f_house"
+      ]
+    },
+    {
+      "id": "fridge",
+      "node": "Fridge",
+      "kind": "fixture",
+      "label": "fridge",
+      "shape": "box",
+      "size": [
+        0.75,
+        1.9,
+        0.8
+      ],
+      "position": [
+        -3.55,
+        0.95,
+        -0.35
+      ],
+      "rotation_y": 1.5707963267948966,
+      "color": "#e9ecea",
+      "inspect_text": "Inside: a green Jell-O ring, a glass bottle of milk, a jar of dill pickles, apples in the crisper, eggs and butter in the door, and a dish of pierogi under foil with a note in Grandma's handwriting: FOR SUNDAY. On the door, a grandkid's crayon drawing of Grandma with an enormous cup of tea."
+    },
+    {
+      "id": "cookie_jar",
+      "node": "CookieJar",
+      "kind": "cookie_jar",
+      "label": "cookie jar",
+      "shape": "cylinder",
+      "size": [
+        0.24,
+        0.26,
+        0.24
+      ],
+      "position": [
+        -3.62,
+        1.03,
+        1
+      ],
+      "color": "#d98c5f",
+      "collide": false,
+      "inspect_text": "A ceramic jar with one last apricot kolaczki in it. Grandma counts them.",
+      "fact_ids": [
+        "f_cookie"
+      ]
+    },
+    {
+      "id": "router",
+      "node": "Router",
+      "kind": "router",
+      "label": "Wi-Fi router",
+      "shape": "box",
+      "size": [
+        0.3,
+        0.07,
+        0.2
+      ],
+      "position": [
+        -3.62,
+        0.94,
+        2.3
+      ],
+      "color": "#202020",
+      "collide": false
+    },
+    {
+      "id": "sticky_note",
+      "node": "StickyNote",
+      "kind": "note",
+      "label": "sticky note",
+      "shape": "box",
+      "size": [
+        0.02,
+        0.12,
+        0.12
+      ],
+      "position": [
+        -3.97,
+        1.3,
+        2.3
+      ],
+      "color": "#f7e463",
+      "collide": false
+    },
+    {
+      "id": "reading_glasses",
+      "node": "ReadingGlasses",
+      "kind": "glasses",
+      "label": "reading glasses",
+      "shape": "box",
+      "size": [
+        0.16,
+        0.04,
+        0.1
+      ],
+      "position": [
+        -0.78,
+        0.47,
+        -0.92
+      ],
+      "color": "#b08a3a",
+      "collide": false,
+      "inspect_text": "Grandma's spare reading glasses, folded on the coffee table. The lenses are thick enough to read the fine print on anything."
+    }
+  ]
+}

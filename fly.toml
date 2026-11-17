@@ -1,0 +1,42 @@
+# Fly.io config (technical design: deploy target). Not deployed yet.
+# First time:
+#   fly launch --no-deploy --copy-config        (pick an app name; update `app` below)
+#   fly volumes create grandma_data --size 1
+#   fly secrets set ANTHROPIC_API_KEY=<course key> GRANDMA_MODE=llm
+#   fly deploy --ha=false                        (exactly one machine, see below)
+#   fly scale show                               (check: count 1)
+# The key only ever lives in Fly secrets; GRANDMA_MODE=llm is what lets the server use an env key.
+# One machine only: rate limits, the one-request-per-visit lock, live visits and the daily budget are kept in
+# the server process and its volume, so a second machine would have its own limits and its own budget.
+app = "grandmas-wifi-password"
+primary_region = "ewr"
+
+[build]
+
+[env]
+  API_PORT = "8787"
+  VAR_DIR = "/data"
+  RATE_LIMIT_ASKS_PER_MIN = "30"
+  GRANDMA_DAILY_BUDGET_USD = "5"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[mounts]
+  source = "grandma_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

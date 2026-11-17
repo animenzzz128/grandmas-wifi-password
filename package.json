@@ -1,0 +1,37 @@
+{
+  "name": "grandmas-wifi-password",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,magenta \"npm run dev -w @gwp/server\" \"npm run dev -w @gwp/web\"",
+    "dev:mock": "concurrently -k -n server,web -c blue,magenta \"npm run dev -w @gwp/server -- --mock\" \"npm run dev -w @gwp/web\"",
+    "build": "npm run build -w @gwp/web",
+    "start": "npm run start -w @gwp/server",
+    "test": "vitest run",
+    "typecheck": "tsc -p packages/engine --noEmit && tsc -p apps/server --noEmit && tsc -p apps/web --noEmit && tsc -p eval --noEmit",
+    "validate": "tsx packages/engine/scripts/validate-data.ts",
+    "schema": "tsx packages/engine/scripts/export-schema.ts",
+    "chat": "tsx apps/server/scripts/chat.ts",
+    "eval": "tsx eval/src/run.ts",
+    "eval:judge": "tsx eval/src/judge.ts",
+    "eval:player": "tsx eval/src/player.ts",
+    "eval:qgen": "tsx eval/src/qgen.ts",
+    "eval:golden": "tsx eval/src/golden.ts",
+    "eval:probe": "tsx eval/src/probe.ts",
+    "stats": "tsx eval/src/playstats.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "concurrently": "^10.0.0",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.0",
+    "vitest": "^4.1.0"
+  }
+}

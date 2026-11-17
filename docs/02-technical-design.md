@@ -1,6 +1,6 @@
 # Technical Design
 
-Version 0.1, 2026-11-11. Status: draft. Decisions marked **[decide]** need team agreement by M1.
+Version 0.2, 2026-11-12. Status: draft. Stack decided on 2026-11-12: TypeScript everywhere, a first-person 3D web client (React Three Fiber), and a client that can later be swapped for Godot (§8.3).
 
 ---
 
@@ -20,17 +20,18 @@ Version 0.1, 2026-11-11. Status: draft. Decisions marked **[decide]** need team 
 ## 2. Architecture
 
 ```
-┌──────────────────────┐   HTTPS/JSON    ┌───────────────────────────────────────────┐
-│ apps/web (client)    │ ──────────────▶ │ apps/server (API)                          │
-│ React + Vite + TS    │ ◀────────────── │ Hono (Node, or Cloudflare Workers later)   │
-│ - UI, animations     │                 │ - session store (in-memory → KV/SQLite)    │
-│ - Web Speech STT     │                 │ - turn pipeline (§5)                       │
-│ - no world data      │                 │ - rate limit, moderation                   │
-└──────────────────────┘                 │ uses packages/engine                       │
-                                         └──────────────┬────────────────────────────┘
-                                                        │ Anthropic API
-                                                        ▼
-                                          Claude Haiku 5.5 (runtime Grandma)
+┌───────────────────────────────┐  HTTPS/JSON   ┌───────────────────────────────────────────┐
+│ apps/web (client)             │ ────────────▶ │ apps/server (API)                          │
+│ React + Vite + TS             │ ◀──────────── │ Hono on Node 24                            │
+│ React Three Fiber (three.js)  │               │ - owns ALL game rules and state (§8.3)     │
+│ - 3D room, walking, clues     │               │ - run store: memory + SQLite; JSONL logs   │
+│ - chat / note / router UI     │               │ - turn pipeline (§5), rate limit           │
+│ - no world data, no rules     │               │ uses packages/engine                       │
+└───────────────────────────────┘               └──────────────┬────────────────────────────┘
+  (a Godot client can replace this box later                     │ Anthropic API
+   and talk to the same API)                                     ▼
+                                                 Claude Haiku 5.5 (runtime Grandma)
+                                                 or the offline mock Grandma (no API key)
 
 Offline tools (run by the team, not shipped):
   packages/worldgen  → generates data/grandmas/*.json   (Claude Opus 5.5 + deterministic code)
@@ -39,19 +40,21 @@ Offline tools (run by the team, not shipped):
 
 ### 2.1 Repository layout
 ```
-apps/web/            client (React + Vite + TypeScript)
-apps/server/         API server (Hono + TypeScript)
-packages/engine/     shared, pure TS: schemas (zod), rules, stamina, validator, retrieval, recipe solver
+apps/web/            client: React + Vite + TypeScript + React Three Fiber (3D room, UI overlay)
+apps/server/         API server: Hono + TypeScript (rules, sessions, Grandma calls)
+packages/engine/     shared, pure TS: zod schemas, rules, stamina, validator, prompts, mock Grandma, API contract
 packages/worldgen/   CLI: skeleton → LLM enrichment → validation → recipe selection
 eval/                AI player agent, LLM judge, red-team runner, report generation
-data/schema/         JSON Schema for a Grandma world
+data/schema/         JSON Schemas: Grandma world, API contract (generated)
 data/grandmas/       generated and hand-written worlds (sample: rosie.json)
+data/scenes/         scene manifests: room layout, props, clue objects (engine-neutral)
+data/i18n/           all player-facing strings (UI labels and Grandma's canned lines)
 data/anchors/        curated public-event date anchors
 prototype/           paper-prototype kit and quick scripts
 docs/                design docs
 ```
 
-**[decide]** TypeScript everywhere (recommended: one language, and the engine's types are shared by server, worldgen and eval) **vs.** Python for worldgen and eval. If the team prefers Python for eval, keep the JSON Schema in `data/schema/` as the shared contract.
+We use npm workspaces (built into Node, no extra tool). Every package is TypeScript. The JSON Schemas in `data/schema/` are the language-neutral contract for any future non-TS client or tool. Python notebooks are still fine for one-off analysis of the JSONL logs.
 
 ---
 
@@ -84,11 +87,16 @@ GrandmaWorld
 
 | Method | Path | Request | Response |
 |---|---|---|---|
-| POST | `/api/runs` | `{mode: "visit"\|"daily"\|"random", grandmaId?}` | `{runId, grandma: {name, portraitSet}, note: {text, smudged}, passwordLength, stamina}` |
-| POST | `/api/runs/:id/ask` | `{text, stt?: {confidence}}` | `{reply, mood, stamina, napped, misheard?: {heard}, questionCount}` |
-| POST | `/api/runs/:id/item` | `{item: "cookie"\|"album"\|"glasses"}` | item-specific payload (e.g. album photos) |
-| POST | `/api/runs/:id/guess` | `{password}` | `{correct, attemptsLeft, grandmaLine, result?}` |
-| GET | `/api/daily` | — | `{date, grandmaId, number}` |
+| GET | `/api/health` | — | `{ok, grandmaMode: "llm" or "mock", degraded?}` |
+| GET | `/api/daily` | — | `DailyInfo`: today's Daily Grandma number, date, Grandma, difficulty and seconds to the next one (never the note) |
+| GET | `/api/scenes/:id` | — | public scene manifest (no fact ids) |
+| POST | `/api/runs` | `{grandmaId?, difficulty?, relaxed?, daily?}` (`daily: true` starts today's Daily Grandma; the other choices are ignored) | `RunView`: run id, Grandma's name, note text and rules, password length, stamina, attempts, cookies, scene id |
+| POST | `/api/runs/:id/ask` | `{text}` | `{reply, mood, cost, run: RunView}` |
+| POST | `/api/runs/:id/show` | `{objectId, text?}` | same as `/ask`: the player shows Grandma a clue object |
+| POST | `/api/runs/:id/item` | `{item: "cookie"}` | `{line, run: RunView}` |
+| POST | `/api/runs/:id/guess` | `{parts: string[]}` (one per note slot; the server assembles and formats the password) or `{password}` | `{correct, line, partsCorrect?, partsTotal?, run: RunView}`. A wrong slot guess says how many parts were right, never which. The run carries the result card when it ends |
+
+The request and response shapes are zod schemas in `packages/engine/src/api.ts`. `npm run schema` exports them as JSON Schema to `data/schema/api.schema.json`.
 
 - Run state lives on the server: world id, recipe id, stamina, history, naps, attempts.
 - Limits:
@@ -108,7 +116,8 @@ player text
 ① Input guard ────── length/rate checks → cheap moderation (rules + Haiku classifier if flagged)
   │                  harmful → canned in-character deflection (no main LLM call)
   ▼
-② Mishear (voice only) ── if stt.confidence < τ and mishear budget left → swap keyword via pun table
+② Mishear (voice only) ── if stt.confidence < τ (0.8) and ≥ 4 questions since the last → swap keyword via pun table;
+  │                  she answers with a canned line (no model call, no facts), free and not counted
   │
   ▼
 ③ Intent + cost ───── engine classifies: on-topic follow-up / topic jump / rude / meta ("tell me the password")
@@ -207,10 +216,29 @@ A world-recipe pair ships only if all of these pass:
 ---
 
 ## 8. Client (`apps/web`)
-- **Stack:** React + Vite + TypeScript, with Zustand for state. Animations use CSS and Framer Motion (or plain CSS).
-- **Components:** `StickyNote`, `Router`, `GrandmaPortrait` (mood sprite swap), `SpeechBubble` (typewriter text plus babble audio), `Teacup`, `ItemBar`, `Notebook` (pin highlighted text), `AskBar` (text and mic).
-- **Voice:** `webkitSpeechRecognition` in Chrome/Edge. It is feature-detected, with typing always available.
-- **Babble audio:** for each word, play a random syllable sample pitched by mood (Web Audio API).
+
+### 8.1 Stack
+- React + Vite + TypeScript, React Three Fiber (three.js) and drei for the 3D room, Zustand for client state.
+- First-person controls: click to look (pointer lock), WASD to walk, E to interact, Enter to talk. Simple box collision against the walls and furniture.
+- The look: low-poly shapes, flat colors, fog, and the canvas rendered at a low pixel ratio and upscaled with `image-rendering: pixelated`. It is a cheap "rough 3D" look that is easy to recreate in Godot.
+
+### 8.2 The room
+- One living room plus a kitchen corner, built from `data/scenes/rosie-living-room.json`. Art: each manifest `node` maps to a CC0 glTF model (KayKit, Kenney), a small prop modelled in code, or a grey box (`apps/web/src/scene/models.ts`). Models are scaled into the object's collider box, so art never changes collision or interaction. Grandma is the Quaternius CC0 base character, posed and dressed in code. Sources and licenses: `CREDITS.md`.
+- Interactables: Grandma (talk within earshot; show or give within reach), clue objects (inspect, take to Grandma), the sticky note (read the recipe), the router (one box per note slot), the cookie jar (take a cookie).
+- Stall nudges: after 3 turns that touch none of the recipe chain facts, Grandma says one of the recipe `nudges` lines, which points at the first hop (`stallNudge` in `packages/engine/src/run.ts`).
+- Clue objects never contain the answer. They give the player something to ask about ("whose dog is this?") and carry distractors (212, 412, the cherry-pie ribbon). Their `fact_ids` stay on the server.
+- UI overlay (HTML on top of the canvas): crosshair and prompt, teacup, attempts, chat log and input, inspect card, note card, router panel, result card.
+
+### 8.3 Keeping the client replaceable (rules for every PR)
+We ship the course version on the web. After playtests we decide whether the Steam version keeps this client (packaged with Electron) or gets a Godot client. To keep that switch cheap:
+1. **The server owns every rule.** Stamina costs, naps, item effects, guess checking and the result card are computed in `packages/engine` and run on the server. The client only renders the state the server returns and sends player actions.
+2. **The scene is data.** Room layout, props and clue objects live in `data/scenes/*.json`, keyed by `node` names. Models are authored in Blender and exported as glTF, which both three.js and Godot import.
+3. **The API is the contract.** Request and response shapes are zod schemas exported to JSON Schema. A new client implements that contract and nothing else.
+4. **Strings are data.** Player-facing text lives in `data/i18n/en.json`, not in components. This is also the path to other languages later.
+5. **Keep the look simple.** Flat or vertex colors, small textures with nearest filtering, fog, low-res upscaling. No heavy custom three.js shaders.
+6. **No browser-only dependencies in the game logic.** For example, the Web Speech API exists in neither Godot nor Electron. If we add voice, speech-to-text runs on the server.
+
+What carries over to a Godot client: the server, engine, worlds, scenes, prompts, eval and glTF models. What gets rewritten: rendering, controls and UI (roughly 1–3 weeks).
 
 ---
 
@@ -220,7 +248,9 @@ Per run we log: grandma/recipe id, the question texts, cost per turn, latency, v
 ---
 
 ## 10. Steam packaging (post-course)
-- Wrap `apps/web` with Electron and `steamworks.js` (achievements, Steam auth tickets for rate limiting). The server stays hosted.
+- Option 1: wrap `apps/web` with Electron and `steamworks.js` (achievements, Steam auth tickets for rate limiting).
+- Option 2: a Godot 4 client (with GodotSteam) built against the same API (§8.3). Decide after the M3 playtests.
+- Either way the server stays hosted.
 - **Do not ship the world pool in the client.** Worlds stay on the server, so a datamined build doesn't spoil the puzzles.
 - An optional future offline mode with a local small model would need a different anti-datamining approach (e.g. encrypted worlds). Out of scope.
 - Steam AI disclosure draft: `docs/03-roadmap.md` §6.
