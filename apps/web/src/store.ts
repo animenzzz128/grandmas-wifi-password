@@ -15,9 +15,6 @@ import { topicQuestion } from "@gwp/engine";
 
 export type Panel = { type: "inspect"; objectId: string } | { type: "note" } | { type: "router" } | { type: "notebook" } | { type: "settings" } | null;
 
-/** What the player is holding: a clue to show Grandma, or a cookie from the jar. One thing at a time. */
-export type Carrying = { kind: "clue"; objectId: string } | { kind: "cookie" } | null;
-
 export interface LogLine {
   /** Increasing id (survives trimming the log), so the scene can tell a new line from an old one. */
   seq?: number;
@@ -51,23 +48,15 @@ interface GameState {
   error: string | null;
   panel: Panel;
   focusId: string | null;
-  locked: boolean;
   noteSeen: boolean;
   /** Bumped to ask the chat box to take keyboard focus. */
   chatFocusTick: number;
   /** True while the chat box has keyboard focus ("talk mode"). */
   talking: boolean;
-  carrying: Carrying;
-  /** Within arm's reach of Grandma (set by the player controller). Showing and giving need it. */
-  nearGrandma: boolean;
-  /** Close enough for Grandma to hear you (a bit farther than arm's reach). Talking needs it. */
-  inEarshot: boolean;
   /** A short message shown for a moment (e.g. "Grandma can't hear you from over here"). */
   hint: { text: string; at: number } | null;
   /** The last thing Grandma misheard (shown big for a moment: "PASS THE SWORD?!"). */
   mishear: { as: string; at: number } | null;
-  /** The player has looked around with the mouse at least once, so the full controls hint can go. */
-  controlsLearned: boolean;
   /** Clue objects the player has inspected this visit (for the objectives strip). */
   inspected: string[];
   /** Fixtures standing open (the fridge door). */
@@ -116,11 +105,6 @@ interface GameState {
   refreshDaily(): void;
   /** Ask Grandma; resolves false if the question didn't reach her (so the box can keep it). */
   ask(text: string, voice?: { confidence: number }, topic?: { id: string; mode: "about" | "when" }): Promise<boolean>;
-  /** Show the carried clue to Grandma (must be near her). */
-  showCarried(): Promise<void>;
-  /** Give the carried cookie to Grandma (must be near her). */
-  giveCookie(): Promise<void>;
-  take(item: Carrying): void;
   /** Returns how the guess went, or null if it couldn't be sent. */
   guess(parts: string[]): Promise<{ correct: boolean; partsCorrect?: number; partsTotal?: number; partsRight?: boolean[] } | null>;
   openPanel(panel: Panel): void;
@@ -128,10 +112,7 @@ interface GameState {
   setFocus(id: string | null): void;
   /** Open or shut a fixture's door (the fridge). */
   setOpened(id: string, open: boolean): void;
-  setLocked(locked: boolean): void;
   setTalking(talking: boolean): void;
-  setNearGrandma(near: boolean): void;
-  setInEarshot(inEarshot: boolean): void;
   showHint(text: string): void;
   /** Pin a quote to the notebook; returns false if it was too short or already pinned. */
   pin(text: string): boolean;
@@ -210,7 +191,7 @@ export const useGame = create<GameState>((set, get) => {
   const enter = async (run: RunView) => {
     const scene = get().scene?.id === run.sceneId ? get().scene : await api.scene(run.sceneId);
     barked.clear();
-    set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy", seq: ++seq }], panel: null, noteSeen: false, carrying: null, talking: false, inspected: [], opened: [], notebook: [], pins: [], hint: null, mishear: null, view: "grandma", pickedTopic: null });
+    set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy", seq: ++seq }], panel: null, noteSeen: false, talking: false, inspected: [], opened: [], notebook: [], pins: [], hint: null, mishear: null, view: "grandma", pickedTopic: null });
   };
 
   return {
@@ -224,16 +205,11 @@ export const useGame = create<GameState>((set, get) => {
     error: null,
     panel: null,
     focusId: null,
-    locked: false,
     noteSeen: false,
     chatFocusTick: 0,
     talking: false,
-    carrying: null,
-    nearGrandma: true,
-    inEarshot: true,
     hint: null,
     mishear: null,
-    controlsLearned: false,
     inspected: [], opened: [],
     notebook: [],
     pins: [],
@@ -344,7 +320,8 @@ export const useGame = create<GameState>((set, get) => {
       const run = get().run;
       const card = run?.topics.find((c) => c.id === id);
       if (!run || !card) return false;
-      const ok = await get().ask(topicQuestion(card.label, mode, card.kind), undefined, { id, mode });
+      // A smudged part reads "…" in the chat, not raw █ blocks.
+      const ok = await get().ask(topicQuestion(card.label.replace(/█+/g, "…"), mode, card.kind), undefined, { id, mode });
       if (ok) set({ pickedTopic: null });
       return ok;
     },
@@ -390,46 +367,6 @@ export const useGame = create<GameState>((set, get) => {
       return true;
     },
 
-    async showCarried() {
-      const { run, carrying, nearGrandma } = get();
-      if (!run || carrying?.kind !== "clue" || !nearGrandma) return;
-      const obj = get().scene?.interactables.find((i) => i.id === carrying.objectId);
-      if (!obj) return;
-      // She's still answering: keep the clue in hand rather than losing it to a skipped request.
-      if (get().busy) return get().showHint(t("talk.wait"));
-      push({ who: "player", text: `[shows the ${obj.label}]` });
-      set({ lastTopic: null });
-      set({ panel: null, carrying: null });
-      const res = await act(() => api.show(run.runId, obj.id));
-      if (!res) {
-        push({ who: "system", text: t("error.showFailed", { item: obj.label }) });
-        set({ carrying });
-        return;
-      }
-      push({ who: "grandma", text: res.reply, mood: res.mood, cost: res.cost, costWhy: costWhy(res.costParts) });
-      if (res.after) push({ who: "grandma", text: res.after, mood: "sleepy" });
-      if (res.nudge) push({ who: "grandma", text: res.nudge, mood: "nostalgic" });
-      learn(res.reply, "grandma");
-      set({ run: res.run });
-    },
-
-    async giveCookie() {
-      const { run, carrying, nearGrandma } = get();
-      if (!run || carrying?.kind !== "cookie" || !nearGrandma) return;
-      if (get().busy) return get().showHint(t("talk.wait"));
-      set({ carrying: null });
-      const res = await act(() => api.cookie(run.runId));
-      if (!res) {
-        push({ who: "system", text: t("error.showFailed", { item: t("cookie.label") }) });
-        set({ carrying });
-        return;
-      }
-      push({ who: "grandma", text: res.line, mood: "happy" });
-      // Not eaten (her tea is still high): the cookie stays in the player's hand for later.
-      const kept = res.run.cookies === run.cookies && res.run.cookies > 0;
-      set({ run: res.run, panel: null, carrying: kept ? carrying : null });
-    },
-
     async putOnGlasses() {
       const run = get().run;
       if (!run) return;
@@ -438,10 +375,6 @@ export const useGame = create<GameState>((set, get) => {
       push({ who: "grandma", text: res.line, mood: "happy" });
       const cleared = !run.glasses && res.run.glasses;
       set({ run: res.run, panel: cleared ? { type: "note" } : null, noteSeen: true });
-    },
-
-    take(item) {
-      set({ carrying: item, panel: null });
     },
 
     async guess(parts) {
@@ -507,23 +440,13 @@ export const useGame = create<GameState>((set, get) => {
       if (open) bark(id);
     },
     focusChat() {
-      if (!get().inEarshot) return get().showHint(t("talk.tooFar"));
       set((s) => ({ panel: null, chatFocusTick: s.chatFocusTick + 1 }));
     },
     setFocus(id) {
       if (get().focusId !== id) set({ focusId: id });
     },
-    setLocked(locked) {
-      set((s) => ({ locked, controlsLearned: s.controlsLearned || locked }));
-    },
     setTalking(talking) {
       if (get().talking !== talking) set({ talking });
-    },
-    setNearGrandma(near) {
-      if (get().nearGrandma !== near) set({ nearGrandma: near });
-    },
-    setInEarshot(inEarshot) {
-      if (get().inEarshot !== inEarshot) set({ inEarshot });
     },
     showHint(text) {
       set({ hint: { text, at: Date.now() } });
@@ -545,7 +468,7 @@ export const useGame = create<GameState>((set, get) => {
     },
     leave() {
       window.speechSynthesis?.cancel();
-      set({ run: null, log: [], panel: null, carrying: null, talking: false, grandmaSpeaking: false, hint: null, mishear: null });
+      set({ run: null, log: [], panel: null, talking: false, grandmaSpeaking: false, hint: null, mishear: null });
       get().refreshDaily();
     },
 

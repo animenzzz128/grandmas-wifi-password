@@ -574,6 +574,34 @@ const cache = new Map<string, Material | null>();
  */
 export function materialFor(name: string): Material | null {
   const key = name.split(".")[0]!;
-  if (!cache.has(key)) cache.set(key, build(key));
+  if (!cache.has(key)) {
+    const m = build(key);
+    if (m instanceof MeshPhysicalMaterial) {
+      m.userData.sheen = m.sheen;
+      m.userData.clearcoat = m.clearcoat;
+      if (!rich) setRich(m, false);
+    }
+    cache.set(key, m);
+  }
   return cache.get(key)!;
+}
+
+let rich = true;
+
+function setRich(m: MeshPhysicalMaterial, on: boolean) {
+  const sheen = on ? (m.userData.sheen as number) : 0;
+  const clearcoat = on ? (m.userData.clearcoat as number) : 0;
+  if (m.sheen === sheen && m.clearcoat === clearcoat) return;
+  m.sheen = sheen;
+  m.clearcoat = clearcoat;
+  m.needsUpdate = true;
+}
+
+/**
+ * Velvet sheen and varnish clearcoat on High only: on an integrated GPU they cost about a third of the frame
+ * (iteration 55). Medium and Low keep the procedural colour and roughness, which carry most of the look.
+ */
+export function setRichMaterials(on: boolean) {
+  rich = on;
+  for (const m of cache.values()) if (m instanceof MeshPhysicalMaterial) setRich(m, on);
 }

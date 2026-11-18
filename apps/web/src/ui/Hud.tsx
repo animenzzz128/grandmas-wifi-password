@@ -387,17 +387,15 @@ function ChatLog() {
   }, [log, busy]);
   // The pin button goes away with its highlight: when the selection is cleared (a click in the room, Esc) or
   // the mouse is captured again. It used to stay floating over the room and pin stale text (review, iteration 40).
-  const locked = useGame((s) => s.locked);
   useEffect(() => {
     if (!picked) return;
-    if (locked) return setPicked(null);
     const onChange = () => {
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || !sel.toString().trim()) setPicked(null);
     };
     document.addEventListener("selectionchange", onChange);
     return () => document.removeEventListener("selectionchange", onChange);
-  }, [picked, locked]);
+  }, [picked]);
   const pinIt = (text: string) => {
     const ok = useGame.getState().pin(text);
     if (ok) chime("pin");

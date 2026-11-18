@@ -32,7 +32,10 @@ export function contradictions(world: GrandmaWorld, t: { reply: string; factIds:
   const cited = t.factIds.map((id) => factById(world, id)).filter((f): f is NonNullable<typeof f> => Boolean(f));
   const citedYears = new Set(cited.map((f) => f.year).filter((y): y is number => typeof y === "number"));
   const out: string[] = [];
-  for (const sentence of t.reply.split(/(?<=[.!?])\s+/)) {
+  // Her allowed slips ("In 1965… no, '64") end on the right year: count the year she settles on, not the slip.
+  const slips = new Map(world.facts.filter((f) => f.misremembers !== undefined && f.year !== undefined).map((f) => [f.misremembers!, f.year!] as [number, number]));
+  const reply = resolveSelfCorrections(t.reply, slips);
+  for (const sentence of reply.split(/(?<=[.!?])\s+/)) {
     const years = (sentence.match(/\b(1[89]\d\d|20\d\d)\b/g) ?? []).map(Number);
     if (!years.length) continue;
     for (const f of cited) {

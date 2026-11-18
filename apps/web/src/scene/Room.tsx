@@ -1,23 +1,20 @@
 /**
- * The room, built from the scene manifest. Each object's art comes from models.ts (CC0 models or
- * props made in code), scaled into the object's collider box; anything without art, or whose model
- * fails to load, falls back to a grey box. Collision and interaction only ever use the manifest.
+ * Art for objects the house model (House.tsx) doesn't have: the fishing rod, the house number sign, and the
+ * close-up card's open fridge, wedding photo and album. Each object's art comes from models.ts (CC0 models or
+ * props made in code), scaled into its box from the scene manifest; without art, or if a model fails to load,
+ * a plain box stands in. (Until iteration 54 this file built the whole walk-around room.)
  */
-import { Suspense, forwardRef, useMemo, useRef } from "react";
+import { Suspense, useRef } from "react";
 import type { ReactNode } from "react";
-import { ContactShadows } from "@react-three/drei";
-import { Glint } from "./Glint.tsx";
 import { useFrame } from "@react-three/fiber";
 import type { Group } from "three";
 import type { PublicScene } from "@gwp/engine";
-import { useGame } from "../store.ts";
 import { ART } from "./models.ts";
 import type { Vec3 } from "./models.ts";
 import { ArtBoundary, GltfModel } from "./Model.tsx";
 import { Handmade } from "./handmade.tsx";
 import type { Detail } from "./handmade.tsx";
 import { GrandmaModel } from "./Grandma.tsx";
-import { ceiling, wallpaper, woodFloor } from "./textures.ts";
 
 type Item = PublicScene["props"][number] | PublicScene["interactables"][number];
 
@@ -85,104 +82,3 @@ export function Art({ item, highlight = false, detail }: { item: Item; highlight
  * which cost 5–10 ms a frame whenever you looked at her (iteration 48). The camera doesn't render this layer.
  */
 export const HITBOX_LAYER = 1;
-
-function HitBox({ size }: { size: Vec3 }) {
-  const s = size.map((v) => Math.max(v, 0.14)) as Vec3;
-  return (
-    <mesh layers={HITBOX_LAYER}>
-      <boxGeometry args={s} />
-      <meshBasicMaterial visible={false} />
-    </mesh>
-  );
-}
-
-const Placed = forwardRef<Group, { item: Item; children: ReactNode; userData?: Record<string, unknown> }>(
-  function Placed({ item, children, userData }, ref) {
-    return (
-      <group ref={ref} name={item.node} position={item.position} rotation={[0, item.rotation_y ?? 0, 0]} userData={userData}>
-        {children}
-      </group>
-    );
-  },
-);
-
-function Shell({ scene }: { scene: PublicScene }) {
-  const { width: W, depth: D, height: H } = scene.room;
-  const tex = useMemo(
-    () => ({
-      floor: woodFloor(W, D),
-      ceiling: ceiling(W, D, scene.room.ceiling_color),
-      wallX: wallpaper(W, scene.room.wall_color),
-      wallZ: wallpaper(D, scene.room.wall_color),
-    }),
-    [W, D, scene.room.ceiling_color, scene.room.wall_color],
-  );
-  const walls: { p: Vec3; ry: number; w: number; t: "wallX" | "wallZ" }[] = [
-    { p: [0, H / 2, -D / 2], ry: 0, w: W, t: "wallX" },
-    { p: [0, H / 2, D / 2], ry: Math.PI, w: W, t: "wallX" },
-    { p: [-W / 2, H / 2, 0], ry: Math.PI / 2, w: D, t: "wallZ" },
-    { p: [W / 2, H / 2, 0], ry: -Math.PI / 2, w: D, t: "wallZ" },
-  ];
-  return (
-    <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[W, D]} />
-        <meshStandardMaterial map={tex.floor} roughness={0.75} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, H, 0]}>
-        <planeGeometry args={[W, D]} />
-        <meshStandardMaterial map={tex.ceiling} roughness={1} />
-      </mesh>
-      {walls.map((w, i) => (
-        <group key={i} position={w.p} rotation={[0, w.ry, 0]}>
-          <mesh>
-            <planeGeometry args={[w.w, H]} />
-            <meshStandardMaterial map={tex[w.t]} roughness={0.95} />
-          </mesh>
-          {/* crown molding */}
-          <mesh position={[0, H / 2 - 0.04, 0.03]}>
-            <boxGeometry args={[w.w, 0.08, 0.06]} />
-            <meshStandardMaterial color="#efe4cc" roughness={0.9} />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  );
-}
-
-export function Room({ scene, interactRef }: { scene: PublicScene; interactRef: React.RefObject<Group | null> }) {
-  const focusId = useGame((s) => s.focusId);
-  const opened = useGame((s) => s.opened);
-  const { height: H } = scene.room;
-  return (
-    <group>
-      <Shell scene={scene} />
-      {/* Soft shadows under furniture, baked once (frames=1): cheap, and nothing big moves. */}
-      <ContactShadows position={[0, 0.004, 0]} scale={[scene.room.width, scene.room.depth]} resolution={512} far={1.6} blur={2.2} opacity={0.55} frames={1} color="#2a1810" />
-
-      {scene.props.map((p) => (
-        <Placed key={p.id} item={p}>
-          <Art item={p} />
-        </Placed>
-      ))}
-
-      {/* Everything the player can look at and press E on lives under interactRef, for raycasting. */}
-      <group ref={interactRef}>
-        {scene.interactables.map((it) => (
-          <Placed key={it.id} item={it} userData={{ interactId: it.id }}>
-            <HitBox size={it.size} />
-            <Art item={it} highlight={focusId === it.id} detail={it.kind === "fixture" ? { open: opened.includes(it.id) } : undefined} />
-            {(it.kind === "clue" || it.kind === "note") && <Glint id={it.id} size={it.size} />}
-          </Placed>
-        ))}
-      </group>
-
-      {/* warm living-room light */}
-      <hemisphereLight args={["#fff1d6", "#4a3426", 1.1]} />
-      <pointLight position={[-0.5, H - 0.45, -0.8]} intensity={5} distance={9} decay={1.6} color="#ffd9a0" />
-      <pointLight position={[-3, H - 0.4, 1.6]} intensity={3} distance={5} decay={1.6} color="#fff4e0" />
-      <pointLight position={[-3.3, 1.5, -2.6]} intensity={1.5} distance={3} decay={1.6} color="#ffc070" />
-    </group>
-  );
-}
-

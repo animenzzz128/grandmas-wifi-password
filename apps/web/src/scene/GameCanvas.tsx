@@ -12,6 +12,7 @@ import type { HouseInfo } from "./House.tsx";
 import { Rosie } from "./Rosie.tsx";
 import { ViewRig } from "./ViewRig.tsx";
 import { HighPost } from "./HighPost.tsx";
+import { setRichMaterials } from "./materials.ts";
 
 const PARAMS = new URLSearchParams(location.search);
 const POST_PARAM = PARAMS.get("post");
@@ -73,6 +74,7 @@ function ShadowSwitch({ ready }: { ready: boolean }) {
   const quality = useSettings((s) => s.quality);
   const frames = useRef(0);
   useEffect(() => {
+    setRichMaterials(quality === "high");
     gl.shadowMap.enabled = quality !== "low";
     gl.shadowMap.type = PCFShadowMap;
     gl.shadowMap.autoUpdate = false;

@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   SceneManifest,
+  contradictions,
   buildMessages,
   retrieveFacts,
   createRunState,
@@ -33,6 +34,15 @@ import type { GrandmaWorld } from "../src/index.ts";
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const world = parseWorld(JSON.parse(readFileSync(join(root, "data/grandmas/rosie.json"), "utf8")));
 const scene = SceneManifest.parse(JSON.parse(readFileSync(join(root, "data/scenes/rosie-living-room.json"), "utf8")));
+
+describe("contradiction rule (iteration 55)", () => {
+  it("doesn't count an allowed slip that ends on the right year, but still catches a wrong year", () => {
+    const ok = "In 1965… no, '64 we bought the house on Maple Avenue, and we've been there ever since.";
+    expect(contradictions(world, { reply: ok, factIds: ["f_house"] })).toEqual([]);
+    const wrong = "In 1966 we bought the house on Maple Avenue.";
+    expect(contradictions(world, { reply: wrong, factIds: ["f_house"] })).toHaveLength(1);
+  });
+});
 
 describe("topic cards", () => {
   it("matches whole words, and a plural", () => {

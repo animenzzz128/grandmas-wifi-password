@@ -190,7 +190,7 @@
     "bark.fridge.b": "Shut that door, you're letting the cold out!",
     "prompt.fixture_open": "{use} · Open the {label}",
     "prompt.fixture": "{use} · Look inside the {label}",
-    "examine.hint": "Drag to turn it · scroll to zoom",
+    "examine.hint": "Drag to turn it · scroll or pinch to zoom",
     "examine.view": "A close-up of the {label} that you can turn",
     "examine.front": "Front",
     "examine.back": "Back",
