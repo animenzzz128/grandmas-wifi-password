@@ -84,8 +84,8 @@ No logo fade-in at the start.
 
 ## 4. Launch checklist
 
-- [ ] Course key set as a Fly secret, `GRANDMA_MODE=llm`, daily budget set (`fly.toml`, README)
-- [ ] `fly deploy --ha=false`, then `fly scale show` says 1 machine
+- [x] Course key set as a Fly secret, `GRANDMA_MODE=llm`, daily budget set (`fly.toml`, README) (2026-11-18)
+- [x] `fly deploy --ha=false`, then `fly scale show` says 1 machine (2026-11-18: one machine in ewr, health check passing)
 - [ ] If embedding on itch.io: `EMBED_ORIGINS="https://itch.io https://*.itch.zone"` as a Fly env value. Otherwise link to the Fly URL from the page.
 - [ ] Fresh-machine check: Chrome, Edge and Firefox, start to solve, sound on
 - [ ] `npm run stats` after the first playtest: funnel, time to first question, clues found

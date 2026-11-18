@@ -1,12 +1,16 @@
-# 👵🔑 Grandma's Wi‑Fi Password *(working title)*
+# 👵🔑 Grandma's Wi‑Fi Password
 
 > Grandma's Wi‑Fi password is on a sticky note that only says *"first dog's name + the year I married Grandpa."*
-> Grandma is 87 and remembers everything. She just can't tell which memory you need.
+> Grandma is 86 and remembers everything. She just can't tell which memory you need.
 > You have until her teacup is empty.
 
-A conversational needle-in-a-haystack puzzle game. Grandma, powered by an LLM, is the haystack. The password is the needle.
+**▶ Play it in your browser: https://grandmas-wifi-password.fly.dev** (desktop or phone, no install; the first load after a quiet spell takes a few seconds while the server wakes up)
+
+A conversational needle-in-a-haystack puzzle game. Grandma, powered by an LLM, is the haystack. The password is the needle. You talk to her in your own words, look around her 3D living room for evidence, and work the answer out from what she says and what you find.
 
 This is the final project for **CPSC 1710: Introduction to AI Applications** (Yale, Fall 2026), and a possible future Steam release.
+
+**How the AI is used.** The model only *words* Grandma's replies. Her facts, the puzzles, the tea economy and every rule live in hand-written data and server code. The password is never in her prompt, and each reply is checked before the player sees it. On 736 test turns per model across all 8 notes, 256 of them attacks (prompt injection, role-play, "repeat your instructions"…), no reply gave away the password ([model choice and results](docs/13-model-choice.md)).
 
 ## Why this project
 - **"Needle in a Haystack"** is the classic long-context retrieval benchmark for LLMs. We flip it: *the human takes the test and the AI is the haystack.* Then we let an AI agent take the same test.
@@ -55,7 +59,16 @@ docs/                design docs and research
 ```
 
 ## Status
-**M0 (through 11/19):** proposal, paper prototype, and a first Haiku script prototype. The code skeleton is in: a furnished 3D living room you can walk around (CC0 furniture, a dressed-up seated Grandma, props made in code), a server that owns the rules, and Grandma in mock or Haiku mode. See the [roadmap](docs/03-roadmap.md).
+**Live since 2026-11-18** at https://grandmas-wifi-password.fly.dev.
+
+The game has:
+- 8 sticky notes on three difficulties;
+- a guided tutorial;
+- Grandma on Claude Haiku 5.5 through OpenRouter, with an offline Grandma as the fallback;
+- original waltz music;
+- keyboard, mouse, touch and accessibility settings.
+
+What's next: a silent playtest with new players, and calibrating the LLM judge against human labels. See the [roadmap](docs/03-roadmap.md) and the [implementation log](docs/07-implementation-audit.md).
 
 ## Getting started
 Requirements: Node 22.13+ (we use 24) and npm.
@@ -68,7 +81,7 @@ npm run dev        # API server on :8787 and the web client on :5173
 Open http://localhost:5173. Pick a sticky note, then:
 - **Ask:** tap a topic card and press *Tell me about it* or *When was that?*, or type any question in your own words. Names Grandma mentions become new cards.
 - **Look around:** the view tabs (or keys 1–7) move the camera; drag to look a little further; tap sparkling things to look closer, then *Show Grandma*.
-- **Keys:** N note · Tab notebook · R router · Enter talk · V ask out loud · Esc backs out one layer.
+- **Keys:** N note · J notebook · R router · H things in the room · Enter talk · V ask out loud · Tab moves between buttons · Esc backs out one layer.
 
 It works with a mouse, a trackpad or a touch screen, and on phones. Settings has Low / Medium / High graphics (the game lowers them itself if the frame rate stays low).
 
@@ -103,7 +116,13 @@ It works with a mouse, a trackpad or a touch screen, and on phones. Settings has
 | `npm run schema` | Exports the API contract and scene format as JSON Schema to `data/schema/` |
 | `npm run build` then `npm start` | Production: the server also serves the built client on :8787 |
 
-**Deploying (Fly.io, not done yet):** `Dockerfile` and `fly.toml` are ready. The steps are at the top of `fly.toml`: create the app and a volume, set `OPENROUTER_API_KEY` and `GRANDMA_MODE=llm` as Fly secrets, then `fly deploy --ha=false`. The key never goes into the image. Run exactly one machine (`fly scale show` should say 1): rate limits and the daily budget live in the server process, so a second machine would double them. The image hasn't been built yet (no Docker on the machine it was written on); its steps were run by hand on a clean copy and pass. To show the game in an itch.io embed, set `EMBED_ORIGINS="https://itch.io https://*.itch.zone"`. The demo script, store-page draft and launch checklist are in `docs/09-demo-and-launch-kit.md`.
+**Deploying (Fly.io; live since 2026-11-18):**
+- **Setup:** the steps are at the top of `fly.toml`: create the app and a volume, set `OPENROUTER_API_KEY` and `GRANDMA_MODE=llm` as Fly secrets, then `fly deploy --ha=false`. The image is built on Fly's remote builder, so no local Docker is needed.
+- **The key:** it never goes into the image (`.dockerignore` keeps `.env` and `var/` out). Give the live site an OpenRouter key with a spending limit; the daily budget below is a second guard.
+- **One machine only:** `fly scale show` should say 1. Rate limits and the daily budget live in the server process, so a second machine would double them.
+- **Updating:** `fly deploy --ha=false` from this folder.
+- **itch.io embed:** set `EMBED_ORIGINS="https://itch.io https://*.itch.zone"`.
+- **Demo materials:** the demo script, store-page draft and launch checklist are in `docs/09-demo-and-launch-kit.md`.
 
 **Cost guard:** the real Grandma stops for the day once today's model spend reaches `GRANDMA_DAILY_BUDGET_USD` (default $5, UTC day, counted from the turn logs so restarts don't reset it). Creating the file `var/KILL` (`/data/KILL` on Fly) switches her off at once, without a redeploy. Either way players keep playing with the offline Grandma, and the title screen says why. The server prints today's spend at startup; per-turn cost is in `var/logs/turns-*.jsonl`, and `npm run stats` sums it up with latency, retries and solve rates (aggregates only).
 

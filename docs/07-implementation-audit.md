@@ -717,3 +717,22 @@ Details are in `docs/13-model-choice.md`, section "Colour instead of retrieval".
   One colour line of mine ("hide the cookie tin behind the flour") caused a misleading reply; it is reworded and the validator now catches hiding words.
 - **Spend:** $1.12 this round, $6.21 in total of the key's $40 (about $0.40 over the approved $5.80).
 - **Tests:** 282 pass.
+
+## Iteration 65 (2026-11-18): live on Fly
+
+- **Live:** https://grandmas-wifi-password.fly.dev. One shared-cpu machine (512 MB) in ewr, plus a 1 GB encrypted volume for runs and turn logs.
+- **Build:** the image is built on Fly's remote builder; `.dockerignore` keeps `.env` and `var/` out of it.
+- **Secrets:** `OPENROUTER_API_KEY` and `GRANDMA_MODE=llm`, set by Jacky from `.env` without the key passing through the assistant.
+- **Checked on the live site:**
+  - the health check says LLM mode (`anthropic/claude-haiku-5.5`) and the browser voice;
+  - the home page loads in 0.09 s, with the CSP and HSTS headers;
+  - a new visit's payload has no answer;
+  - "What was your very first dog called?" got an in-character Haiku reply in 2.2 s, and the tea went to 92;
+  - the title screen renders in Chrome.
+- **Snag:** flyctl 0.4.120 broke itself while auto-updating (it rejects versions that are "severely out of date"). Re-installing with the official script brought it to 0.5.12.
+- **README:**
+  - play link at the top;
+  - how the AI is used and the leak results;
+  - current status and keys;
+  - deploy notes;
+  - the team table is left as it was for now.
