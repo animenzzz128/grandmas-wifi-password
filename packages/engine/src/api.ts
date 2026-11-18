@@ -8,6 +8,7 @@ import type { GrandmaWorld, Recipe } from "./world.ts";
 import type { RunState } from "./run.ts";
 import { RULES } from "./rules.ts";
 import { noteText, stars } from "./run.ts";
+import { noteTopics, topicReadable, worldTopics } from "./topics.ts";
 
 export const MoodSchema = z.enum(["happy", "nostalgic", "teasing", "confused", "sleepy", "suspicious", "worried"]);
 
@@ -34,6 +35,8 @@ export const CreateRunRequest = z.strictObject({
 
 export const AskRequest = z.strictObject({
   text: z.string().trim().min(1).max(RULES.maxQuestionChars),
+  /** Asked with a topic card (topics.ts): the card's id and which button. The card picks the memory. */
+  topic: z.strictObject({ id: z.string().max(64), mode: z.enum(["about", "when"]) }).optional(),
   /** Present when the question was spoken: the speech recognizer's confidence (0 = it didn't say). */
   voice: z.strictObject({ confidence: z.number().min(0).max(1) }).optional(),
 });
@@ -44,7 +47,7 @@ export const ShowRequest = z.strictObject({
 });
 
 export const ItemRequest = z.strictObject({
-  item: z.enum(["cookie", "glasses"]),
+  item: z.enum(["cookie", "glasses", "phone"]),
 });
 
 /** Either the whole password, or one entry per slot of the note (preferred: the game assembles it). */
@@ -69,6 +72,17 @@ export const RunResult = z.strictObject({
   password: z.string().optional(),
 });
 
+/** A topic card as the player sees it. */
+export const TopicView = z.strictObject({
+  id: z.string(),
+  label: z.string(),
+  kind: z.enum(["note", "person", "pet", "place", "event", "thing"]),
+  /** Appeared since the player last asked about it. */
+  fresh: z.boolean(),
+  /** False for a note part that is still smudged. */
+  readable: z.boolean(),
+});
+
 export const RunView = z.strictObject({
   runId: z.string(),
   grandma: z.strictObject({ name: z.string(), nickname: z.string().optional() }),
@@ -89,14 +103,32 @@ export const RunView = z.strictObject({
   attemptsLeft: z.number().int(),
   maxAttempts: z.number().int(),
   cookies: z.number().int(),
+  /** Calls to Uncle Michael left this visit. */
+  callsLeft: z.number().int(),
   questionCount: z.number().int(),
   status: z.enum(["playing", "solved", "failed", "bedtime"]),
   greeting: z.string(),
   relaxed: z.boolean(),
   /** Daily Grandma number, when this visit is the daily puzzle. */
   daily: z.number().int().optional(),
+  /** The topic cards the player has, note parts first. */
+  topics: z.array(TopicView),
+  /** Which sticky note this is (the title screen keeps the best stars per note). */
+  noteId: z.string().optional(),
   result: RunResult.optional(),
 });
+
+/** One sticky note to choose from on the title screen (no answers: the note is what the player reads anyway). */
+export const NoteChoice = z.strictObject({
+  id: z.string(),
+  difficulty: Difficulty,
+  /** As the player first sees it (smudged parts show as █). */
+  text: z.string(),
+});
+export const NotesResponse = z.strictObject({ notes: z.array(NoteChoice) });
+
+/** Looking at an object can bring up new topic cards (names on a photo, a label). */
+export const LookResponse = z.strictObject({ newTopics: z.array(z.string()), run: RunView });
 
 /** Today's Daily Grandma, without spoiling the note. */
 export const DailyInfo = z.strictObject({
@@ -133,10 +165,19 @@ export const AskResponse = z.strictObject({
   nudge: z.string().optional(),
   /** Voice mode: she misheard a word and answered the misheard question (this turn was free). */
   misheard: z.strictObject({ heard: z.string(), said: z.string(), as: z.string() }).optional(),
+  /** Labels of topic cards this reply brought up. */
+  newTopics: z.array(z.string()).optional(),
   run: RunView,
 });
 
-export const ItemResponse = z.strictObject({ line: z.string(), run: RunView });
+export const ItemResponse = z.strictObject({
+  line: z.string(),
+  /** Who said the line: Grandma, or Uncle Michael on the phone. */
+  who: z.enum(["grandma", "michael"]).optional(),
+  /** Labels of topic cards the line brought up. */
+  newTopics: z.array(z.string()).optional(),
+  run: RunView,
+});
 export const GuessResponse = z.strictObject({
   correct: z.boolean(),
   line: z.string(),
@@ -180,6 +221,9 @@ export type GuessResponse = z.infer<typeof GuessResponse>;
 export type HealthResponse = z.infer<typeof HealthResponse>;
 export type VoiceRequest = z.infer<typeof VoiceRequest>;
 export type DailyInfo = z.infer<typeof DailyInfo>;
+export type TopicView = z.infer<typeof TopicView>;
+export type NoteChoice = z.infer<typeof NoteChoice>;
+export type LookResponse = z.infer<typeof LookResponse>;
 
 export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe, opts: { hidePassword?: boolean } = {}): RunView {
   const ended = state.status !== "playing";
@@ -204,11 +248,14 @@ export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe, 
     attemptsLeft: state.attemptsLeft,
     maxAttempts: RULES.attempts,
     cookies: state.cookies,
+    callsLeft: Math.max(0, RULES.phoneCalls - (state.calls ?? 0)),
     questionCount: state.questionCount,
     status: state.status,
     greeting,
     relaxed: Boolean(state.relaxed),
     ...(state.daily ? { daily: state.daily } : {}),
+    topics: topicViews(state, world, recipe),
+    noteId: recipe.id,
     result: ended
       ? {
           solved: state.status === "solved",
@@ -221,4 +268,15 @@ export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe, 
         }
       : undefined,
   };
+}
+
+/** The player's cards, note parts first, labelled as they can read them now. */
+export function topicViews(state: RunState, world: GrandmaWorld, recipe: Recipe): TopicView[] {
+  const shown = noteText(state, recipe).text;
+  const defs = new Map([...noteTopics(recipe, shown), ...worldTopics(world)].map((t) => [t.id, t]));
+  const fresh = new Set(state.freshTopics ?? []);
+  return (state.topics ?? [])
+    .map((id) => defs.get(id))
+    .filter((t): t is NonNullable<typeof t> => Boolean(t))
+    .map((t) => ({ id: t.id, label: t.label, kind: t.kind, fresh: fresh.has(t.id), readable: topicReadable(t) }));
 }

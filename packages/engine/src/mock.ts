@@ -65,7 +65,11 @@ export function mockGrandmaReply(args: {
   const hidden = hiddenYears(world, args.recipe);
 
   let main: Fact | undefined;
-  if (input.kind === "show") {
+  const focus = input.kind === "ask" ? input.focus : undefined;
+  if (focus) {
+    // A topic card picked the memory already (topics.ts).
+    main = factById(world, focus.factId);
+  } else if (input.kind === "show") {
     // The scene lists an object's facts most-relevant first, so Grandma reacts to *that* object, and to the
     // memory of it that matters for this note when there is one: the one the note asks about, else another
     // link of its chain (the album means Linda's birth on Easy 2, not the Maple house; F6). A part behind
@@ -107,13 +111,6 @@ export function mockGrandmaReply(args: {
   // One tangent: prefer a fact sharing a tag, never the confusable partner (that would be too helpful),
   // never the next link of the recipe's chain (Recipe.separate), and never one that, together with the
   // main memory, spells out every part of the password (the validator would reject the reply).
-  const chained = (args.recipe.separate ?? []).filter((g) => g.includes(main!.id)).flat();
-  const avoid = new Set([main.id, ...(main.confusable_with ?? []), ...args.recentFactIds, ...chained]);
-  const tags = new Set(main.tags ?? []);
-  const pool = world.facts.filter((f) => !avoid.has(f.id) && f.salience >= 2 && !containsAllSlots(world, args.recipe, `${main!.text} ${f.text}`));
-  const related = pool.filter((f) => (f.tags ?? []).some((t) => tags.has(t)));
-  const tangent = related.length && rand() < 0.7 ? pick(related, rand) : pool.length ? pick(pool, rand) : undefined;
-
   // Self-corrections (GDD §3.2) use their own random stream, so the rest of the reply stays the same.
   const slip = rng(hashString(`${args.seed}:slip`));
   const say = (f: Fact) => {
@@ -123,6 +120,17 @@ export function mockGrandmaReply(args: {
     }
     return t;
   };
+  // "When was that?" is about one date: no tangent. A retold memory doesn't get one either.
+  if (focus && (focus.mode === "when" || focus.repeat)) {
+    return { reply: say(main), fact_ids_used: [main.id], distractor_ids: [], mood: MOOD_BY_TAG[(main.tags ?? []).find((t) => t in MOOD_BY_TAG) ?? ""] ?? "happy" };
+  }
+  const chained = (args.recipe.separate ?? []).filter((g) => g.includes(main!.id)).flat();
+  const avoid = new Set([main.id, ...(main.confusable_with ?? []), ...args.recentFactIds, ...chained]);
+  const tags = new Set(main.tags ?? []);
+  const pool = world.facts.filter((f) => !avoid.has(f.id) && f.salience >= 2 && !containsAllSlots(world, args.recipe, `${main!.text} ${f.text}`));
+  const related = pool.filter((f) => (f.tags ?? []).some((t) => tags.has(t)));
+  const tangent = related.length && rand() < 0.7 ? pick(related, rand) : pool.length ? pick(pool, rand) : undefined;
+
   const opener = rand() < 0.5 ? `${tic}. ` : "";
   const reply = tangent ? `${opener}${say(main)} ${say(tangent)}` : `${opener}${say(main)}`;
   const mood = MOOD_BY_TAG[(main.tags ?? []).find((t) => t in MOOD_BY_TAG) ?? ""] ?? "happy";

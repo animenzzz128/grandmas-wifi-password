@@ -229,7 +229,8 @@ function StickyNote({ size: [w, h, d] }: { size: Vec3 }) {
 }
 
 function HouseNumber({ size: [w, h, d] }: { size: Vec3 }) {
-  const label = useLabel("412", "#e9dcc0", "#5a3a22");
+  // The middle digit has flaked off (the inspect text says so): showing "412" handed Medium its answer.
+  const label = useLabel("4  2", "#e9dcc0", "#5a3a22");
   return (
     <group>
       <mesh>

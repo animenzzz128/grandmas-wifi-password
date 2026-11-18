@@ -26,6 +26,16 @@ export const GrandmaLines = z.strictObject({
   glasses_on: LineBank,
   /** Glasses when there's nothing smudged, or already worn. */
   glasses_not_needed: LineBank,
+  /** Topic cards: "When was that?" about something with no date. Must not mention any facts. */
+  no_year: LineBank,
+  /** Topic cards: she tells a memory again. Said before it. */
+  repeat: LineBank,
+  /** Topic cards: a part of the note still smudged. Free. */
+  smudged_card: LineBank,
+  /** The hall phone: Michael picks up. Followed by the hint, quoted. */
+  phone_lead: LineBank,
+  /** The hall phone: no more calls, or no more hints. */
+  phone_none: LineBank,
 });
 export type GrandmaLines = z.infer<typeof GrandmaLines>;
 

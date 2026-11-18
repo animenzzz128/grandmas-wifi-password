@@ -16,7 +16,18 @@ export interface ShownObject {
   factIds: string[];
 }
 
-export type TurnInput = { kind: "ask"; text: string } | { kind: "show"; object: ShownObject; text?: string };
+/**
+ * A question asked with a topic card: the game has already picked the memory (topics.ts), so the reply tells
+ * that one. "when" asks for its date (or its time phrase when the note hides the year); `repeat` means she
+ * told it before.
+ */
+export interface Focus {
+  factId: string;
+  mode: "about" | "when";
+  repeat?: boolean;
+}
+
+export type TurnInput = { kind: "ask"; text: string; focus?: Focus } | { kind: "show"; object: ShownObject; text?: string };
 
 /**
  * What the player typed, with square brackets turned into round ones. Brackets in a message are the game's
@@ -79,6 +90,7 @@ export function retrieveFacts(
   const picked = new Set<string>();
   const text = input.kind === "ask" ? input.text : [input.object.label, input.object.inspectText, input.text ?? ""].join(" ");
   if (input.kind === "show") input.object.factIds.forEach((id) => picked.add(id));
+  if (input.kind === "ask" && input.focus) picked.add(input.focus.factId);
   for (const s of scoreFacts(world, expandedTokens(text), text)) {
     if (picked.size >= k) break;
     picked.add(s.fact.id);
@@ -171,6 +183,14 @@ export function buildMessages(history: readonly Turn[], input: TurnInput, stamin
   let content = playerTurnText(input);
   if (input.kind === "show") {
     content += `\n[What they see: ${input.object.inspectText}]\n[Memories this object brings back: ${input.object.factIds.join(", ") || "none"}]`;
+  }
+  if (input.kind === "ask" && input.focus) {
+    const f = input.focus;
+    content +=
+      f.mode === "when"
+        ? `\n[They picked a topic card and asked when. Tell memory ${f.factId} and say when it happened, the way that memory says it. Nothing else.]`
+        : `\n[They picked a topic card. Tell memory ${f.factId}; you may add one short tangent.]`;
+    if (f.repeat) content += "\n[You told them this one already. Say so warmly, then tell it again.]";
   }
   const summary = conversationSummary(history, stamina, maxTurns);
   if (summary) content += `\n${summary}`;

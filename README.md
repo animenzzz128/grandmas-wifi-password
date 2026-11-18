@@ -29,6 +29,7 @@ This is the final project for **CPSC 1710: Introduction to AI Applications** (Ya
 | [Roadmap](docs/03-roadmap.md) | Milestones M0–M5, task checklist, roles, risks, Steam plan |
 | [Evaluation plan](docs/04-evaluation-plan.md) | Datasets, metrics, judge calibration, ablations, playtests, human vs. AI study |
 | [Playtest review](docs/05-playtest-review.md) | Bugs, design problems and the improvement plan from the 2026-11-12 build |
+| [Godot port and re-score](docs/12-godot-port.md) | Iteration 54: the topic cards, house, materials, camera views and title brought over from the Godot edition, and the re-score against it |
 | [Skill-based review and plan](docs/06-skill-review-and-plan.md) | Second review with the project skill: scorecard, floors, findings, a 7-phase plan with exit checks |
 | [Dev skill](.claude/skills/llm-deduction-game-dev/SKILL.md) | Our Claude Code skill for designing, building, reviewing and playtesting this game |
 | [Market research](docs/research/market-research.md) | Find The Needle case study, comparable games, Steam AI policy |
@@ -38,8 +39,8 @@ This is the final project for **CPSC 1710: Introduction to AI Applications** (Ya
 
 ## Repository layout
 ```
-apps/web/            client: React + Vite + TypeScript + React Three Fiber (first-person 3D room)
-apps/web/public/models/  CC0 3D models (KayKit, Kenney, Quaternius); see CREDITS.md
+apps/web/            client: React + Vite + TypeScript + React Three Fiber (the 3D house, camera views, topic cards)
+apps/web/public/models/  the house and Grandma (from the Godot edition), plus CC0 models (KayKit, Kenney, Quaternius); see CREDITS.md
 apps/server/         API server: Hono + TypeScript; owns the rules, the API key and the secret world data
 packages/engine/     shared rules, schemas, validator, prompts, offline mock Grandma, API contract
 packages/worldgen/   world generation CLI (planned)
@@ -64,7 +65,12 @@ npm install
 npm run dev        # API server on :8787 and the web client on :5173
 ```
 
-Open http://localhost:5173. Click to look around, WASD to walk, E to interact, Enter to talk to Grandma, Esc to back out (card → talk → mouse). Take a clue or a cookie to Grandma and press E on her to show or give it; Q puts it back.
+Open http://localhost:5173. Pick a sticky note, then:
+- **Ask:** tap a topic card and press *Tell me about it* or *When was that?*, or type any question in your own words. Names Grandma mentions become new cards.
+- **Look around:** the view tabs (or keys 1–7) move the camera; drag to look a little further; tap sparkling things to look closer, then *Show Grandma*.
+- **Keys:** N note · Tab notebook · R router · Enter talk · V ask out loud · Esc backs out one layer.
+
+It works with a mouse, a trackpad or a touch screen, and on phones. Settings has Low / Medium / High graphics (the game lowers them itself if the frame rate stays low).
 
 **Grandma's brain**
 - **Mock mode (no key):** a keyword matcher that answers from her facts. Good for building the room, UI and controls. `npm run dev:mock` forces it even when a key is set.

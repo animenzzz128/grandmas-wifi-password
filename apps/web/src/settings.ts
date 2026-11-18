@@ -53,10 +53,24 @@ export interface Settings {
   cameraAssist: boolean;
   /** Darker, opaque panels and bolder text (Xbox Accessibility Guideline 102). */
   highContrast: boolean;
+  /** Graphics: shadows, resolution and antialiasing (low for phones). */
+  quality: Quality;
+  /** No camera sway, cuts instead of camera moves, no talking bob (reduced motion). */
+  calmCamera: boolean;
+  /** The game may lower the quality by itself when the frame rate stays low (off once the player picks one). */
+  autoQuality: boolean;
+}
+
+export type Quality = "low" | "medium" | "high";
+
+/** Phones and tablets (no fine pointer) start on Low; computers on High. */
+export function defaultQuality(): Quality {
+  if (typeof window === "undefined") return "high";
+  return window.matchMedia?.("(any-pointer: fine)").matches === false ? "low" : "high";
 }
 
 const KEY = "gwp-settings";
-const DEFAULTS: Settings = { sensitivity: 1, fov: 70, invertY: false, relaxed: false, retro: true, voice: typeof window !== "undefined" && "speechSynthesis" in window ? "spoken" : "blips", textScale: 1, readableFont: false, roomSound: true, typeOut: true, musicVolume: 0.35, sfxVolume: 1, voiceVolume: 1, keys: DEFAULT_KEYS, cameraAssist: true, highContrast: false };
+const DEFAULTS: Settings = { sensitivity: 1, fov: 70, invertY: false, relaxed: false, retro: false, voice: typeof window !== "undefined" && "speechSynthesis" in window ? "spoken" : "blips", textScale: 1, readableFont: false, roomSound: true, typeOut: true, musicVolume: 0.35, sfxVolume: 1, voiceVolume: 1, keys: DEFAULT_KEYS, cameraAssist: true, highContrast: false, quality: defaultQuality(), calmCamera: false, autoQuality: true };
 
 function load(): Settings {
   try {

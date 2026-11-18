@@ -92,6 +92,25 @@ const Recipe = z.strictObject({
   }),
   password: z.string(),
   par: z.number().int().nullable().optional(),
+  /**
+   * Topic cards (see topics.ts): for each part of the note (split at "+"), the memories Grandma tells when the
+   * player taps that part's card. They point at the clue, not always the answer: on Medium and Hard a part
+   * needs a hop.
+   */
+  note_facts: z.array(z.array(z.string())).optional(),
+});
+
+/**
+ * A topic card the player can ask about (topics.ts). It appears once Grandma says one of its `match` phrases or
+ * a clue mentions one; asking about it tells its memories in order.
+ */
+const Topic = z.strictObject({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  label: z.string(),
+  kind: z.enum(["person", "pet", "place", "event", "thing"]),
+  /** Words that unlock the card when Grandma or a clue says them (whole words; a plural "s" also counts). */
+  match: z.array(z.string()).optional(),
+  facts: z.array(z.string()).min(1),
 });
 
 export const GrandmaWorld = z.strictObject({
@@ -106,8 +125,13 @@ export const GrandmaWorld = z.strictObject({
   anchors: z.array(Anchor).optional(),
   stories: z.array(Story).optional(),
   recipes: z.array(Recipe).min(1),
+  /** Topic cards. Without them, cards are made from the entities (topics.ts). */
+  topics: z.array(Topic).optional(),
+  /** Cards the player has from the start (besides the note's own parts). */
+  start_topics: z.array(z.string()).optional(),
 });
 
+export type Topic = z.infer<typeof Topic>;
 export type GrandmaWorld = z.infer<typeof GrandmaWorld>;
 export type Fact = z.infer<typeof Fact>;
 export type Entity = z.infer<typeof Entity>;
@@ -288,6 +312,17 @@ export function checkWorld(world: GrandmaWorld): string[] {
         problems.push(`recipe ${r.id}: unknown anchor ${slot.requires_anchor}`);
       }
     }
+  }
+  const topicIds = new Set((world.topics ?? []).map((t) => t.id));
+  for (const t of world.topics ?? []) {
+    for (const id of t.facts) if (!factIds.has(id)) problems.push(`topic ${t.id}: unknown fact ${id}`);
+  }
+  if ((world.topics ?? []).length !== topicIds.size) problems.push("duplicate topic id");
+  for (const id of world.start_topics ?? []) if (!topicIds.has(id)) problems.push(`start_topics: unknown topic ${id}`);
+  for (const r of world.recipes) {
+    const parts = r.note_text.split("+").length;
+    if (r.note_facts && r.note_facts.length > parts) problems.push(`recipe ${r.id}: note_facts has ${r.note_facts.length} parts, the note ${parts}`);
+    for (const id of (r.note_facts ?? []).flat()) if (!factIds.has(id)) problems.push(`recipe ${r.id}: note_facts has unknown fact ${id}`);
   }
   for (const r of world.recipes) {
     for (const group of r.separate ?? []) {

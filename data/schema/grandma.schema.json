@@ -101,6 +101,23 @@
         }
       }
     },
+    "topics": {
+      "type": "array",
+      "description": "Topic cards. Without them, cards are made from the entities.",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "kind", "facts"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "label": { "type": "string" },
+          "kind": { "enum": ["person", "pet", "place", "event", "thing"] },
+          "match": { "type": "array", "items": { "type": "string" }, "description": "Whole-word phrases that unlock the card when said." },
+          "facts": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+        }
+      }
+    },
+    "start_topics": { "type": "array", "items": { "type": "string" } },
     "recipes": {
       "type": "array",
       "minItems": 1,
@@ -139,7 +156,10 @@
             }
           },
           "password": { "type": "string", "description": "SERVER-ONLY. Must equal the computed value from slots." },
-          "par": { "type": ["integer", "null"], "description": "Median questions by the AI play-test agent." }
+          "par": { "type": ["integer", "null"], "description": "Median questions by the AI play-test agent." },
+          "separate": { "type": "array", "items": { "type": "array", "minItems": 2, "items": { "type": "string" } }, "description": "Groups of chain facts a single reply may use at most one of." },
+          "nudges": { "type": "array", "items": { "type": "string" }, "description": "In-character lines for a stuck player, pointing at the first hop." },
+          "note_facts": { "type": "array", "items": { "type": "array", "items": { "type": "string" } }, "description": "Per part of the note (split at +): the memories its topic card tells." }
         }
       }
     }

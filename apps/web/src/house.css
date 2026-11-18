@@ -1,0 +1,187 @@
+/*
+ * The house look (ported from the Godot edition's UI, iteration 54): cream paper panels, Fraunces for titles,
+ * Nunito for text, Caveat for handwriting; the title over the live room; view tabs; topic cards; phone layout.
+ * Loaded after styles.css, so these rules win where they overlap.
+ */
+@font-face { font-family: "Nunito"; src: url("/fonts/Nunito.ttf") format("truetype"); font-weight: 200 1000; font-display: swap; }
+@font-face { font-family: "Fraunces"; src: url("/fonts/Fraunces.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Caveat"; src: url("/fonts/Caveat.ttf") format("truetype"); font-weight: 400 700; font-display: swap; }
+
+:root {
+  --paper: #f8f0e1;
+  --paper-2: #efe3cc;
+  --ink: #3a2a1e;
+  --ink-soft: #6b5440;
+  --accent: #c0563b;
+  --accent-dark: #8f3b27;
+  --note: #f7e27a;
+  --panel: rgba(248, 240, 225, 0.94);
+  --panel-ink: #3a2a1e;
+  font-family: "Nunito", "Trebuchet MS", system-ui, sans-serif;
+}
+html, body, #root { background: #05060b; }
+#game-canvas canvas { image-rendering: auto; }
+h1, h2, h3, .card h3, .result h2 { font-family: "Fraunces", Georgia, serif; font-weight: 700; }
+
+button { border-radius: 999px; padding: 8px 16px; font-weight: 600; transition: transform 0.08s, filter 0.15s; }
+button:hover:not(:disabled) { filter: brightness(1.06); }
+button:active:not(:disabled) { transform: translateY(1px); }
+button.secondary { background: rgba(255, 250, 240, 0.92); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(58, 42, 30, 0.18); }
+button.icon { padding: 8px 12px; }
+input { border-radius: 10px; border-color: rgba(58, 42, 30, 0.25); }
+
+/* ---------------------------------------------------------------- title over the room */
+.title-screen.over-room {
+  position: fixed; inset: 0; z-index: 4; background: linear-gradient(90deg, rgba(20, 12, 8, 0.78) 0%, rgba(20, 12, 8, 0.45) 38%, rgba(20, 12, 8, 0) 62%);
+  align-items: flex-start; justify-content: center; text-align: left; padding: clamp(18px, 5vw, 64px);
+}
+.title-column { max-width: min(460px, 92vw); display: flex; flex-direction: column; gap: 14px; color: #fbf3e4; }
+.title-column .kicker { margin: 0; font-family: "Caveat", cursive; font-size: 1.6em; color: #f0c98a; }
+.title-column h1 { font-size: clamp(40px, 6.4vw, 76px); line-height: 0.98; margin: 0; color: #fff4dc; text-shadow: 0 3px 18px rgba(0, 0, 0, 0.5); letter-spacing: 0; }
+.title-column .premise { text-align: left; font-size: 1.05em; line-height: 1.5; opacity: 0.92; margin: 0; }
+.title-buttons { display: flex; flex-direction: column; gap: 10px; align-items: stretch; width: min(320px, 100%); }
+.title-buttons button { text-align: center; }
+.title-buttons button.primary.big { background: var(--accent); box-shadow: 0 4px 0 var(--accent-dark); }
+
+.picker {
+  align-self: center; width: min(1040px, 96vw); max-height: 94vh; overflow-y: auto; background: rgba(28, 18, 12, 0.72);
+  border-radius: 18px; padding: clamp(14px, 3vw, 28px); backdrop-filter: blur(3px); color: #fbf3e4;
+}
+.picker-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+.picker h2 { margin: 0; font-size: clamp(26px, 4vw, 40px); color: #fff4dc; }
+.picker-help { margin: 4px 0 0; opacity: 0.8; }
+.note-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.note-choice {
+  background: var(--note); color: #3d3205; border-radius: 3px; padding: 10px 12px 16px; text-align: left; min-height: 140px;
+  display: flex; flex-direction: column; gap: 6px; transform: rotate(var(--tilt, 0deg)); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+  font-weight: 400;
+}
+.note-choice:hover:not(:disabled) { transform: rotate(0deg) translateY(-3px); }
+.note-choice.medium { background: #f6d76a; }
+.note-choice.hard { background: #f3c85e; }
+.note-meta { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #a2611c; }
+.note-text { font-family: "Caveat", cursive; font-size: 1.45em; line-height: 1.15; display: flex; flex-direction: column; gap: 2px; }
+.note-stars { color: #b8741d; letter-spacing: 1px; }
+.note-stars .dim { opacity: 0.45; }
+.picker .daily-box { align-items: flex-start; margin-top: 16px; }
+.daily-box button { background: rgba(255, 250, 240, 0.92); color: var(--ink); }
+.howto { width: min(560px, 92vw); }
+.howto ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; line-height: 1.45; }
+
+/* ---------------------------------------------------------------- HUD */
+.hud .top-center, .hud .top-buttons, .hud .cards, .hud .dialog, .hud .top-right .sticky { pointer-events: auto; }
+.hud-panel { background: var(--panel); color: var(--panel-ink); border-radius: 14px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); }
+.tea-bar { background: #e2d3b8; }
+.cup { position: relative; width: 22px; height: 18px; border: 2px solid var(--ink); border-top: 0; border-radius: 0 0 8px 8px; overflow: hidden; }
+.cup::after { content: ""; position: absolute; right: -7px; top: 2px; width: 6px; height: 8px; border: 2px solid var(--ink); border-left: 0; border-radius: 0 6px 6px 0; }
+.cup-fill { position: absolute; left: 0; right: 0; bottom: 0; background: #8a4a1c; transition: height 0.5s; }
+.stats .stat-row { color: var(--ink-soft); }
+
+.top-center { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: min(760px, 60vw); }
+.view-tabs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: safe center; }
+.view-tabs button { background: rgba(255, 250, 240, 0.86); color: var(--ink); padding: 5px 12px; font-size: 14px; box-shadow: inset 0 0 0 1px rgba(58, 42, 30, 0.2); }
+.view-tabs button.on { background: #fff; box-shadow: inset 0 0 0 2px var(--accent); }
+.how-line { font-size: 13px; font-weight: 700; color: #fff8ea; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); text-align: center; }
+.top-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.top-buttons { display: flex; gap: 6px; }
+.top-buttons .btn-note { background: var(--note); color: #3d3205; }
+.top-buttons .btn-note.attention { animation: nudge 2.4s ease-in-out infinite; }
+@keyframes nudge { 0%, 80%, 100% { transform: none; } 85% { transform: rotate(-4deg); } 90% { transform: rotate(4deg); } }
+.top-buttons .btn-router { background: var(--accent); }
+.top-right .sticky.pinned { font-family: "Caveat", cursive; font-size: 1.3em; line-height: 1.15; background: var(--note); }
+.objectives { color: var(--ink); }
+.hover-label { position: absolute; left: 50%; bottom: calc(var(--dock, 230px) + 8px); transform: translateX(-50%); background: rgba(30, 20, 14, 0.82); color: #fff6e6; padding: 5px 14px; border-radius: 999px; font-size: 14px; pointer-events: none; white-space: nowrap; }
+.zzz { font: 700 22px "Fraunces", Georgia, serif; color: #fff; text-shadow: 0 0 6px #3a2a50, 0 2px 0 #3a2a50; white-space: nowrap; transition: opacity 0.6s; }
+
+/* Bottom dock: topic cards over the conversation. Grandma's face stays above it in her view. */
+.bottom, .bottom.side { left: 50%; right: auto; transform: translateX(-50%); bottom: 10px; width: min(980px, 96vw); gap: 8px; }
+.cards { display: flex; flex-direction: column; gap: 6px; }
+.card-ask { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: rgba(30, 20, 14, 0.78); padding: 6px 8px 6px 14px; border-radius: 999px; align-self: flex-start; max-width: 100%; }
+.card-ask-label { color: #fff3dc; font-weight: 700; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-ask small { opacity: 0.8; font-weight: 600; margin-left: 4px; }
+.card-ask .close-x { color: #fff3dc; text-decoration: none; padding: 4px 10px; font-size: 18px; }
+.card-strip { display: flex; gap: 8px; overflow-x: auto; padding: 6px 2px 8px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.topic {
+  position: relative; flex: 0 0 auto; scroll-snap-align: start; border-radius: 10px; padding: 9px 14px; font-weight: 700; font-size: 14px;
+  background: #f7e4dc; color: var(--ink); box-shadow: 0 2px 0 rgba(58, 42, 30, 0.25), inset 0 0 0 1px rgba(58, 42, 30, 0.12); white-space: nowrap;
+}
+.topic.note { background: var(--note); color: #3d3205; font-family: "Caveat", cursive; font-size: 1.3em; font-weight: 700; padding: 5px 14px; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
+.topic.person { background: #f6dfe0; }
+.topic.pet { background: #e7efd9; }
+.topic.place { background: #dfe9f3; }
+.topic.event { background: #f3e5cf; }
+.topic.thing { background: #ece3f2; }
+.topic.picked { box-shadow: 0 0 0 3px var(--accent), 0 2px 0 rgba(58, 42, 30, 0.25); transform: translateY(-2px); }
+.topic.fresh { animation: card-in 0.5s ease-out; }
+.new-badge { position: absolute; top: -7px; right: -4px; background: var(--accent); color: #fff; font: 800 10px "Nunito", sans-serif; padding: 1px 6px; border-radius: 999px; letter-spacing: 0.5px; }
+@keyframes card-in { from { transform: translateY(10px) scale(0.9); opacity: 0; } }
+
+.dialog { background: var(--panel); border-radius: 16px; padding: 10px 12px; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column; gap: 8px; }
+.dialog .chat-log { background: transparent; padding: 2px 4px; color: var(--ink); max-height: calc(min(5.4em, 16vh) / var(--text-scale, 1)); font-size: 16px; }
+.dialog:focus-within .chat-log, .dialog:hover .chat-log { max-height: calc(min(14em, 34vh) / var(--text-scale, 1)); }
+.chat-log .line.grandma { color: var(--ink); }
+.chat-log .line.player { color: #3c6f95; font-weight: 600; }
+.chat-log .line.system { color: var(--ink-soft); }
+.cost { color: #b0602a; font-weight: 700; }
+.ask-bar input { background: #fffaf2; }
+.ask-bar.talking { margin-top: 0; }
+.talk-mode { display: none; }
+
+.card { border-radius: 16px; }
+.result .stars { color: #e3a42e; letter-spacing: 4px; font-size: 40px; }
+.sticky, .sticky.big { font-family: "Caveat", cursive; background: var(--note); }
+.sticky.big { font-size: 28px; line-height: 1.15; }
+.readable .topic.note, .readable .note-text, .readable .sticky { font-family: Verdana, Tahoma, sans-serif !important; font-size: 1em; }
+
+/* Middle widths: the view tabs get their own row under the tea and the buttons. */
+@media (max-width: 1280px) {
+  .top-center { top: 66px; max-width: calc(100vw - 24px); }
+  .view-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 24px); }
+  .view-tabs button { flex: 0 0 auto; }
+  .top-left .objectives { margin-top: 44px; }
+  .top-right .sticky.pinned { margin-top: 44px; }
+}
+
+/* ---------------------------------------------------------------- phones and narrow windows */
+@media (max-width: 820px) {
+  .top-center { top: auto; bottom: auto; left: 8px; right: 8px; transform: none; max-width: none; position: absolute; top: 64px; }
+  .view-tabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; scrollbar-width: none; padding-bottom: 2px; }
+  .view-tabs button { flex: 0 0 auto; padding: 6px 12px; }
+  .how-line { display: none; }
+  .top-left { top: 8px; left: 8px; }
+  .top-left .objectives, .top-left .stat-row span:nth-child(n + 3) { display: none; }
+  .tea-bar { width: 80px; }
+  .top-right { top: 8px; right: 8px; }
+  .top-buttons button { padding: 7px 11px; font-size: 13px; }
+  .top-right .sticky.pinned { display: none; }
+  .bottom, .bottom.side { width: calc(100vw - 12px); bottom: 6px; }
+  .dialog .chat-log { max-height: calc(14vh / var(--text-scale, 1)); font-size: 15px; }
+  .topic { font-size: 13px; padding: 9px 12px; }
+  .title-screen.over-room { background: linear-gradient(180deg, rgba(20, 12, 8, 0.2) 0%, rgba(20, 12, 8, 0.82) 55%); justify-content: flex-end; }
+  .title-column h1 { font-size: 44px; }
+  .note-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .hover-label { display: none; }
+}
+@media (max-width: 480px) {
+  .top-left .hud-panel.stats { padding: 6px 10px; }
+  .top-left .tea > span:not(.cup):not(.num), .top-left .stat-row { display: none; }
+  .tea-bar { width: 52px; }
+  .top-buttons { gap: 4px; }
+  .top-buttons button { padding: 6px 9px; font-size: 12.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .topic.fresh, .top-buttons .btn-note.attention { animation: none; }
+}
+
+.house-loading { z-index: 6; bottom: 24px; }
+html, body, #root { background: radial-gradient(ellipse at 60% 40%, #3a2618, #120c08 70%); }
+
+.house-loading { bottom: 14px; top: auto; }
+
+/* An ink smudge where part of the note is unreadable (the reading glasses clear it). */
+.smudge { display: inline-block; height: 0.9em; vertical-align: -0.1em; margin: 0 0.1em; border-radius: 40% 60% 55% 45%; background: radial-gradient(ellipse at 40% 50%, rgba(40, 30, 10, 0.75), rgba(40, 30, 10, 0.35) 55%, rgba(40, 30, 10, 0) 72%); filter: blur(0.6px); }
+
+.chat-log .line.michael { color: #6a4f8a; font-style: italic; }
+
+/* The close-up card's own loading line sits in the middle of its canvas. */
+.examine-stage .loading-pill { position: static; transform: none; white-space: nowrap; }

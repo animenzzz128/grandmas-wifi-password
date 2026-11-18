@@ -1,5 +1,5 @@
 /** Thin client for the server API. Responses are checked against the shared zod contract. */
-import { AskResponse, DailyInfo, GuessResponse, HealthResponse, ItemResponse, PublicScene, RunView } from "@gwp/engine";
+import { AskResponse, DailyInfo, GuessResponse, HealthResponse, ItemResponse, LookResponse, NotesResponse, PublicScene, RunView } from "@gwp/engine";
 import type { z } from "zod";
 import { t } from "./strings.ts";
 
@@ -43,11 +43,18 @@ export const api = {
   daily: () => request(DailyInfo, "/api/daily"),
   createRun: (difficulty: RunView["difficulty"], relaxed = false, after?: string) =>
     request(RunView, "/api/runs", { difficulty, relaxed, ...(after ? { after } : {}) }),
+  /** A visit to one chosen sticky note (the title screen's note picker). */
+  createRunFor: (recipeId: string, relaxed = false) => request(RunView, "/api/runs", { recipeId, relaxed }),
+  notes: () => request(NotesResponse, "/api/notes"),
+  /** Look closely at an object: names on it may become topic cards. */
+  look: (runId: string, objectId: string) => request(LookResponse, `/api/runs/${runId}/look`, { kind: "inspect", objectId }),
   createDaily: (relaxed = false) => request(RunView, "/api/runs", { daily: true, relaxed }),
-  ask: (runId: string, text: string, voice?: { confidence: number }) => request(AskResponse, `/api/runs/${runId}/ask`, voice ? { text, voice } : { text }),
+  ask: (runId: string, text: string, voice?: { confidence: number }, topic?: { id: string; mode: "about" | "when" }) =>
+    request(AskResponse, `/api/runs/${runId}/ask`, { text, ...(voice ? { voice } : {}), ...(topic ? { topic } : {}) }),
   show: (runId: string, objectId: string, text?: string) => request(AskResponse, `/api/runs/${runId}/show`, { objectId, text }),
   cookie: (runId: string) => request(ItemResponse, `/api/runs/${runId}/item`, { item: "cookie" }),
   glasses: (runId: string) => request(ItemResponse, `/api/runs/${runId}/item`, { item: "glasses" }),
+  phone: (runId: string) => request(ItemResponse, `/api/runs/${runId}/item`, { item: "phone" }),
   guess: (runId: string, parts: string[]) => request(GuessResponse, `/api/runs/${runId}/guess`, { parts }),
   /** Grandma's lines as speech (MP3), or null if the server can't say them now (the caller falls back). */
   voice: async (runId: string, lines: string[], mood?: string): Promise<ArrayBuffer | null> => {

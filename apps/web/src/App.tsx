@@ -6,16 +6,12 @@ import { useGame } from "./store.ts";
 import { t } from "./strings.ts";
 import { dailyStreak, formatCountdown, loadDailyRecords } from "./daily.ts";
 import { hasVisited } from "./firsts.ts";
+import { loadNoteStars } from "./noteStars.ts";
+import { Smudged } from "./ui/Smudged.tsx";
 
-/** The 3D game is its own chunk; started loading as soon as the title shows, so a click rarely waits. */
+/** The 3D room and HUD are their own chunk; the title screen shows while it loads. */
 const loadGame = () => import("./Game.tsx");
 const Game = lazy(loadGame);
-
-/**
- * Touch-only devices: the game needs a keyboard and mouse (walk, look, type). Asks whether any fine pointer
- * exists, not the window width: a narrow desktop window or a touch-screen laptop with a trackpad can still play.
- */
-const needsKeyboard = () => typeof window !== "undefined" && window.matchMedia?.("(any-pointer: fine)").matches === false;
 
 /** "12 of 30 visits today solved it, in 9 questions (median)". */
 export function dailyStatsLine(s: { finished: number; solved: number; medianQuestions?: number }): string {
@@ -45,12 +41,12 @@ function DailyBox() {
   const vars = { n: daily.number, difficulty: t(`difficulty.${daily.difficulty}`), name: daily.grandma.nickname ?? daily.grandma.name };
   return (
     <div className="daily-box">
-      <button disabled={busy} onClick={() => void startDaily()}>
+      <button className="secondary" disabled={busy} onClick={() => void startDaily()}>
         {rec ? t("daily.again", vars) : t("daily.play", vars)}
       </button>
       {rec && (
         <p className="daily-status">
-          {rec.solved ? t("daily.solved", { stars: "⭐".repeat(rec.stars), n: rec.questions }) : t("daily.failed")} · {t("daily.next", { time: formatCountdown(left) })}
+          {rec.solved ? t("daily.solved", { stars: "★".repeat(rec.stars), n: rec.questions }) : t("daily.failed")} · {t("daily.next", { time: formatCountdown(left) })}
         </p>
       )}
       {streak > 1 && <p className="daily-status">{t("daily.streak", { n: streak })}</p>}
@@ -59,59 +55,122 @@ function DailyBox() {
   );
 }
 
+/** Stars as text with a spoken label (never colour alone). */
+function Stars({ n, of = 3 }: { n: number; of?: number }) {
+  return (
+    <span className="note-stars" role="img" aria-label={t("result.starsLabel", { n })}>
+      {"★".repeat(n)}
+      <span className="dim">{"☆".repeat(Math.max(0, of - n))}</span>
+    </span>
+  );
+}
+
+/** "Which sticky note today?" Every note, Easy first, with your best stars (ported from the Godot edition). */
+function NotePicker({ onBack }: { onBack: () => void }) {
+  const notes = useGame((s) => s.notes);
+  const startNote = useGame((s) => s.startNote);
+  const busy = useGame((s) => s.busy);
+  const [stars] = useState(loadNoteStars);
+  return (
+    <div className="picker" role="dialog" aria-labelledby="picker-title">
+      <div className="picker-head">
+        <div>
+          <h2 id="picker-title">{t("title.pick")}</h2>
+          <p className="picker-help">{t("title.pickHelp")}</p>
+        </div>
+        <button className="secondary" onClick={onBack}>
+          {t("title.back")}
+        </button>
+      </div>
+      <div className="note-grid">
+        {(notes ?? []).map((n, i) => (
+          <button key={n.id} className={`note-choice ${n.difficulty}`} disabled={busy} autoFocus={i === 0} onClick={() => void startNote(n.id)} style={{ ["--tilt" as string]: `${((i * 37) % 5) - 2}deg` }}>
+            <span className="note-meta">
+              <span>{t(`difficulty.${n.difficulty}`)}</span>
+              <Stars n={stars[n.id] ?? 0} />
+            </span>
+            <span className="note-text">
+              {n.text.split("+").map((p, k) => (
+                <span key={k}>
+                  {k > 0 && "+ "}
+                  <Smudged text={p.trim()} />
+                </span>
+              ))}
+            </span>
+          </button>
+        ))}
+        {notes === null && <p>{t("loading.door")}</p>}
+      </div>
+      <DailyBox />
+    </div>
+  );
+}
+
+function HowToPlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="card howto" role="dialog" aria-labelledby="howto-title">
+      <h3 id="howto-title">{t("howto.title")}</h3>
+      <ol>
+        <li>{t("howto.1")}</li>
+        <li>{t("howto.2")}</li>
+        <li>{t("howto.3")}</li>
+        <li>{t("howto.4")}</li>
+        <li>{t("howto.5")}</li>
+      </ol>
+      <p className="hint">{t("howto.keys")}</p>
+      <button autoFocus onClick={onClose}>
+        {t("close")}
+      </button>
+    </div>
+  );
+}
+
+/** The title over the live room (the camera drifts behind it), as in the Godot edition. */
 function TitleScreen() {
-  const start = useGame((s) => s.start);
   const busy = useGame((s) => s.busy);
   const error = useGame((s) => s.error);
   const health = useGame((s) => s.health);
-  const [settings, setSettings] = useState(false);
-  // First visit: one obvious button straight into an Easy visit; the daily, the other difficulties and the full
-  // key list wait behind "More ways to play" (players should be playing within seconds; plan A1).
+  const start = useGame((s) => s.start);
+  const [step, setStep] = useState<"home" | "pick">("home");
+  const [panel, setPanel] = useState<"settings" | "howto" | null>(null);
   const [firstVisit] = useState(() => !hasVisited());
-  const [more, setMore] = useState(!firstVisit);
   return (
-    <div className="title-screen">
-      {settings && (
+    <div className="title-screen over-room">
+      {panel && (
         <div className="panel-wrap" role="dialog" aria-labelledby="panel-title">
-          <SettingsCard onClose={() => setSettings(false)} />
+          {panel === "settings" ? <SettingsCard onClose={() => setPanel(null)} /> : <HowToPlay onClose={() => setPanel(null)} />}
         </div>
       )}
-      <h1>{t("title")}</h1>
-      <p className="tagline">{t("tagline")}</p>
-      {firstVisit && (
-        <button className="primary big" autoFocus disabled={busy} onClick={() => void start("easy")}>
-          {t("title.firstVisit")}
-        </button>
-      )}
-      <p className="premise">{t("premise")}</p>
-      {more ? (
-        <>
-          <DailyBox />
-          <div className="difficulty">
-            {(["easy", "medium", "hard"] as const).map((d) => (
-              <button key={d} disabled={busy} onClick={() => void start(d)}>
-                {t("start")} · {t(`difficulty.${d}`)}
+      {step === "home" ? (
+        <div className="title-column">
+          <p className="kicker">{t("title.kicker")}</p>
+          {/* A non-breaking hyphen: "Wi-Fi" never splits across lines. */}
+          <h1>{t("title").replace("-", "‑")}</h1>
+          <p className="premise">{t("premise")}</p>
+          <div className="title-buttons">
+            {/* The very first visit goes straight in on Easy: playing within seconds (plan A1). */}
+            <button className="primary big" autoFocus disabled={busy} onClick={() => (firstVisit ? void start("easy") : setStep("pick"))}>
+              {t("title.firstVisit")}
+            </button>
+            {firstVisit && (
+              <button className="secondary" onClick={() => setStep("pick")}>
+                {t("title.chooseNote")}
               </button>
-            ))}
+            )}
+            <button className="secondary" onClick={() => setPanel("howto")}>
+              {t("howto.title")}
+            </button>
+            <button className="secondary" onClick={() => setPanel("settings")}>
+              {t("settings.title")}
+            </button>
           </div>
-          <p className="difficulty-help">{t("difficulty.help")}</p>
-        </>
+          {health && import.meta.env.DEV && <div className="badge">{health.grandmaMode === "mock" ? t("mode.mock") : t("mode.llm", { model: health.model ?? "" })}</div>}
+          {health?.degraded && <p className="device-note">{t(`mode.degraded.${health.degraded}`)}</p>}
+          {error && <div className="error">{error}</div>}
+        </div>
       ) : (
-        <button className="ghost" onClick={() => setMore(true)}>
-          {t("title.moreWays")}
-        </button>
+        <NotePicker onBack={() => setStep("home")} />
       )}
-      <button className="ghost" onClick={() => setSettings(true)}>
-        {t("settings.title")}
-      </button>
-      <details className="controls">
-        <summary>{t("title.controls")}</summary>
-        {t("controls")}
-      </details>
-      {needsKeyboard() && <p className="device-note">{t("title.desktopOnly")}</p>}
-      {health && import.meta.env.DEV && <div className="badge">{health.grandmaMode === "mock" ? t("mode.mock") : t("mode.llm", { model: health.model ?? "" })}</div>}
-      {health?.degraded && <p className="device-note">{t(`mode.degraded.${health.degraded}`)}</p>}
-      {error && <div className="error">{error}</div>}
     </div>
   );
 }
@@ -122,21 +181,25 @@ export function App() {
   const scene = useGame((s) => s.scene);
   const textScale = useSettings((s) => s.textScale);
   const readableFont = useSettings((s) => s.readableFont);
+  const highContrast = useSettings((s) => s.highContrast);
   useEffect(() => {
     void init();
   }, [init]);
-  const highContrast = useSettings((s) => s.highContrast);
   useEffect(() => applyTextSettings({ textScale, readableFont, highContrast }), [textScale, readableFont, highContrast]);
   useEffect(() => {
     void loadGame().catch(() => undefined); // prefetch; a real failure shows when the game mounts
   }, []);
-  if (!run || !scene) return <TitleScreen />;
   return (
-    <GameErrorBoundary key={run.runId}>
-      <Suspense fallback={<div className="title-screen"><p className="tagline">{t("loading.door")}</p></div>}>
-        <Game scene={scene} />
-      </Suspense>
-    </GameErrorBoundary>
+    <>
+      {scene && (
+        <GameErrorBoundary>
+          <Suspense fallback={run ? <div className="title-screen"><p className="tagline">{t("loading.door")}</p></div> : null}>
+            <Game scene={scene} />
+          </Suspense>
+        </GameErrorBoundary>
+      )}
+      {!run && <TitleScreen />}
+    </>
   );
 }
 

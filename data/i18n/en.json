@@ -29,7 +29,7 @@
     "hud.naps": "Naps {n}/{max}",
     "hud.cookies": "Cookies {n}",
     "hud.questions": "Questions {n}",
-    "cookie.none": "The jar is empty. Grandma counted them.",
+    "cookie.none": "The plate is empty. Grandma counted them.",
     "result.solved": "Connected!",
     "result.failed": "No internet today.",
     "result.bedtime": "Grandma's off to bed.",
@@ -62,7 +62,7 @@
     "router.formatted": "Capitals and spaces are fixed for you",
     "premise": "Grandma's Wi-Fi password is a riddle on a sticky note, made of her memories. Ask her about the old days, look around the living room for proof, and type the answer into the router before her tea runs out.",
     "difficulty.help": "Easy: one step per clue · Medium: two steps and a decoy · Hard: three steps, and she won't say the year",
-    "goal.note": "Read the sticky note in the kitchen",
+    "goal.note": "Read the sticky note by the router",
     "goal.ask": "Ask Grandma about it",
     "goal.proof": "Find proof in the room",
     "goal.router": "Try the password at the router",
@@ -104,7 +104,7 @@
     "notebook.pinnedHint": "Pinned to your notebook ({notebook}).",
     "notebook.pinSkipped": "That's already pinned.",
     "error.server": "Grandma's house had a hiccup on our end. Try again in a moment.",
-    "error.askFailed": "(Grandma didn't catch that. Your question is back in the box; press Enter to try again.)",
+    "error.askFailed": "(Grandma didn't catch that. Your question is back in the box; try again.)",
     "loading.room": "Setting up Grandma's living room… {pct}%",
     "title.desktopOnly": "This game needs a keyboard and mouse (you walk, look around and type). Please play it on a computer.",
     "mishear.big": "{as}?!",
@@ -163,7 +163,7 @@
     "lesson.tea": "Each question drinks some of Grandma’s tea (top left). When the cup is empty she naps, and each nap costs a star.",
     "lesson.followUp": "Following up on what she just said is cheaper: −3 tea.",
     "lesson.nap": "She dozed off for a moment. Her tea is back to half. A third nap means bedtime.",
-    "lesson.cookie": "Her tea is getting low. A cookie from the jar in the kitchen perks her up (+25), once per visit.",
+    "lesson.cookie": "Her tea is getting low. The kolaczki on the coffee table perks her up (+25), once per visit.",
     "bark.photo_album.a": "Oh, the album! Mind the loose pages, sweetheart.",
     "bark.photo_album.b": "Go on, have a look. I was quite the looker, wasn’t I?",
     "bark.wedding_photo.a": "Isn’t your grandpa handsome there? Don’t tell him I said that.",
@@ -182,7 +182,7 @@
     "bark.moon_plate.b": "Oh, I do love that plate.",
     "bark.house_number.a": "Your grandpa and his paintbrush.",
     "bark.house_number.b": "Don’t laugh. He was very proud of that.",
-    "bark.cookie_jar.a": "I see you eyeing my cookies.",
+    "bark.cookie_jar.a": "I see you eyeing my kolaczki.",
     "bark.cookie_jar.b": "Hands where I can see them, sweetheart.",
     "bark.reading_glasses.a": "Have you seen my glasses? Oh, there they are.",
     "bark.reading_glasses.b": "Those are my good glasses, dear. Gently.",
@@ -219,11 +219,64 @@
     "router.partRight": "Part {n} is right.",
     "router.partWrong": "Part {n} isn’t.",
     "router.noneRight": "No part is right yet.",
-    "result.another": "Try another {difficulty} puzzle"
+    "result.another": "Try another {difficulty} puzzle",
+    "title.kicker": "A snowy Sunday at Rosie's",
+    "title.chooseNote": "Choose a sticky note",
+    "title.pick": "Which sticky note today?",
+    "title.pickHelp": "Uncle Michael changes the Wi-Fi password every Sunday and leaves Grandma a riddle. Start with an easy one.",
+    "title.back": "Back",
+    "howto.title": "How to play",
+    "howto.1": "The Wi-Fi password is a riddle on a sticky note by the router. Each part points at one of Grandma's memories.",
+    "howto.2": "Tap a topic card, then “Tell me about it” or “When was that?”. Or type any question in your own words.",
+    "howto.3": "Names she mentions become new cards. Follow the trail: a year she won't say is hidden behind another memory.",
+    "howto.4": "Tap sparkling things in the room to look closer, and show them to Grandma. Her tea is her energy: every question costs some.",
+    "howto.5": "Type the parts into the router. You have three tries, and it tells you how many parts are right.",
+    "howto.keys": "Keyboard: 1–7 switch views · N note · Tab notebook · R router · Enter talk · Esc back · drag to look around.",
+    "cards.label": "Topic cards",
+    "cards.about": "Tell me about it",
+    "cards.when": "When was that?",
+    "cards.smudged": "It's smudged. Ask anyway?",
+    "cards.newBadge": "NEW",
+    "cards.new": "New topic cards: {labels}",
+    "views.label": "Views",
+    "views.grandma": "Grandma",
+    "views.table": "Coffee table",
+    "views.sideboard": "Sideboard",
+    "views.tv": "TV corner",
+    "views.hall": "Front hall",
+    "views.kitchen": "Kitchen",
+    "views.room": "Living room",
+    "buttons.note": "Note",
+    "buttons.notebook": "Notebook",
+    "buttons.router": "Router",
+    "tap.grandma": "Grandma · tap to talk",
+    "tap.clue": "{label} · tap to look closer",
+    "tap.note": "The sticky note · tap to read",
+    "tap.router": "The Wi-Fi router · tap to type the password",
+    "tap.cookie_jar": "{label} · tap to look closer",
+    "tap.glasses": "{label} · tap to look closer",
+    "tap.fixture": "The {label} · tap to look inside",
+    "hud.how": "Pick a topic card below, then ask. Tap sparkling things in the room to look closer.",
+    "ask.placeholderTyped": "…or ask in your own words",
+    "inspect.show": "Show Grandma",
+    "cookie.give": "Give Grandma the kolaczki",
+    "settings.quality": "Graphics",
+    "settings.quality.low": "Low (phones, older laptops)",
+    "settings.quality.medium": "Medium",
+    "settings.quality.high": "High (shadows from the lamp and the moon)",
+    "settings.qualityHint": "If the room feels slow, try Medium or Low. The picture also gets a little softer by itself when the frame rate drops.",
+    "settings.calmCamera": "Calm camera (no sway; views cut instead of gliding)",
+    "settings.qualityLowered": "The room was running slowly, so the graphics went down to {quality}. Change it in Settings.",
+    "note.smudged": "smudged",
+    "phone.call": "Call Uncle Michael ({n} left)",
+    "phone.none": "Michael won't pick up again",
+    "tap.phone": "{label} · tap to look closer",
+    "bark.phone.a": "Call your uncle! He never calls me.",
+    "bark.phone.b": "That phone has been in the family since Eisenhower."
   },
   "grandma": {
     "greeting": [
-      "Oh, sweetheart, you made it! Sit down, sit down. The Wi-Fi? Your uncle Michael set that up. He left a hint on the sticky note by the box in the kitchen.",
+      "Oh, sweetheart, you made it! Sit down, sit down. The Wi-Fi? Your uncle Michael set that up. He left a hint on the sticky note by the box in the front hall.",
       "There's my favorite grandchild. Don't tell your cousins. The internet thing again? Michael wrote something on a sticky note by the router."
     ],
     "password_deflect": [
@@ -290,6 +343,23 @@
     "cookie_full": [
       "Oh, not now, sweetheart, I’m still full of tea. Hang on to it for when I’m flagging.",
       "Save that for later, dear. Ask me when my cup’s running low."
+    ],
+    "no_year": [
+      "Oh, I couldn't put a year on that one, sweetheart.",
+      "A year? Heavens, I don't keep a calendar of everything.",
+      "That I couldn't tell you when. Ask me something else."
+    ],
+    "repeat": [
+      "I told you that one already, dear, but I don't mind."
+    ],
+    "smudged_card": [
+      "I can't read that part either, dear. It's all smudged. Where did I put my spare glasses?"
+    ],
+    "phone_lead": [
+      "You dial Uncle Michael. Ring… ring… “Yeah? Oh, the Wi-Fi. Huh. Okay, one hint, then I'm hanging up. Grandma always says:"
+    ],
+    "phone_none": [
+      "Ring… ring… ring… Michael's not answering. He never answers."
     ]
   },
   "mishears": [

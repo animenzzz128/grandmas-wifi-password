@@ -42,8 +42,15 @@ import {
   toPublicScene,
   toRunView,
   VoiceRequest,
+  discoverTopics,
+  noteText,
+  pickTopicFact,
+  topicById,
+  topicReadable,
+  worldTopics,
+  callMichael,
 } from "@gwp/engine";
-import type { AskResponse, GrandmaWorld, GuessResponse, ItemResponse, Recipe, RunState, TurnInput } from "@gwp/engine";
+import type { AskRequest as AskBody, AskResponse, GrandmaWorld, GuessResponse, ItemResponse, LookResponse, Recipe, RunState, TurnInput } from "@gwp/engine";
 import type { GameData } from "./data.ts";
 import type { GrandmaBrain } from "./grandma.ts";
 import type { RunStore } from "./store.ts";
@@ -248,6 +255,17 @@ export function createApp(deps: AppDeps) {
     }
   });
 
+  /** The sticky notes to choose from (title screen). Only what the player reads anyway: no answers. */
+  app.get("/api/notes", (c) => {
+    const world = data.worlds.get("rosie") ?? [...data.worlds.values()][0];
+    if (!world) throw new HttpError(404, "No Grandmas available.");
+    const order = { easy: 0, medium: 1, hard: 2, expert: 3 } as const;
+    const notes = [...world.recipes]
+      .sort((a, b) => order[a.difficulty] - order[b.difficulty])
+      .map((r) => ({ id: r.id, difficulty: r.difficulty, text: r.smudged_text ?? r.note_text }));
+    return c.json({ notes });
+  });
+
   app.get("/api/scenes/:id", (c) => {
     const scene = data.scenes.get(c.req.param("id"));
     if (!scene) throw new HttpError(404, "No such scene.");
@@ -334,7 +352,42 @@ export function createApp(deps: AppDeps) {
     return c.body(null, 204);
   });
 
-  async function talk(c: Context, runId: string, input: TurnInput, voice?: { confidence: number }): Promise<AskResponse> {
+  /**
+   * Cards a text brings up (topics.ts): added to the visit, marked new, and returned as labels for the toast.
+   */
+  function unlockTopics(run: RunState, world: GrandmaWorld, text: string): string[] {
+    const found = discoverTopics(world, text, run.topics ?? []);
+    if (!found.length) return [];
+    run.topics = [...(run.topics ?? []), ...found];
+    run.freshTopics = [...(run.freshTopics ?? []), ...found];
+    const labels = new Map(worldTopics(world).map((t) => [t.id, t.label]));
+    return found.map((id) => labels.get(id) ?? id);
+  }
+
+  /** Looking closely at an object: names on it become topic cards. Free, and logged once like other events. */
+  app.post("/api/runs/:id/look", async (c) => {
+    limitActions(clientIp(c));
+    const req = await body(c, EventRequest);
+    const { run, world, recipe } = loadRun(c.req.param("id"));
+    const scene = data.scenes.get(run.sceneId);
+    const obj = scene?.interactables.find((i) => i.id === req.objectId);
+    if (!obj) throw new HttpError(400, "There's nothing like that here.");
+    return oneAtATime(run.id, () => {
+      const newTopics = run.status === "playing" && obj.inspect_text ? unlockTopics(run, world, obj.inspect_text) : [];
+      const key = `inspect:${obj.id}`;
+      if (newTopics.length || !(run.events ?? []).includes(key)) {
+        if (!(run.events ?? []).includes(key)) {
+          run.events = [...(run.events ?? []), key];
+          store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "event", event: "inspect", objectId: obj.id, input: "", stamina: run.stamina, status: run.status, ...(run.daily ? { daily: run.daily } : {}) });
+        }
+        store.save(run);
+      }
+      const res: LookResponse = { newTopics, run: view(run, world, recipe) };
+      return c.json(res);
+    });
+  });
+
+  async function talk(c: Context, runId: string, input: TurnInput, voice?: { confidence: number }, card?: AskBody["topic"]): Promise<AskResponse> {
     limit(clientIp(c));
     const { run, world, recipe } = loadRun(runId);
     requirePlaying(run);
@@ -342,6 +395,25 @@ export function createApp(deps: AppDeps) {
 
     const playerText = playerTurnText(input);
     const cost = questionCost(world, input.kind === "ask" ? input.text : (input.text ?? input.object.label), run.lastFactIds);
+    /** A topic card's canned answer (smudged part, no date), instead of asking her brain. */
+    let cardLine: { reply: string; mood: AskResponse["mood"]; free?: boolean } | undefined;
+    if (card && input.kind === "ask") {
+      if (!(run.topics ?? []).includes(card.id)) throw new HttpError(400, "You haven't heard about that yet, dear.");
+      const topic = topicById(world, recipe, noteText(run, recipe).text, card.id);
+      if (!topic) throw new HttpError(400, "You haven't heard about that yet, dear.");
+      // A card follows up the last card: asking the same card again is cheaper, like any follow-up.
+      cost.followUp = card.id === run.lastTopic ? -RULES.followUpDiscount : 0;
+      cost.total = Math.max(1, cost.base + cost.long + cost.rude + cost.followUp);
+      if (!topicReadable(topic)) cardLine = { reply: lineFor(run, lines.smudged_card, "smudged"), mood: "confused", free: true };
+      else {
+        const picked = pickTopicFact(world, topic, card.mode, run.heard ?? [], run.heardWhen ?? []);
+        if (picked.kind === "no_year") {
+          cardLine = { reply: lineFor(run, lines.no_year, "noyear"), mood: "confused" };
+          Object.assign(cost, { base: RULES.noYearCost, followUp: 0, total: RULES.noYearCost });
+        } else if (picked.kind === "fact") input.focus = { factId: picked.factId, mode: card.mode, ...(picked.repeat ? { repeat: true } : {}) };
+      }
+      run.freshTopics = (run.freshTopics ?? []).filter((id) => id !== card.id);
+    }
 
     let reply: string;
     let mood: AskResponse["mood"];
@@ -371,7 +443,11 @@ export function createApp(deps: AppDeps) {
       const as = misheard.as;
       reply = fill(lineFor(run, lines.misheard, "mishear"), { as, As: as.charAt(0).toUpperCase() + as.slice(1) });
       mood = "confused";
-    } else if (asksForPassword(said)) {
+    } else if (cardLine) {
+      reply = cardLine.reply;
+      mood = cardLine.mood;
+      if (cardLine.free) free = true;
+    } else if (!card && asksForPassword(said)) {
       reply = lineFor(run, lines.password_deflect, "pw");
       mood = "suspicious";
     } else {
@@ -386,6 +462,8 @@ export function createApp(deps: AppDeps) {
       reply = result.output.reply;
       mood = result.output.mood;
       factIds = result.output.fact_ids_used;
+      // The mock says "I told you that one already" itself only through the prompt; say it here for both.
+      if (input.kind === "ask" && input.focus?.repeat && !result.fallback && brain.mode === "mock") reply = `${lineFor(run, lines.repeat, "repeat")} ${reply}`;
       meta = {
         latencyMs: result.latencyMs,
         attempts: result.attempts,
@@ -401,6 +479,9 @@ export function createApp(deps: AppDeps) {
       { role: "grandma", text: reply, factIds, mood },
     );
     if (factIds.length) run.lastFactIds = factIds;
+    run.heard = [...new Set([...(run.heard ?? []), ...factIds])];
+    if (input.kind === "ask" && input.focus?.mode === "when" && factIds.includes(input.focus.factId)) run.heardWhen = [...new Set([...(run.heardWhen ?? []), input.focus.factId])];
+    run.lastTopic = card?.id;
     // Her ears' (or her memory's) fault, not the player's: a misheard question or a fallback costs no tea.
     if (misheard) free = true;
     if (free) Object.assign(cost, { total: 0, base: 0, long: 0, rude: 0, followUp: 0 });
@@ -414,6 +495,8 @@ export function createApp(deps: AppDeps) {
     // Stuck for a few turns? Grandma brings up the first hop herself (not while she's dozing off).
     const nudge = !after && !free && run.status === "playing" ? stallNudge(run, world, recipe, factIds) : undefined;
     if (nudge) run.history.push({ role: "grandma", text: nudge, mood: "nostalgic" });
+    // Names she just said become topic cards.
+    const newTopics = unlockTopics(run, world, [reply, after ?? "", nudge ?? ""].join(" "));
     store.save(run);
     store.log({
       ts: new Date().toISOString(),
@@ -432,13 +515,13 @@ export function createApp(deps: AppDeps) {
       ...meta,
     });
     const costParts = { base: cost.base, long: cost.long, rude: cost.rude, followUp: cost.followUp };
-    return { reply, mood: napped ? "sleepy" : mood, cost: cost.total, costParts: free ? undefined : costParts, napped, after, nudge, misheard, run: view(run, world, recipe) };
+    return { reply, mood: napped ? "sleepy" : mood, cost: cost.total, costParts: free ? undefined : costParts, napped, after, nudge, misheard, ...(newTopics.length ? { newTopics } : {}), run: view(run, world, recipe) };
   }
 
   app.post("/api/runs/:id/ask", async (c) => {
     const req = await body(c, AskRequest);
     const id = c.req.param("id");
-    return c.json(await oneAtATime(id, () => talk(c, id, { kind: "ask", text: req.text }, req.voice)));
+    return c.json(await oneAtATime(id, () => talk(c, id, { kind: "ask", text: req.text }, req.topic ? undefined : req.voice, req.topic)));
   });
 
   app.post("/api/runs/:id/show", async (c) => {
@@ -463,6 +546,19 @@ export function createApp(deps: AppDeps) {
       requirePlaying(run);
       let line: string;
       let changed: boolean;
+      if (req.item === "phone") {
+        // Uncle Michael on the hall phone (from the Godot edition): one of the note's nudges, twice a visit, free.
+        // His words aren't Grandma's, so they stay out of her conversation history.
+        const call = callMichael(run, recipe);
+        if ("none" in call) {
+          return c.json({ line: lineFor(run, lines.phone_none, "phone"), who: "michael", run: view(run, world, recipe) } satisfies ItemResponse);
+        }
+        line = `${lineFor(run, lines.phone_lead, "phone")} ${call.hint}”`;
+        const newTopics = unlockTopics(run, world, call.hint);
+        store.save(run);
+        store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "item", input: "phone", reply: line, stamina: run.stamina, status: run.status, ...(run.daily ? { daily: run.daily } : {}) });
+        return c.json({ line, who: "michael", ...(newTopics.length ? { newTopics } : {}), run: view(run, world, recipe) } satisfies ItemResponse);
+      }
       if (req.item === "glasses") {
         const result = wearGlasses(run, recipe);
         changed = result === "on";

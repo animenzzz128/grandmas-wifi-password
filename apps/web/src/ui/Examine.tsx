@@ -11,6 +11,7 @@ import { Bounds, Center, Html, OrbitControls } from "@react-three/drei";
 import { useGame } from "../store.ts";
 import { t } from "../strings.ts";
 import { Art } from "../scene/Room.tsx";
+import { RoomNode } from "../scene/House.tsx";
 import { OpenAlbum } from "../scene/props.tsx";
 import { facingTurn, stepView, viewCount, viewer, viewsFor } from "../examine.ts";
 import type { PublicScene } from "@gwp/engine";
@@ -20,9 +21,12 @@ type Item = PublicScene["interactables"][number];
 function Subject({ item, view, turn }: { item: Item; view: number; turn: number }) {
   if (item.node === "PhotoAlbum") return <OpenAlbum spread={view} />;
   const detail = item.node === "WeddingPhoto" ? { flipped: view === 1 } : item.kind === "fixture" ? { open: true } : undefined;
+  // The room model's own object, except where the close-up shows more than the room does (the photo's back,
+  // the open fridge).
+  const own = item.model && !detail;
   return (
     <group rotation={[0, turn, 0]}>
-      <Art item={item} detail={detail} />
+      {own ? <RoomNode name={item.model!} /> : <Art item={item} detail={detail} />}
     </group>
   );
 }
@@ -66,13 +70,11 @@ function Stage({ item, view }: { item: Item; view: number }) {
 export function ExamineCard({ objectId }: { objectId: string }) {
   const scene = useGame((s) => s.scene);
   const run = useGame((s) => s.run)!;
-  const carrying = useGame((s) => s.carrying);
-  const { take, openPanel, setOpened } = useGame();
+  const { openPanel, setOpened, showObject, offerCookie, callMichael } = useGame();
+  const busy = useGame((s) => s.busy);
   const [view, setView] = useState(0);
   const it = scene?.interactables.find((i) => i.id === objectId);
   if (!it) return null;
-  const holdingThis = carrying?.kind === "clue" && carrying.objectId === it.id;
-  const holdingCookie = carrying?.kind === "cookie";
   const views = viewsFor(it.node);
   const n = viewCount(it.node);
 
@@ -112,9 +114,13 @@ export function ExamineCard({ objectId }: { objectId: string }) {
             <button disabled={run.glasses || !run.note.smudged} onClick={() => void useGame.getState().putOnGlasses()}>
               {run.glasses ? t("glasses.wearing") : run.note.smudged ? t("glasses.putOn") : t("glasses.notNeeded")}
             </button>
+          ) : it.kind === "phone" ? (
+            <button disabled={busy || run.callsLeft <= 0 || run.status !== "playing"} onClick={() => void callMichael()}>
+              {run.callsLeft > 0 ? t("phone.call", { n: run.callsLeft }) : t("phone.none")}
+            </button>
           ) : it.kind === "cookie_jar" ? (
-            <button disabled={run.cookies <= 0 || holdingCookie} onClick={() => take({ kind: "cookie" })}>
-              {run.cookies <= 0 ? t("cookie.none") : holdingCookie ? t("cookie.holding") : t("cookie.take")}
+            <button disabled={run.cookies <= 0 || busy} onClick={() => void offerCookie()}>
+              {run.cookies <= 0 ? t("cookie.none") : t("cookie.give")}
             </button>
           ) : it.kind === "fixture" ? (
             <button
@@ -126,8 +132,8 @@ export function ExamineCard({ objectId }: { objectId: string }) {
               {t("fixture.close", { label: it.label })}
             </button>
           ) : (
-            <button disabled={holdingThis} onClick={() => take({ kind: "clue", objectId: it.id })}>
-              {holdingThis ? t("inspect.holding") : t("inspect.take")}
+            <button disabled={busy || run.status !== "playing"} onClick={() => void showObject(it.id)}>
+              {t("inspect.show")}
             </button>
           )}
           <button className="ghost" onClick={() => openPanel(null)}>

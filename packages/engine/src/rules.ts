@@ -13,10 +13,14 @@ export const RULES = {
   longPenalty: 4,
   rudePenalty: 6,
   followUpDiscount: 3,
+  /** "When was that?" about a topic with no date: she says so, and it costs less than a question. */
+  noYearCost: 4,
   napRefill: 50,
   maxNaps: 3, // the third nap ends the run
   attempts: 3,
   cookies: 1,
+  /** Calls to Uncle Michael on the hall phone: each passes on one of the note's nudges (from the Godot edition). */
+  phoneCalls: 2,
   cookieStamina: 25,
   /** She turns the cookie down (the player keeps it) while her tea is at or above this. */
   cookieRefuseAt: 80,

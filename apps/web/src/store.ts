@@ -9,7 +9,9 @@ import { hasString, t } from "./strings.ts";
 import { addPin, costWhy, extractNotes } from "./notebook.ts";
 import { useSettings } from "./settings.ts";
 import { firstTime, markVisited } from "./firsts.ts";
-import { fridgeDoor } from "./audio.ts";
+import { cardFlick, fridgeDoor } from "./audio.ts";
+import type { AskResponse, NoteChoice } from "@gwp/engine";
+import { topicQuestion } from "@gwp/engine";
 
 export type Panel = { type: "inspect"; objectId: string } | { type: "note" } | { type: "router" } | { type: "notebook" } | { type: "settings" } | null;
 
@@ -19,7 +21,7 @@ export type Carrying = { kind: "clue"; objectId: string } | { kind: "cookie" } |
 export interface LogLine {
   /** Increasing id (survives trimming the log), so the scene can tell a new line from an old one. */
   seq?: number;
-  who: "grandma" | "player" | "system";
+  who: "grandma" | "player" | "system" | "michael";
   text: string;
   mood?: string;
   cost?: number;
@@ -79,9 +81,33 @@ interface GameState {
   listening: boolean;
   /** Bumped by the V key to start listening (the chat box owns the microphone). */
   voiceTick: number;
+  /** The camera view: a view id from the scene ("grandma", "table", …) or "focus:<object id>". */
+  view: string;
+  /** The sticky notes to choose from on the title screen (null until loaded). */
+  notes: NoteChoice[] | null;
+  /** The topic card picked in the card strip (its two ask buttons show). */
+  pickedTopic: string | null;
+  /** The card of the last question (asking it again is a cheaper follow-up), as the server counts it. */
+  lastTopic: string | null;
 
   init(): Promise<void>;
   start(difficulty: "easy" | "medium" | "hard"): Promise<void>;
+  /** Visit with one chosen sticky note. */
+  startNote(recipeId: string): Promise<void>;
+  /** Move the camera to a view. */
+  goView(view: string): void;
+  /** The player tapped an object in the room. */
+  tapObject(id: string): void;
+  /** Show a clue to Grandma straight from its close-up card. */
+  showObject(id: string): Promise<void>;
+  /** Give Grandma the kolaczki from the plate. */
+  offerCookie(): Promise<void>;
+  /** Ring Uncle Michael on the hall phone for a hint (twice a visit). */
+  callMichael(): Promise<void>;
+  /** Pick a topic card (or put it down with null). */
+  pickTopic(id: string | null): void;
+  /** Ask about a topic card. */
+  askTopic(id: string, mode: "about" | "when"): Promise<boolean>;
   /** From the result card: a new visit at the same difficulty, with a different puzzle (design plan D4). */
   another(): Promise<void>;
   /** Visit today's Daily Grandma. */
@@ -89,7 +115,7 @@ interface GameState {
   /** Fetch today's Daily Grandma again (after a visit, or when the day rolls over). */
   refreshDaily(): void;
   /** Ask Grandma; resolves false if the question didn't reach her (so the box can keep it). */
-  ask(text: string, voice?: { confidence: number }): Promise<boolean>;
+  ask(text: string, voice?: { confidence: number }, topic?: { id: string; mode: "about" | "when" }): Promise<boolean>;
   /** Show the carried clue to Grandma (must be near her). */
   showCarried(): Promise<void>;
   /** Give the carried cookie to Grandma (must be near her). */
@@ -164,11 +190,27 @@ export const useGame = create<GameState>((set, get) => {
     });
   };
 
+  /** A new topic card turned up: say so, with a flick of paper. */
+  const newCards = (labels: string[]) => {
+    push({ who: "system", text: t("cards.new", { labels: labels.join(", ") }) });
+    cardFlick();
+  };
+
+  /** Everything a reply from Grandma does to the log and the state. */
+  const afterReply = (res: AskResponse) => {
+    push({ who: "grandma", text: res.reply, mood: res.mood, cost: res.cost, costWhy: costWhy(res.costParts) });
+    if (res.after) push({ who: "grandma", text: res.after, mood: "sleepy" });
+    if (res.nudge) push({ who: "grandma", text: res.nudge, mood: "nostalgic" });
+    learn(res.reply, "grandma");
+    if (res.newTopics?.length) newCards(res.newTopics);
+    set({ run: res.run });
+  };
+
   /** Enter a freshly created visit. */
   const enter = async (run: RunView) => {
     const scene = get().scene?.id === run.sceneId ? get().scene : await api.scene(run.sceneId);
     barked.clear();
-    set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy", seq: ++seq }], panel: null, noteSeen: false, carrying: null, talking: false, inspected: [], opened: [], notebook: [], pins: [], hint: null, mishear: null });
+    set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy", seq: ++seq }], panel: null, noteSeen: false, carrying: null, talking: false, inspected: [], opened: [], notebook: [], pins: [], hint: null, mishear: null, view: "grandma", pickedTopic: null });
   };
 
   return {
@@ -187,8 +229,8 @@ export const useGame = create<GameState>((set, get) => {
     chatFocusTick: 0,
     talking: false,
     carrying: null,
-    nearGrandma: false,
-    inEarshot: false,
+    nearGrandma: true,
+    inEarshot: true,
     hint: null,
     mishear: null,
     controlsLearned: false,
@@ -198,8 +240,21 @@ export const useGame = create<GameState>((set, get) => {
     grandmaSpeaking: false,
     listening: false,
     voiceTick: 0,
+    view: "grandma",
+    notes: null,
+    pickedTopic: null,
+    lastTopic: null,
 
     async init() {
+      void api.notes().then(
+        (r) => set({ notes: r.notes }),
+        () => set({ notes: [] }),
+      );
+      // The room shows behind the title screen, so fetch it now.
+      void api.scene("rosie-living-room").then(
+        (scene) => set((s) => (s.scene ? {} : { scene })),
+        () => undefined,
+      );
       // The daily is optional: the title screen just hides it if this fails.
       void api.daily().then(
         (daily) => set({ daily, dailyAt: Date.now() }),
@@ -217,6 +272,83 @@ export const useGame = create<GameState>((set, get) => {
       await act(async () => enter(await api.createRun(difficulty, useSettings.getState().relaxed)));
     },
 
+    async startNote(recipeId) {
+      markVisited();
+      await act(async () => enter(await api.createRunFor(recipeId, useSettings.getState().relaxed)));
+    },
+
+    goView(view) {
+      if (get().view !== view) set({ view });
+    },
+
+    tapObject(id) {
+      const g = get();
+      const it = g.scene?.interactables.find((i) => i.id === id);
+      if (!it || g.run?.status !== "playing") return;
+      if (it.kind === "grandma") {
+        set({ view: "grandma" });
+        return g.focusChat();
+      }
+      if (it.view) set({ view: it.view });
+      if (it.kind === "note") return g.openPanel({ type: "note" });
+      if (it.kind === "router") return g.openPanel({ type: "router" });
+      if (it.kind === "fixture") g.setOpened(it.id, true);
+      g.openPanel({ type: "inspect", objectId: it.id });
+    },
+
+    async showObject(id) {
+      const { run } = get();
+      const obj = get().scene?.interactables.find((i) => i.id === id);
+      if (!run || !obj) return;
+      if (get().busy) return get().showHint(t("talk.wait"));
+      set({ panel: null, view: "grandma" });
+      push({ who: "player", text: `[shows the ${obj.label}]` });
+      set({ lastTopic: null });
+      const res = await act(() => api.show(run.runId, obj.id));
+      if (!res) {
+        push({ who: "system", text: t("error.showFailed", { item: obj.label }) });
+        return;
+      }
+      afterReply(res);
+    },
+
+    async offerCookie() {
+      const run = get().run;
+      if (!run) return;
+      if (get().busy) return get().showHint(t("talk.wait"));
+      set({ panel: null, view: "grandma" });
+      const res = await act(() => api.cookie(run.runId));
+      if (!res) {
+        push({ who: "system", text: t("error.showFailed", { item: t("cookie.label") }) });
+        return;
+      }
+      push({ who: "grandma", text: res.line, mood: "happy" });
+      set({ run: res.run });
+    },
+
+    async callMichael() {
+      const run = get().run;
+      if (!run) return;
+      const res = await act(() => api.phone(run.runId));
+      if (!res) return;
+      push({ who: "michael", text: res.line });
+      if (res.newTopics?.length) newCards(res.newTopics);
+      set({ run: res.run, panel: null });
+    },
+
+    pickTopic(id) {
+      set({ pickedTopic: id });
+    },
+
+    async askTopic(id, mode) {
+      const run = get().run;
+      const card = run?.topics.find((c) => c.id === id);
+      if (!run || !card) return false;
+      const ok = await get().ask(topicQuestion(card.label, mode, card.kind), undefined, { id, mode });
+      if (ok) set({ pickedTopic: null });
+      return ok;
+    },
+
     async another() {
       const run = get().run;
       if (!run) return;
@@ -229,27 +361,23 @@ export const useGame = create<GameState>((set, get) => {
       await act(async () => enter(await api.createDaily(useSettings.getState().relaxed)));
     },
 
-    async ask(text, voice) {
+    async ask(text, voice, topic) {
       const run = get().run;
       if (!run || !text.trim() || get().busy) return false;
-      if (!get().inEarshot) {
-        get().showHint(t("talk.tooFar"));
-        return false;
-      }
+      // She should be in view while she answers (floor: the protagonist is visible while you talk).
+      set({ view: "grandma" });
       push({ who: "player", text });
-      const res = await act(() => api.ask(run.runId, text, voice));
+      const res = await act(() => api.ask(run.runId, text, voice, topic));
       if (!res) {
         push({ who: "system", text: t("error.askFailed") });
         return false;
       }
+      set({ lastTopic: topic?.id ?? null });
       if (res.misheard) {
         push({ who: "system", text: t("mishear.line", { heard: res.misheard.heard }) });
         set({ mishear: { as: res.misheard.as, at: Date.now() } });
       }
-      push({ who: "grandma", text: res.reply, mood: res.mood, cost: res.cost, costWhy: costWhy(res.costParts) });
-      if (res.after) push({ who: "grandma", text: res.after, mood: "sleepy" });
-      if (res.nudge) push({ who: "grandma", text: res.nudge, mood: "nostalgic" });
-      learn(res.reply, "grandma");
+      afterReply(res);
       // Her tea dips under 30: she says she's flagging, so tiredness shows before the first nap (plan C1).
       if (run.stamina > 30 && res.run.stamina <= 30 && res.run.status === "playing" && !res.napped) push({ who: "grandma", text: t("bark.yawn"), mood: "sleepy" });
       set({ run: res.run });
@@ -270,6 +398,7 @@ export const useGame = create<GameState>((set, get) => {
       // She's still answering: keep the clue in hand rather than losing it to a skipped request.
       if (get().busy) return get().showHint(t("talk.wait"));
       push({ who: "player", text: `[shows the ${obj.label}]` });
+      set({ lastTopic: null });
       set({ panel: null, carrying: null });
       const res = await act(() => api.show(run.runId, obj.id));
       if (!res) {
@@ -351,7 +480,17 @@ export const useGame = create<GameState>((set, get) => {
     openPanel(panel) {
       const run0 = get().run;
       if (run0 && panel && (panel.type === "note" || panel.type === "notebook")) api.event(run0.runId, panel.type);
-      if (run0 && panel?.type === "inspect") api.event(run0.runId, "inspect", panel.objectId);
+      if (run0 && panel?.type === "inspect" && run0.status === "playing") {
+        // Looking closely can bring up topic cards (names on a photo); the server says which.
+        void api.look(run0.runId, panel.objectId).then(
+          (r) => {
+            if (get().run?.runId !== r.run.runId) return;
+            set({ run: r.run });
+            if (r.newTopics.length) newCards(r.newTopics);
+          },
+          () => undefined,
+        );
+      }
       set({ panel, noteSeen: get().noteSeen || panel?.type === "note" });
       if (panel?.type === "inspect") {
         const obj = get().scene?.interactables.find((i) => i.id === panel.objectId);
@@ -395,8 +534,11 @@ export const useGame = create<GameState>((set, get) => {
         set({ panel: null });
         return true;
       }
-      if (talking && document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
+      // Leave the text box: by what has focus, not only the talking flag (focus events can be missed).
+      const el = document.activeElement;
+      if ((talking || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && el instanceof HTMLElement && el !== document.body) {
+        el.blur();
+        set({ talking: false });
         return true;
       }
       return false;

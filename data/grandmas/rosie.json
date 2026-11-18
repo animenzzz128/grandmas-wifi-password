@@ -785,6 +785,14 @@
       "nudges": [
         "You know, I keep meaning to put names under those dog pictures in my album. It's on the coffee table, dear.",
         "Did I ever show you my wedding picture on the sideboard? Turn it over sometime."
+      ],
+      "note_facts": [
+        [
+          "f_dog1_habit"
+        ],
+        [
+          "f_wedding"
+        ]
       ]
     },
     {
@@ -830,6 +838,14 @@
       "nudges": [
         "That moon-landing plate by the TV, your grandpa bought it the same summer as the TV itself. Have a look.",
         "We've lived in a couple of places, you know. Ask me about the homes we had."
+      ],
+      "note_facts": [
+        [
+          "f_tv"
+        ],
+        [
+          "f_house_number"
+        ]
       ]
     },
     {
@@ -873,7 +889,15 @@
         "Michael's old sled is still by the door. That boy and that sled, I tell you.",
         "Ask me what your grandpa calls me, dear. He's had a pet name for me since the day we met."
       ],
-      "smudged_text": "the bird Grandpa named me after + year of the big █████████ + !"
+      "smudged_text": "the bird Grandpa named me after + year of the big █████████ + !",
+      "note_facts": [
+        [
+          "f_nickname"
+        ],
+        [
+          "f_snowstorm"
+        ]
+      ]
     },
     {
       "id": "r_easy_2",
@@ -914,6 +938,14 @@
       "nudges": [
         "Your grandpa got soaked on our honeymoon, did I ever tell you? That wedding picture brings it all back.",
         "Your mom was my very first baby, you know. Ask me when she came along, sweetheart."
+      ],
+      "note_facts": [
+        [
+          "f_honeymoon"
+        ],
+        [
+          "f_linda_born"
+        ]
       ]
     },
     {
@@ -955,6 +987,14 @@
       "nudges": [
         "Did you see the spaniel in my album? Oh, she was my favorite. Ask me her name.",
         "That blue ribbon on the wall is my proudest moment, sweetheart. Ask me about it."
+      ],
+      "note_facts": [
+        [
+          "f_dog2"
+        ],
+        [
+          "f_pie"
+        ]
       ]
     },
     {
@@ -1000,6 +1040,14 @@
       "nudges": [
         "That bowling trophy is from the Tuesday league. I haven't missed a Tuesday in forty years.",
         "Two of my best days were at the county fair, you know. Ask me about the fair, sweetheart."
+      ],
+      "note_facts": [
+        [
+          "f_bowling"
+        ],
+        [
+          "f_met_walt"
+        ]
       ]
     },
     {
@@ -1040,6 +1088,14 @@
       "nudges": [
         "We got our first color TV just for the moon landing. Our dog loved lying in front of it.",
         "Our first little apartment had stairs that squeaked something awful. Ask me about it."
+      ],
+      "note_facts": [
+        [
+          "f_moon"
+        ],
+        [
+          "f_apt"
+        ]
       ]
     },
     {
@@ -1078,7 +1134,437 @@
       "nudges": [
         "Biscuit came home when I was just a little girl, you know. Ask me how old I was.",
         "I'm an Erie girl, born and raised. Ask me when I was born, sweetheart."
+      ],
+      "note_facts": [
+        [
+          "f_dog1_habit"
+        ],
+        [
+          "f_dog1"
+        ]
       ]
     }
+  ],
+  "topics": [
+    {
+      "id": "grandma",
+      "label": "You, Grandma",
+      "kind": "person",
+      "facts": [
+        "f_birth",
+        "f_polish",
+        "f_sister",
+        "f_job1",
+        "f_job2",
+        "f_garden",
+        "f_cookie",
+        "f_bowling"
+      ]
+    },
+    {
+      "id": "walt",
+      "label": "Grandpa Walt",
+      "kind": "person",
+      "match": [
+        "Walt",
+        "your grandpa",
+        "Grandpa"
+      ],
+      "facts": [
+        "f_met_walt",
+        "f_nickname",
+        "f_engaged",
+        "f_car",
+        "f_walt_hobby",
+        "f_stan"
+      ]
+    },
+    {
+      "id": "linda",
+      "label": "Mom (Linda)",
+      "kind": "person",
+      "match": [
+        "Linda",
+        "your mom"
+      ],
+      "facts": [
+        "f_linda_born"
+      ]
+    },
+    {
+      "id": "michael",
+      "label": "Uncle Michael",
+      "kind": "person",
+      "match": [
+        "Michael",
+        "Mikey"
+      ],
+      "facts": [
+        "f_michael_born",
+        "f_michael_arm",
+        "f_router"
+      ]
+    },
+    {
+      "id": "dot",
+      "label": "Great-aunt Dot",
+      "kind": "person",
+      "match": [
+        "Dot",
+        "Dorothy"
+      ],
+      "facts": [
+        "f_sister",
+        "f_dot_married"
+      ]
+    },
+    {
+      "id": "stan",
+      "label": "Uncle Stan",
+      "kind": "person",
+      "match": [
+        "Stan"
+      ],
+      "facts": [
+        "f_stan",
+        "f_stan_cabin",
+        "f_snowstorm"
+      ]
+    },
+    {
+      "id": "marge",
+      "label": "Marge Novak",
+      "kind": "person",
+      "match": [
+        "Marge"
+      ],
+      "facts": [
+        "f_marge",
+        "f_bowling"
+      ]
+    },
+    {
+      "id": "pets",
+      "label": "Your pets",
+      "kind": "pet",
+      "facts": [
+        "f_dog2",
+        "f_dog1",
+        "f_cat"
+      ]
+    },
+    {
+      "id": "biscuit",
+      "label": "Biscuit",
+      "kind": "pet",
+      "match": [
+        "Biscuit"
+      ],
+      "facts": [
+        "f_dog1",
+        "f_dog1_habit",
+        "f_dog1_breed"
+      ]
+    },
+    {
+      "id": "buttons",
+      "label": "Buttons",
+      "kind": "pet",
+      "match": [
+        "Buttons"
+      ],
+      "facts": [
+        "f_dog2"
+      ]
+    },
+    {
+      "id": "pickles",
+      "label": "Pickles the cat",
+      "kind": "pet",
+      "match": [
+        "Pickles"
+      ],
+      "facts": [
+        "f_cat"
+      ]
+    },
+    {
+      "id": "homes",
+      "label": "Your homes",
+      "kind": "place",
+      "facts": [
+        "f_house",
+        "f_apt"
+      ]
+    },
+    {
+      "id": "cherry_st",
+      "label": "Cherry Street",
+      "kind": "place",
+      "match": [
+        "Cherry Street",
+        "Cherry St"
+      ],
+      "facts": [
+        "f_apt",
+        "f_apt_number",
+        "f_linda_born"
+      ]
+    },
+    {
+      "id": "maple_ave",
+      "label": "Maple Avenue",
+      "kind": "place",
+      "match": [
+        "Maple Avenue"
+      ],
+      "facts": [
+        "f_house",
+        "f_house_number",
+        "f_michael_born"
+      ]
+    },
+    {
+      "id": "erie",
+      "label": "Erie",
+      "kind": "place",
+      "match": [
+        "Erie"
+      ],
+      "facts": [
+        "f_birth",
+        "f_walt_hobby"
+      ]
+    },
+    {
+      "id": "niagara",
+      "label": "Niagara Falls",
+      "kind": "place",
+      "match": [
+        "Niagara"
+      ],
+      "facts": [
+        "f_honeymoon"
+      ]
+    },
+    {
+      "id": "cabin",
+      "label": "Stan's fishing cabin",
+      "kind": "place",
+      "match": [
+        "fishing cabin",
+        "outhouse",
+        "Presque Isle"
+      ],
+      "facts": [
+        "f_stan_cabin",
+        "f_snowstorm"
+      ]
+    },
+    {
+      "id": "fair",
+      "label": "The county fair",
+      "kind": "event",
+      "match": [
+        "county fair",
+        "the fair"
+      ],
+      "facts": [
+        "f_met_walt",
+        "f_pie"
+      ]
+    },
+    {
+      "id": "wedding",
+      "label": "The wedding",
+      "kind": "event",
+      "match": [
+        "married",
+        "wedding",
+        "said 'I do'"
+      ],
+      "facts": [
+        "f_wedding",
+        "f_song",
+        "f_honeymoon"
+      ]
+    },
+    {
+      "id": "proposal",
+      "label": "Walt's proposal",
+      "kind": "event",
+      "match": [
+        "proposed",
+        "proposal",
+        "pierogi"
+      ],
+      "facts": [
+        "f_engaged"
+      ]
+    },
+    {
+      "id": "snowstorm",
+      "label": "The big snowstorm",
+      "kind": "event",
+      "match": [
+        "snowstorm"
+      ],
+      "facts": [
+        "f_snowstorm"
+      ]
+    },
+    {
+      "id": "moon",
+      "label": "The moon landing",
+      "kind": "event",
+      "match": [
+        "moon landing",
+        "on the moon"
+      ],
+      "facts": [
+        "f_moon",
+        "f_tv"
+      ]
+    },
+    {
+      "id": "tv",
+      "label": "The color TV",
+      "kind": "thing",
+      "match": [
+        "color TV"
+      ],
+      "facts": [
+        "f_tv",
+        "f_moon"
+      ]
+    },
+    {
+      "id": "sled",
+      "label": "Michael's sled",
+      "kind": "thing",
+      "match": [
+        "sled"
+      ],
+      "facts": [
+        "f_michael_arm",
+        "f_snowstorm"
+      ]
+    },
+    {
+      "id": "switchboard",
+      "label": "The switchboard job",
+      "kind": "event",
+      "match": [
+        "switchboard",
+        "telephone exchange"
+      ],
+      "facts": [
+        "f_job1",
+        "f_marge"
+      ]
+    },
+    {
+      "id": "lincoln",
+      "label": "Lincoln Elementary",
+      "kind": "place",
+      "match": [
+        "Lincoln Elementary",
+        "cafeteria"
+      ],
+      "facts": [
+        "f_job2",
+        "f_pie"
+      ]
+    },
+    {
+      "id": "bowling",
+      "label": "Tuesday bowling",
+      "kind": "event",
+      "match": [
+        "bowling",
+        "bowl"
+      ],
+      "facts": [
+        "f_bowling",
+        "f_bowling_score",
+        "f_marge"
+      ]
+    },
+    {
+      "id": "pie",
+      "label": "The blue ribbon",
+      "kind": "thing",
+      "match": [
+        "blue ribbon",
+        "cherry pie"
+      ],
+      "facts": [
+        "f_pie"
+      ]
+    },
+    {
+      "id": "car",
+      "label": "The Bel Air",
+      "kind": "thing",
+      "match": [
+        "Bel Air",
+        "Chevy"
+      ],
+      "facts": [
+        "f_car"
+      ]
+    },
+    {
+      "id": "song",
+      "label": "\"Moon River\"",
+      "kind": "thing",
+      "match": [
+        "Moon River"
+      ],
+      "facts": [
+        "f_song"
+      ]
+    },
+    {
+      "id": "sparrow",
+      "label": "Grandpa's pet name",
+      "kind": "thing",
+      "match": [
+        "pet name",
+        "calls me",
+        "songbird"
+      ],
+      "facts": [
+        "f_nickname"
+      ]
+    },
+    {
+      "id": "kolaczki",
+      "label": "Kolaczki",
+      "kind": "thing",
+      "match": [
+        "kolaczki"
+      ],
+      "facts": [
+        "f_cookie"
+      ]
+    },
+    {
+      "id": "wifi",
+      "label": "The Wi-Fi",
+      "kind": "thing",
+      "facts": [
+        "f_router"
+      ]
+    }
+  ],
+  "start_topics": [
+    "grandma",
+    "walt",
+    "linda",
+    "michael",
+    "pets",
+    "homes",
+    "wifi"
   ]
 }

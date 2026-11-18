@@ -1,16 +1,17 @@
 /** HTML overlay on top of the 3D canvas. Text comes from data/i18n via t(). */
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useProgress } from "@react-three/drei";
 import { useGame } from "../store.ts";
 import { api } from "../api.ts";
-import type { Carrying } from "../store.ts";
 import { t } from "../strings.ts";
 import { babble, chime, snore, startClock, startMusic, stopClock, stopMusic, toggleMute } from "../audio.ts";
 import { canListen, listen, speak, stopSpeaking } from "../voice.ts";
 import { useSettings } from "../settings.ts";
-import { suggestions } from "../suggest.ts";
 import { SettingsCard } from "./Settings.tsx";
+import { CardStrip } from "./Cards.tsx";
+import { Smudged } from "./Smudged.tsx";
+import { HoverLabel, KeyboardControls, TopButtons, ViewTabs } from "./Controls.tsx";
+import { saveNoteStars } from "../noteStars.ts";
 import { ExamineCard } from "./Examine.tsx";
 import { saveDailyRecord } from "../daily.ts";
 import { revealPlan, typedLength } from "../typeout.ts";
@@ -21,7 +22,10 @@ function Teacup() {
   return (
     <div className="hud-panel stats">
       <div className="tea">
-        <span>☕ {t("hud.tea")}</span>
+        <span className="cup" aria-hidden="true">
+          <span className="cup-fill" style={{ height: `${pct}%` }} />
+        </span>
+        <span>{t("hud.tea")}</span>
         <div className="tea-bar">
           <div className="tea-fill" style={{ width: `${pct}%` }} />
         </div>
@@ -50,7 +54,7 @@ function PinnedNote() {
   if (!seen) return null;
   return (
     <div className="sticky pinned">
-      <div>{run.note.text}</div>
+      <div><Smudged text={run.note.text} /></div>
       <small>
         {run.note.rules.join(" · ")} · {t("note.length", { n: run.passwordLength })}
       </small>
@@ -58,56 +62,12 @@ function PinnedNote() {
   );
 }
 
-/** The label of whatever the player is carrying, if anything. */
-function useCarriedLabel(): string | null {
-  const carrying = useGame((s) => s.carrying);
-  const scene = useGame((s) => s.scene);
-  if (!carrying) return null;
-  if (carrying.kind === "cookie") return t("carry.cookieLabel");
-  return scene?.interactables.find((i) => i.id === carrying.objectId)?.label ?? null;
-}
-
-/** What pressing E on the focused object will do, in words. */
-function promptFor(kind: string, label: string, carrying: Carrying, carriedLabel: string | null, near: boolean): string {
-  if (kind === "grandma" && carrying && carriedLabel) {
-    if (!near) return t("prompt.grandmaCloser", { label: carriedLabel });
-    return carrying.kind === "cookie" ? t("prompt.grandmaCookie") : t("prompt.grandmaShow", { label: carriedLabel });
-  }
-  return t(`prompt.${kind}`, { label });
-}
-
-function Crosshair() {
-  const locked = useGame((s) => s.locked);
-  const focusId = useGame((s) => s.focusId);
-  const scene = useGame((s) => s.scene);
-  const panel = useGame((s) => s.panel);
-  const talking = useGame((s) => s.talking);
-  const carrying = useGame((s) => s.carrying);
-  const near = useGame((s) => s.nearGrandma);
-  const learned = useGame((s) => s.controlsLearned);
-  const carriedLabel = useCarriedLabel();
-  const finished = useGame((s) => s.run?.status !== "playing");
-  const cookiesLeft = useGame((s) => s.run?.cookies ?? 0);
-  const opened = useGame((s) => s.opened);
-  const it = scene?.interactables.find((i) => i.id === focusId);
-  const kind = !it ? "" : it.kind === "cookie_jar" && cookiesLeft <= 0 ? "cookie_jar_empty" : it.kind === "fixture" && !opened.includes(it.id) ? "fixture_open" : it.kind;
-  if (panel || talking || finished) return null;
-  return (
-    <>
-      <div className={`crosshair ${it ? "on" : ""}`} />
-      {it && <div className="prompt">{promptFor(kind, it.label, carrying, carriedLabel, near)}</div>}
-      {!locked &&
-        (learned ? (
-          <div className="look-hint">{t("clickToLook")}</div>
-        ) : (
-          <div className="look-hint">
-            {t("clickToLook")}
-            <br />
-            <small>{t("controls.basic")}</small>
-          </div>
-        ))}
-    </>
-  );
+/** One line under the view tabs saying how to play, until the player has asked and looked at something. */
+function HowLine() {
+  const asked = useGame((s) => (s.run?.questionCount ?? 0) > 0);
+  const looked = useGame((s) => s.inspected.length > 0);
+  if (asked && looked) return null;
+  return <div className="how-line">{t("hud.how")}</div>;
 }
 
 /** First-visit objectives, ticked off as the player does them (onboarding by doing). */
@@ -144,7 +104,7 @@ function NotebookCard() {
   return (
     <div className="card notebook-card">
       <h3 id="panel-title">{t("notebook.title")}</h3>
-      <p className="riddle">{run.note.text}</p>
+      <p className="riddle"><Smudged text={run.note.text} /></p>
       {pins.length > 0 && (
         <div className="group pins">
           <h4>{t("notebook.pinned")}</h4>
@@ -289,18 +249,6 @@ function AudioDirector() {
   return null;
 }
 
-/** A short message that fades after a few seconds. */
-/** While furniture and Grandma are still downloading, say so (placeholder boxes stand in meanwhile). */
-function LoadingPill() {
-  const { active, progress } = useProgress();
-  if (!active) return null;
-  return (
-    <div className="loading-pill" role="status">
-      {t("loading.room", { pct: Math.round(progress) })}
-    </div>
-  );
-}
-
 /** Voice mode: what Grandma misheard, big, for a moment (game design §8.3: "Pass the SWORD?!"). */
 function MishearBanner() {
   const mishear = useGame((s) => s.mishear);
@@ -356,13 +304,6 @@ function HintToast() {
   return visible && hint ? <div className="hint-toast">{hint.text}</div> : null;
 }
 
-/** "Carrying: the old sled · E on Grandma to show her · Q to put it back" */
-function CarryHint() {
-  const carrying = useGame((s) => s.carrying);
-  const label = useCarriedLabel();
-  if (!carrying || !label) return null;
-  return <div className="carry">{carrying.kind === "cookie" ? t("carry.cookie") : t("carry.clue", { label })}</div>;
-}
 
 /** F3: frames per second and worst frame time, measured in the browser (for diagnosing "laggy" reports). */
 function FpsMeter() {
@@ -477,7 +418,7 @@ function ChatLog() {
     <div className="chat-log" aria-label={t("a11y.chat")} ref={ref} onMouseUp={onSelect} onKeyUp={onSelect} onClick={() => plan.includes("typing") && showAll()} title={plan.includes("typing") ? t("chat.skipTyping") : undefined}>
       {log.map((l, i) => plan[i] === "hidden" ? null : (
         <div key={i} className={`line ${l.who}`}>
-          {l.who === "grandma" ? "👵 " : l.who === "player" ? "🧑 " : ""}
+          {l.who === "grandma" ? "👵 " : l.who === "player" ? "🧑 " : l.who === "michael" ? "📞 " : ""}
           {plan[i] === "typing" ? <TypingText text={l.text} onGrow={toBottom} onDone={() => setRevealed((r) => Math.max(r, l.seq ?? 0))} /> : l.text}
           {l.cost ? <span className="cost">{t("ask.cost", { cost: l.cost })}{l.costWhy ? ` (${l.costWhy})` : ""}</span> : null}
           {l.who === "grandma" && (
@@ -500,27 +441,6 @@ function ChatLog() {
   );
 }
 
-/** Suggested questions for the ask box (plan A2): the note's parts, the object just looked at, a follow-up. */
-function useSuggestions(): string[] {
-  const run = useGame((s) => s.run);
-  const log = useGame((s) => s.log);
-  const inspected = useGame((s) => s.inspected);
-  const scene = useGame((s) => s.scene);
-  if (!run) return [];
-  const lastId = inspected.at(-1);
-  const lastObject = lastId ? scene?.interactables.find((i) => i.id === lastId)?.label : undefined;
-  return suggestions({
-    note: run.note.text,
-    asked: log.filter((l) => l.who === "player").map((l) => l.text),
-    lastObject,
-    answered: run.questionCount > 0,
-    words: {
-      remember: (part) => t("suggest.remember", { part }),
-      object: (label) => t("suggest.object", { label }),
-      followUp: t("suggest.followUp"),
-    },
-  });
-}
 
 function AskBar() {
   const [text, setText] = useState("");
@@ -530,13 +450,11 @@ function AskBar() {
   const talking = useGame((s) => s.talking);
   const setTalking = useGame((s) => s.setTalking);
   const playing = useGame((s) => s.run?.status === "playing");
-  const inEarshot = useGame((s) => s.inEarshot);
   const listening = useGame((s) => s.listening);
   const voiceTick = useGame((s) => s.voiceTick);
   const input = useRef<HTMLInputElement>(null);
   /** Ask by voice: interim words fill the box; the final words are sent. */
   const startListening = () => {
-    if (!useGame.getState().inEarshot) return useGame.getState().showHint(t("talk.tooFar"));
     listen({
       onInterim: (words) => setText(words),
       onFinal: (words, confidence) => {
@@ -564,8 +482,6 @@ function AskBar() {
     }
   }, [tick]);
   useEffect(() => () => setTalking(false), [setTalking]);
-  const chips = useSuggestions();
-  const showChips = playing && !busy && !listening && !text && (inEarshot || talking) && chips.length > 0;
   const submit = async () => {
     const q = text.trim();
     if (!q || useGame.getState().busy) return; // live state: two quick Enters in one tick send once
@@ -586,10 +502,13 @@ function AskBar() {
         value={text}
         maxLength={280}
         aria-label={t("ask.label")}
-        disabled={!playing || (!inEarshot && !talking)}
-        placeholder={listening ? t("ask.listening") : inEarshot || talking ? t("ask.placeholder") : t("ask.placeholderFar")}
+        disabled={!playing}
+        placeholder={listening ? t("ask.listening") : t("ask.placeholderTyped")}
         onChange={(e) => setText(e.target.value)}
-        onFocus={() => setTalking(true)}
+        onFocus={() => {
+          setTalking(true);
+          useGame.getState().goView("grandma");
+        }}
         onBlur={() => setTalking(false)}
       />
       {canListen() && (
@@ -598,26 +517,6 @@ function AskBar() {
         </button>
       )}
       <button disabled={busy || !text.trim() || !playing}>{t("ask.send")}</button>
-      {talking && <div className="talk-mode">{t("talk.mode")}</div>}
-      {showChips && (
-        <div className="chips" aria-label={t("suggest.label")}>
-          {chips.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className="chip"
-              // Keep the box focused: a chip only fills it, the player still sends.
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                setText(c);
-                input.current?.focus();
-              }}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
     </form>
   );
 }
@@ -629,7 +528,7 @@ function NoteCard() {
     <div className="card note-card">
       <h3 id="panel-title">{t("note.title")}</h3>
       <div className="sticky big">
-        <div>{run.note.text}</div>
+        <div><Smudged text={run.note.text} /></div>
         <small>
           {run.note.rules.join(" · ")} · {t("note.length", { n: run.passwordLength })}
         </small>
@@ -712,6 +611,9 @@ function ResultCard() {
   const [firstDaily, setFirstDaily] = useState<boolean | null>(null);
   const finished = Boolean(r);
   useEffect(() => {
+    if (run.noteId && run.result?.solved) saveNoteStars(run.noteId, run.result.stars);
+  }, [run.runId, finished]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
     if (!run.daily || !run.result) return;
     const res = run.result;
     const saved = saveDailyRecord({ number: run.daily, solved: res.solved, stars: res.stars, questions: res.questions });
@@ -732,7 +634,7 @@ function ResultCard() {
   };
   if (!r) return null;
   const title = r.solved ? t("result.solved") : run.status === "bedtime" ? t("result.bedtime") : t("result.failed");
-  const stars = "⭐".repeat(r.stars) || "—";
+  const stars = "★".repeat(r.stars) + "☆".repeat(3 - r.stars);
   const card = t("result.card", {
     name: run.daily ? t("daily.cardName", { n: run.daily }) : (run.grandma.nickname ?? run.grandma.name),
     difficulty: t(`difficulty.${run.difficulty}`),
@@ -789,15 +691,20 @@ export function Hud() {
         <Objectives />
         <ModeBadge />
       </div>
+      <div className="top-center">
+        <ViewTabs />
+        <HowLine />
+      </div>
       <div className="top-right">
+        <TopButtons />
         <PinnedNote />
       </div>
-      <Crosshair />
-      <CarryHint />
+      <HoverLabel />
+      <KeyboardControls />
       <HintToast />
       <Announcer />
       <MishearBanner />
-      <LoadingPill />
+
       <AudioDirector />
       <FpsMeter />
       {panel && (
@@ -811,8 +718,11 @@ export function Hud() {
       )}
       <div className={`bottom ${talking ? "side" : ""}`}>
         {error && <div className="error" role="alert">{error}</div>}
-        <ChatLog />
-        <AskBar />
+        <CardStrip />
+        <div className="dialog">
+          <ChatLog />
+          <AskBar />
+        </div>
       </div>
       <Ambience />
       <Confetti />

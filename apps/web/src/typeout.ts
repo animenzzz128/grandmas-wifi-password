@@ -7,7 +7,7 @@
 export type Reveal = "full" | "typing" | "hidden";
 
 interface Line {
-  who: "grandma" | "player" | "system";
+  who: "grandma" | "player" | "system" | "michael";
   seq?: number;
 }
 

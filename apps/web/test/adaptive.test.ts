@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ADAPT, adapt } from "../src/scene/adaptive.ts";
+import { ADAPT, adapt, qualityStep } from "../src/scene/adaptive.ts";
 
 describe("adaptive resolution (iteration 48)", () => {
   it("steps down after one slow window, to a floor", () => {
@@ -31,5 +31,20 @@ describe("adaptive resolution (iteration 48)", () => {
     let s = { scale: ADAPT.min, goodStreak: 0 };
     for (let i = 0; i < 15; i++) s = adapt(s, 120, 0.6);
     expect(s.scale).toBe(0.6);
+  });
+
+  it("takes bigger steps on a high-density screen (iteration 54)", () => {
+    expect(adapt({ scale: 2, goodStreak: 0 }, 20, 2).scale).toBe(1.76);
+    expect(adapt({ scale: 0.6, goodStreak: 0 }, 20, 0.6).scale).toBe(0.55);
+  });
+});
+
+describe("automatic quality (iteration 54)", () => {
+  it("steps quality down after two slow windows in a row, not one", () => {
+    let s = qualityStep(0, 20);
+    expect(s).toEqual({ slowStreak: 1, down: false });
+    s = qualityStep(s.slowStreak, 50);
+    expect(s).toEqual({ slowStreak: 0, down: false });
+    expect(qualityStep(qualityStep(0, 20).slowStreak, 25).down).toBe(true);
   });
 });

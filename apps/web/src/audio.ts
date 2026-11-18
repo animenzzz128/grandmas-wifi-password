@@ -177,6 +177,22 @@ export function stopClock() {
   clockTimer = null;
 }
 
+/** A soft air movement when the camera moves to another view (the Godot edition's "whoosh"). */
+export function whoosh() {
+  const c = audio();
+  if (!c) return;
+  hiss(c, c.currentTime + 0.01, { type: "bandpass", freq: 900, q: 0.8 }, [0.35, 0.1, 0.5], 0.012);
+}
+
+/** A card turns up: a light paper flick. */
+export function cardFlick() {
+  const c = audio();
+  if (!c) return;
+  const t = c.currentTime + 0.01;
+  hiss(c, t, { type: "highpass", freq: 3000 }, [0.005, 0.02, 0.06], 0.03);
+  tone(c, t + 0.02, 1320, 0.08, 0.02, "sine", 1760);
+}
+
 /** The fridge door: the seal unsticking and the hum (open), or a soft thump (shut). */
 export function fridgeDoor(open: boolean) {
   const c = audio();
