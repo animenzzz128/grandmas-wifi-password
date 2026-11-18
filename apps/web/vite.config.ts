@@ -10,7 +10,8 @@ const apiPort = (existsSync(rootEnv) ? parseEnv(readFileSync(rootEnv, "utf8")).A
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    // 5173 unless PORT says otherwise (the preview tool picks a free one when 5173 is taken).
+    port: Number(process.env.PORT) || 5173,
     strictPort: true,
     // The API server owns all game state; in dev, Vite forwards /api to it.
     proxy: { "/api": `http://localhost:${apiPort}` },

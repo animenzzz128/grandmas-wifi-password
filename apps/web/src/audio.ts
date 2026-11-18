@@ -5,12 +5,13 @@
  * - chime(): small UI cues (notebook entry, router success/failure).
  * - snore(): one soft snore while she dozes (GDD §8.3).
  * - clock: a quiet ticking clock for the room (GDD §8.2 ambience); a setting turns it off.
- * - music: a short original parlor-piano loop for the room, written note by note below (plan C4).
+ * - music: "Rosie's Waltz", an original minute-long loop for the room, written note by note in music.ts.
  * Three channels (effects, voice, music) with their own volume in Settings (Game Accessibility Guidelines).
  * Everything also has an on-screen equivalent (text), so muting (M) loses no information.
  */
 import { storage } from "./storage.ts";
 import { useSettings } from "./settings.ts";
+import { BAR, musicBus, playBar } from "./music.ts";
 
 const MUTE_KEY = "gwp-muted";
 let ctx: AudioContext | null = null;
@@ -43,6 +44,22 @@ function channel(c: AudioContext, ch: Channel): AudioNode {
 useSettings.subscribe(() => {
   for (const ch of ["sfx", "voice", "music"] as const) channels[ch]?.gain.setTargetAtTime(level(ch), ctx?.currentTime ?? 0, 0.05);
 });
+
+/**
+ * Plays recorded speech (Grandma's ElevenLabs voice) on the voice channel, so its volume setting applies.
+ * Resolves when it ends or is stopped; returns a stop function right away. Null if sound is off.
+ */
+export async function playVoiceClip(mp3: ArrayBuffer): Promise<{ stop(): void; ended: Promise<void> } | null> {
+  const c = audio();
+  if (!c) return null;
+  const buffer = await c.decodeAudioData(mp3);
+  const src = c.createBufferSource();
+  src.buffer = buffer;
+  src.connect(channel(c, "voice"));
+  const ended = new Promise<void>((resolve) => (src.onended = () => resolve()));
+  src.start();
+  return { stop: () => src.stop(), ended };
+}
 
 export function isMuted(): boolean {
   return muted;
@@ -159,6 +176,60 @@ export function startClock() {
 export function stopClock() {
   if (clockTimer) clearInterval(clockTimer);
   clockTimer = null;
+  stopWind();
+}
+
+/**
+ * Wind past the snowy window (iteration 56, review F13): low filtered noise whose level and colour drift
+ * slowly, very quiet, under the clock. Part of "room sound", like the clock.
+ */
+let wind: { src: AudioBufferSourceNode; lfo: OscillatorNode } | null = null;
+export function startWind() {
+  const c = audio();
+  if (!c || wind) return;
+  const src = c.createBufferSource();
+  src.buffer = noiseBuffer(c);
+  src.loop = true;
+  const f = c.createBiquadFilter();
+  f.type = "bandpass";
+  f.frequency.value = 380;
+  f.Q.value = 0.7;
+  const g = c.createGain();
+  g.gain.value = 0.012;
+  // A gust every ~9 seconds: the LFO swells the level and opens the filter a little.
+  const lfo = c.createOscillator();
+  lfo.frequency.value = 0.11;
+  const depth = c.createGain();
+  depth.gain.value = 0.008;
+  const sweep = c.createGain();
+  sweep.gain.value = 160;
+  lfo.connect(depth).connect(g.gain);
+  lfo.connect(sweep).connect(f.frequency);
+  src.connect(f).connect(g).connect(channel(c, "sfx"));
+  src.start();
+  lfo.start();
+  wind = { src, lfo };
+}
+export function stopWind() {
+  wind?.src.stop();
+  wind?.lfo.stop();
+  wind = null;
+}
+
+/** A soft air movement when the camera moves to another view (the Godot edition's "whoosh"). */
+export function whoosh() {
+  const c = audio();
+  if (!c) return;
+  hiss(c, c.currentTime + 0.01, { type: "bandpass", freq: 900, q: 0.8 }, [0.35, 0.1, 0.5], 0.012);
+}
+
+/** A card turns up: a light paper flick. */
+export function cardFlick() {
+  const c = audio();
+  if (!c) return;
+  const t = c.currentTime + 0.01;
+  hiss(c, t, { type: "highpass", freq: 3000 }, [0.005, 0.02, 0.06], 0.03);
+  tone(c, t + 0.02, 1320, 0.08, 0.02, "sine", 1760);
 }
 
 /** The fridge door: the seal unsticking and the hum (open), or a soft thump (shut). */
@@ -193,62 +264,62 @@ export function chime(kind: "note" | "pin" | "success" | "fail") {
   }
 }
 
-// ---- Music: "Kolaczki Rag", an original 8-bar parlor-piano loop (plan C4) ----------------------------------
-// Oom-pah left hand (bass on 1 and 3, chord on 2 and 4) under a music-box melody, swung, about 92 BPM.
-// Every other time round the melody thins out, so the loop doesn't wear thin. MIDI note numbers.
-const BEAT = 60 / 92;
-const PROGRESSION: { bass: number; chord: number[] }[] = [
-  { bass: 48, chord: [60, 64, 67] }, // C
-  { bass: 45, chord: [61, 64, 67] }, // A7
-  { bass: 50, chord: [62, 65, 69] }, // Dm
-  { bass: 43, chord: [59, 62, 65] }, // G7
-  { bass: 48, chord: [60, 64, 67] }, // C
-  { bass: 40, chord: [59, 62, 68] }, // E7
-  { bass: 41, chord: [60, 65, 69] }, // F
-  { bass: 43, chord: [59, 62, 65] }, // G7
-];
-const MELODY: (number | null)[][] = [
-  [72, 76, 79, 76, 74, 72, null, 67],
-  [73, 76, 79, 81, 79, 76, 73, null],
-  [74, 77, 81, 77, 76, 74, null, 69],
-  [71, 74, 77, 74, 71, 67, null, null],
-  [72, 76, 79, 84, 83, 79, 76, null],
-  [80, 83, 76, 80, 83, 80, 76, null],
-  [77, 81, 84, 81, 79, 77, 76, 74],
-  [74, 77, 71, 74, 72, null, null, null],
-];
-const hz = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
-
-/** When each eighth note of a bar sounds, with a gentle swing (long-short). */
-export function eighthOffsets(beat = BEAT, swing = 0.62): number[] {
-  return Array.from({ length: 8 }, (_, i) => Math.floor(i / 2) * beat + (i % 2 ? swing * beat : 0));
-}
-
+// ---- Music: "Rosie's Waltz" (iteration 56; the score and synths are in music.ts) -------------------------
 let musicTimer: ReturnType<typeof setInterval> | null = null;
+let bus: { ctx: AudioContext; node: AudioNode; duck: GainNode } | null = null;
+let ducked = false;
+/** Music steps back (about −6 dB) while Grandma speaks, so her words stay clear (iteration 56, review F13). */
+export function duckMusic(on: boolean) {
+  ducked = on;
+  if (bus) bus.duck.gain.setTargetAtTime(on ? 0.5 : 1, bus.ctx.currentTime, on ? 0.08 : 0.4);
+}
 export function startMusic() {
   if (musicTimer) return;
   let bar = 0;
   let barStart = 0;
-  const offsets = eighthOffsets();
   musicTimer = setInterval(() => {
     const c = audio();
     if (!c) return;
-    if (barStart < c.currentTime) barStart = c.currentTime + 0.1;
-    while (barStart < c.currentTime + 0.5) {
-      const { bass, chord } = PROGRESSION[bar % 8]!;
-      const sparse = Math.floor(bar / 8) % 2 === 1;
-      tone(c, barStart, hz(bass), BEAT * 0.9, 0.05, "triangle", undefined, "music");
-      tone(c, barStart + 2 * BEAT, hz(bass + 7), BEAT * 0.9, 0.04, "triangle", undefined, "music");
-      for (const beat of [1, 3]) for (const n of chord) tone(c, barStart + beat * BEAT, hz(n), BEAT * 0.5, 0.012, "triangle", undefined, "music");
-      MELODY[bar % 8]!.forEach((n, i) => {
-        if (n === null || (sparse && i % 3 === 2)) return;
-        tone(c, barStart + offsets[i]!, hz(n), 0.32, 0.03, "sine", undefined, "music");
-      });
-      barStart += 4 * BEAT;
+    if (bus?.ctx !== c) {
+      const duck = c.createGain();
+      duck.gain.value = ducked ? 0.5 : 1;
+      duck.connect(channel(c, "music"));
+      bus = { ctx: c, node: musicBus(c, duck), duck };
+    }
+    // A fresh start (or after the tab slept): begin a little ahead, from the top of the loop.
+    if (barStart < c.currentTime) {
+      barStart = c.currentTime + 0.15;
+      bar = 0;
+    }
+    while (barStart < c.currentTime + 0.8) {
+      playBar(c, bus.node, bar, barStart);
+      barStart += BAR;
       bar++;
     }
-  }, 200);
+  }, 250);
 }
+
+/** Dev only: render `seconds` of the music offline and return it as a WAV file (to listen without playing). */
+export async function renderMusicWav(seconds = 60, rate = 44100): Promise<ArrayBuffer> {
+  const c = new OfflineAudioContext(2, Math.ceil(rate * seconds), rate);
+  const out = musicBus(c, c.destination);
+  for (let n = 0, at = 0.05; at < seconds; n++, at += BAR) playBar(c, out, n, at);
+  const buf = await c.startRendering();
+  return wav(buf);
+}
+
+function wav(buf: AudioBuffer): ArrayBuffer {
+  const ch = buf.numberOfChannels, len = buf.length, out = new DataView(new ArrayBuffer(44 + len * ch * 2));
+  const str = (o: number, s: string) => [...s].forEach((x, i) => out.setUint8(o + i, x.charCodeAt(0)));
+  str(0, "RIFF"); out.setUint32(4, 36 + len * ch * 2, true); str(8, "WAVEfmt "); out.setUint32(16, 16, true);
+  out.setUint16(20, 1, true); out.setUint16(22, ch, true); out.setUint32(24, buf.sampleRate, true);
+  out.setUint32(28, buf.sampleRate * ch * 2, true); out.setUint16(32, ch * 2, true); out.setUint16(34, 16, true);
+  str(36, "data"); out.setUint32(40, len * ch * 2, true);
+  const data = Array.from({ length: ch }, (_, i) => buf.getChannelData(i));
+  for (let i = 0, o = 44; i < len; i++) for (let j = 0; j < ch; j++, o += 2) out.setInt16(o, Math.max(-1, Math.min(1, data[j]![i]!)) * 0x7fff, true);
+  return out.buffer;
+}
+if (import.meta.env?.DEV && typeof window !== "undefined") Object.assign(window, { __renderMusicWav: renderMusicWav });
 
 export function stopMusic() {
   if (musicTimer) clearInterval(musicTimer);

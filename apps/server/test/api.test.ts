@@ -140,7 +140,8 @@ describe("API", () => {
 
   it("plays a full easy run: ask, show, cookie, wrong guess, right guess", async () => {
     const app = newApp();
-    const created = await post(app, "/api/runs", { difficulty: "easy" });
+    // The sock-thief note by id: "easy" alone picks one of three Easy notes at random (that made this test flaky).
+    const created = await post(app, "/api/runs", { recipeId: "r_easy" });
     neverLeaks(created.text);
     const run = RunView.parse(JSON.parse(created.text));
     expect(run.passwordLength).toBe(11);
@@ -156,7 +157,13 @@ describe("API", () => {
 
     const show = await post(app, `/api/runs/${run.runId}/show`, { objectId: "wedding_photo" });
     neverLeaks(show.text);
-    expect(AskResponse.parse(JSON.parse(show.text)).reply.length).toBeGreaterThan(10);
+    const shown = AskResponse.parse(JSON.parse(show.text));
+    expect(shown.reply.length).toBeGreaterThan(10);
+    // She turns the cookie down while her tea is high; some replies cost less than others (iteration 56), so
+    // make sure she's thirsty enough instead of counting on the exact costs.
+    for (let tea = shown.run.stamina; tea >= 80; ) {
+      tea = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, { text: "Tell me about the county fair" })).text)).run.stamina;
+    }
 
     const cookie = ItemResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/item`, { item: "cookie" })).text));
     expect(cookie.run.cookies).toBe(0);

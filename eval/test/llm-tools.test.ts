@@ -7,7 +7,7 @@ import { REPO_ROOT } from "../../apps/server/src/config.ts";
 import { loadGameData } from "../../apps/server/src/data.ts";
 import { MockBrain } from "../../apps/server/src/grandma.ts";
 import { RunStore } from "../../apps/server/src/store.ts";
-import type { ParseClient } from "../src/llm.ts";
+import { MODELS, type ParseClient } from "../src/llm.ts";
 import { cohensKappa, judgeOne, judgePrompt, sampleForLabels } from "../src/judge.ts";
 import { playOnce, stateForPlayer, summarizePlays } from "../src/player.ts";
 import { dedupe, generateCategory, similarity } from "../src/qgen.ts";
@@ -39,11 +39,12 @@ const record = (over: Partial<TurnRecord> = {}): TurnRecord => ({
 
 describe("LLM judge", () => {
   it("sends the full memory list and the cited memories, with a structured format", async () => {
-    const client = fakeClient([{ contradictions: [], invented: [], safety: "ok", verdict: "consistent" }]);
+    const client = fakeClient([{ contradictions: [], misleading: [], colour: [], safety: "ok", charm: 4, verdict: "consistent" }]);
     const { judgment, usage } = await judgeOne(client, world, record());
     expect(judgment?.verdict).toBe("consistent");
     expect(usage).toEqual({ input: 100, output: 20 });
-    expect(client.calls[0]!.model).toBe("claude-opus-5-5");
+    // The judge comes from JUDGE_MODEL in .env when set (iteration 62), so compare with whatever is configured.
+    expect(client.calls[0]!.model).toBe(MODELS.judge);
     expect(client.calls[0]!.hasFormat).toBe(true);
     const prompt = judgePrompt(world, record());
     expect(prompt).toContain("f_wedding (1961)");

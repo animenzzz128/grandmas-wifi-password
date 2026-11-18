@@ -8,6 +8,8 @@ import type { GrandmaWorld, Recipe } from "./world.ts";
 import type { RunState } from "./run.ts";
 import { RULES } from "./rules.ts";
 import { noteText, stars } from "./run.ts";
+import { noteParts, noteTopics, topicReadable, worldTopics } from "./topics.ts";
+import { factById, slotParts } from "./world.ts";
 
 export const MoodSchema = z.enum(["happy", "nostalgic", "teasing", "confused", "sleepy", "suspicious", "worried"]);
 
@@ -34,6 +36,8 @@ export const CreateRunRequest = z.strictObject({
 
 export const AskRequest = z.strictObject({
   text: z.string().trim().min(1).max(RULES.maxQuestionChars),
+  /** Asked with a topic card (topics.ts): the card's id and which button. The card picks the memory. */
+  topic: z.strictObject({ id: z.string().max(64), mode: z.enum(["about", "when"]) }).optional(),
   /** Present when the question was spoken: the speech recognizer's confidence (0 = it didn't say). */
   voice: z.strictObject({ confidence: z.number().min(0).max(1) }).optional(),
 });
@@ -44,7 +48,7 @@ export const ShowRequest = z.strictObject({
 });
 
 export const ItemRequest = z.strictObject({
-  item: z.enum(["cookie", "glasses"]),
+  item: z.enum(["cookie", "glasses", "phone"]),
 });
 
 /** Either the whole password, or one entry per slot of the note (preferred: the game assembles it). */
@@ -67,6 +71,19 @@ export const RunResult = z.strictObject({
    * failing on purpose with three free guesses would give away today’s answer (security review E).
    */
   password: z.string().optional(),
+  /** With the password: how each part follows from the clues (iteration 56, review F10). */
+  explain: z.array(z.string()).optional(),
+});
+
+/** A topic card as the player sees it. */
+export const TopicView = z.strictObject({
+  id: z.string(),
+  label: z.string(),
+  kind: z.enum(["note", "person", "pet", "place", "event", "thing"]),
+  /** Appeared since the player last asked about it. */
+  fresh: z.boolean(),
+  /** False for a note part that is still smudged. */
+  readable: z.boolean(),
 });
 
 export const RunView = z.strictObject({
@@ -89,14 +106,39 @@ export const RunView = z.strictObject({
   attemptsLeft: z.number().int(),
   maxAttempts: z.number().int(),
   cookies: z.number().int(),
+  /** Calls to Uncle Michael left this visit. */
+  callsLeft: z.number().int(),
   questionCount: z.number().int(),
   status: z.enum(["playing", "solved", "failed", "bedtime"]),
   greeting: z.string(),
   relaxed: z.boolean(),
   /** Daily Grandma number, when this visit is the daily puzzle. */
   daily: z.number().int().optional(),
+  /** The topic cards the player has, note parts first. */
+  topics: z.array(TopicView),
+  /** Which sticky note this is (the title screen keeps the best stars per note). */
+  noteId: z.string().optional(),
   result: RunResult.optional(),
 });
+
+/** One sticky note to choose from on the title screen (no answers: the note is what the player reads anyway). */
+export const NoteChoice = z.strictObject({
+  id: z.string(),
+  difficulty: Difficulty,
+  /** As the player first sees it (smudged parts show as █). */
+  text: z.string(),
+});
+export const NotesResponse = z.strictObject({ notes: z.array(NoteChoice) });
+
+/** A visit still in progress, to pick it up again after a reload (iteration 56): the run and what was said. */
+export const ResumeResponse = z.strictObject({
+  run: RunView,
+  history: z.array(z.strictObject({ role: z.enum(["player", "grandma"]), text: z.string(), mood: z.string().optional() })),
+});
+export type ResumeResponse = z.infer<typeof ResumeResponse>;
+
+/** Looking at an object can bring up new topic cards (names on a photo, a label). */
+export const LookResponse = z.strictObject({ newTopics: z.array(z.string()), run: RunView });
 
 /** Today's Daily Grandma, without spoiling the note. */
 export const DailyInfo = z.strictObject({
@@ -133,10 +175,19 @@ export const AskResponse = z.strictObject({
   nudge: z.string().optional(),
   /** Voice mode: she misheard a word and answered the misheard question (this turn was free). */
   misheard: z.strictObject({ heard: z.string(), said: z.string(), as: z.string() }).optional(),
+  /** Labels of topic cards this reply brought up. */
+  newTopics: z.array(z.string()).optional(),
   run: RunView,
 });
 
-export const ItemResponse = z.strictObject({ line: z.string(), run: RunView });
+export const ItemResponse = z.strictObject({
+  line: z.string(),
+  /** Who said the line: Grandma, or Uncle Michael on the phone. */
+  who: z.enum(["grandma", "michael"]).optional(),
+  /** Labels of topic cards the line brought up. */
+  newTopics: z.array(z.string()).optional(),
+  run: RunView,
+});
 export const GuessResponse = z.strictObject({
   correct: z.boolean(),
   line: z.string(),
@@ -152,6 +203,17 @@ export const HealthResponse = z.strictObject({
   model: z.string().optional(),
   /** Why the real Grandma is offline right now: today's budget is spent, or an operator switched her off. */
   degraded: z.enum(["budget", "kill"]).optional(),
+  /** Grandma's spoken voice: ElevenLabs through the server, or the player's browser voice. */
+  voice: z.enum(["elevenlabs", "browser"]).optional(),
+});
+
+/**
+ * Ask the server to say lines aloud. Each line must be one Grandma said in this visit (or one of her canned
+ * reactions), so the voice can't be used to read out anything else.
+ */
+export const VoiceRequest = z.strictObject({
+  lines: z.array(z.string().min(1).max(1200)).min(1).max(6),
+  mood: z.string().max(20).optional(),
 });
 export const ErrorResponse = z.strictObject({ error: z.string() });
 
@@ -167,7 +229,11 @@ export type AskResponse = z.infer<typeof AskResponse>;
 export type ItemResponse = z.infer<typeof ItemResponse>;
 export type GuessResponse = z.infer<typeof GuessResponse>;
 export type HealthResponse = z.infer<typeof HealthResponse>;
+export type VoiceRequest = z.infer<typeof VoiceRequest>;
 export type DailyInfo = z.infer<typeof DailyInfo>;
+export type TopicView = z.infer<typeof TopicView>;
+export type NoteChoice = z.infer<typeof NoteChoice>;
+export type LookResponse = z.infer<typeof LookResponse>;
 
 export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe, opts: { hidePassword?: boolean } = {}): RunView {
   const ended = state.status !== "playing";
@@ -192,11 +258,14 @@ export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe, 
     attemptsLeft: state.attemptsLeft,
     maxAttempts: RULES.attempts,
     cookies: state.cookies,
+    callsLeft: Math.max(0, RULES.phoneCalls - (state.calls ?? 0)),
     questionCount: state.questionCount,
     status: state.status,
     greeting,
     relaxed: Boolean(state.relaxed),
     ...(state.daily ? { daily: state.daily } : {}),
+    topics: topicViews(state, world, recipe),
+    noteId: recipe.id,
     result: ended
       ? {
           solved: state.status === "solved",
@@ -205,8 +274,35 @@ export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe, 
           naps: state.naps,
           cookiesUsed: state.cookiesUsed,
           par: recipe.par ?? RULES.defaultPar[recipe.difficulty],
-          ...(opts.hidePassword ? {} : { password: recipe.password }),
+          ...(opts.hidePassword ? {} : { password: recipe.password, explain: explainParts(world, recipe) }),
         }
       : undefined,
   };
+}
+
+/**
+ * After the visit: each note line, its answer, and the memories that lead there for the hidden years
+ * ("year of the big snowstorm → 1977: the winter Michael broke his arm sledding…").
+ */
+export function explainParts(world: GrandmaWorld, recipe: Recipe): string[] {
+  const lines = noteParts(recipe.note_text);
+  const answers = slotParts(world, recipe);
+  return recipe.slots.map((slot, i) => {
+    const head = `${lines[i] ?? `part ${i + 1}`} → ${answers[i]}`;
+    const anchor = slot.requires_anchor ? (world.anchors ?? []).find((a) => a.id === slot.requires_anchor) : undefined;
+    if (!anchor) return head;
+    const via = (anchor.via_fact_ids ?? []).map((id) => factById(world, id)?.text).filter(Boolean);
+    return `${head}: ${anchor.phrase}${via.length ? `. ${via.join(" ")}` : ""}`;
+  });
+}
+
+/** The player's cards, note parts first, labelled as they can read them now. */
+export function topicViews(state: RunState, world: GrandmaWorld, recipe: Recipe): TopicView[] {
+  const shown = noteText(state, recipe).text;
+  const defs = new Map([...noteTopics(recipe, shown), ...worldTopics(world)].map((t) => [t.id, t]));
+  const fresh = new Set(state.freshTopics ?? []);
+  return (state.topics ?? [])
+    .map((id) => defs.get(id))
+    .filter((t): t is NonNullable<typeof t> => Boolean(t))
+    .map((t) => ({ id: t.id, label: t.label, kind: t.kind, fresh: fresh.has(t.id), readable: topicReadable(t) }));
 }

@@ -5,6 +5,7 @@
 import type { Difficulty, GrandmaWorld, Recipe } from "./world.ts";
 import { RULES } from "./rules.ts";
 import { progressFacts, slotAnswers } from "./world.ts";
+import { startingTopics } from "./topics.ts";
 
 export type RunStatus = "playing" | "solved" | "failed" | "bedtime";
 
@@ -50,6 +51,22 @@ export interface RunState {
   freeFallbacks?: number;
   /** Play events already logged for this visit ("inspect:sled"), so each is logged once (design plan E3). */
   events?: string[];
+  /** Topic cards the player has, in the order they appeared (topics.ts). */
+  topics?: string[];
+  /** Cards that appeared and haven't been asked about yet (shown as NEW). */
+  freshTopics?: string[];
+  /** Every memory Grandma has told this visit (cards tell the next untold one). */
+  heard?: string[];
+  /** Memories she has given a date for through "When was that?". */
+  heardWhen?: string[];
+  /** The card of the last question, if it was asked with a card (asking about it again is a follow-up). */
+  lastTopic?: string;
+  /** How many lines each canned bank has used this visit (they go round in order; iteration 56). */
+  lineTurns?: Record<string, number>;
+  /** Cards her last reply mentioned: asking one next is a follow-up (iteration 56, review 2 F8). */
+  lastMentioned?: string[];
+  /** Calls made to Uncle Michael this visit. */
+  calls?: number;
   status: RunStatus;
   createdAt: string;
   endedAt?: string;
@@ -83,6 +100,10 @@ export function createRunState(args: {
     status: "playing",
     relaxed: args.relaxed || undefined,
     daily: args.daily,
+    topics: startingTopics(args.world, args.recipe),
+    freshTopics: [],
+    heard: [],
+    heardWhen: [],
     createdAt: (args.now ?? new Date()).toISOString(),
   };
 }
@@ -199,6 +220,20 @@ export function stallNudge(state: RunState, world: GrandmaWorld, recipe: Recipe,
   state.nudges = (state.nudges ?? 0) + 1;
   state.stall = 0;
   return line;
+}
+
+/**
+ * Ring Uncle Michael (the hall phone, from the Godot edition). He passes on the next of the note's nudges, the
+ * same lines Grandma says when the player is stuck (they share a counter, so no hint comes twice). Free, but only
+ * RULES.phoneCalls times a visit, and not once the hints run out.
+ */
+export function callMichael(state: RunState, recipe: Recipe): { hint: string } | { none: true } {
+  const lines = recipe.nudges ?? [];
+  const given = state.nudges ?? 0;
+  if ((state.calls ?? 0) >= RULES.phoneCalls || given >= lines.length) return { none: true };
+  state.calls = (state.calls ?? 0) + 1;
+  state.nudges = given + 1;
+  return { hint: lines[given]! };
 }
 
 export function checkGuess(state: RunState, recipe: Recipe, guess: string, now = new Date()): boolean {

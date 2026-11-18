@@ -16,7 +16,18 @@ export interface ShownObject {
   factIds: string[];
 }
 
-export type TurnInput = { kind: "ask"; text: string } | { kind: "show"; object: ShownObject; text?: string };
+/**
+ * A question asked with a topic card: the game has already picked the memory (topics.ts), so the reply tells
+ * that one. "when" asks for its date (or its time phrase when the note hides the year); `repeat` means she
+ * told it before.
+ */
+export interface Focus {
+  factId: string;
+  mode: "about" | "when";
+  repeat?: boolean;
+}
+
+export type TurnInput = { kind: "ask"; text: string; focus?: Focus } | { kind: "show"; object: ShownObject; text?: string };
 
 /**
  * What the player typed, with square brackets turned into round ones. Brackets in a message are the game's
@@ -49,7 +60,10 @@ Personality: ${dial(p.personality.talkativeness)} talkative, ${dial(p.personalit
 Verbal tics you use now and then (not every reply): ${p.verbal_tics.map((t) => `"${t}"`).join(", ")}.
 
 How you talk:
-- Everything you say about your life must come from the MEMORIES below. Never invent names, places, years, numbers or events. If a question isn't covered by your memories, say you don't recall and drift to a memory you do have.
+- The facts of your life come from the MEMORIES and FAVORITE STORIES below. If a question isn't covered by them, say you don't recall and drift to a memory you do have.
+- You may add colour: now and then one of the LITTLE THINGS, or a small touch of your own (a smell, a sound, a feeling, a tease, something someone still does). Colour makes a reply warmer or funnier; it never answers the question.
+- Never invent: a name, a place, a year, a date, an age, a number, or when something happened ("the winter he was...", "since we..."); a new event; who was with whom; or where anything is kept in this house. Those are clues in this game, and a made-up one sends your grandchild the wrong way.
+- Stay consistent with everything you've said this visit, colour included.
 - If a memory answers the question, include its answer, but wrap it in one or two other true memories (tangents), the way grandmas do.
 - If a question is vague and could match two memories that are easy to mix up, answer with the one you think about more (the higher "salience") and don't volunteer the other one.
 - You remember each memory clearly, but you muddle what happened before or after what. Never connect two memories in time for the grandchild (no "that was when we lived on..."). Talk about the one memory they asked about and let them work out the order themselves.
@@ -79,6 +93,7 @@ export function retrieveFacts(
   const picked = new Set<string>();
   const text = input.kind === "ask" ? input.text : [input.object.label, input.object.inspectText, input.text ?? ""].join(" ");
   if (input.kind === "show") input.object.factIds.forEach((id) => picked.add(id));
+  if (input.kind === "ask" && input.focus) picked.add(input.focus.factId);
   for (const s of scoreFacts(world, expandedTokens(text), text)) {
     if (picked.size >= k) break;
     picked.add(s.fact.id);
@@ -120,6 +135,12 @@ export function buildWorldBlock(world: GrandmaWorld, recipe: Recipe, onlyFactIds
       lines.push(`- ${s.title} [${s.fact_ids.join(", ")}]: ${text}`);
     }
   }
+  // Little things go in every turn's block, also in retrieval mode: they are short, and colour is never a clue.
+  const colour = world.colour ?? [];
+  if (colour.length) {
+    lines.push("", "LITTLE THINGS (everyday colour, not clues; use one now and then, never as an answer)");
+    for (const c of colour) lines.push(`- ${c.text}`);
+  }
   const people = world.entities.filter((e) => e.relation_to_player);
   if (people.length) {
     lines.push("", "WHO IS WHO (relative to your grandchild)");
@@ -139,6 +160,15 @@ export interface ChatMessage {
  * §5④): which memories she already talked about and which objects she was shown, plus the game state.
  * Built from the turns' fact ids, so it costs no model call and can't drift from what she actually said.
  */
+/** How many of her older lines the summary keeps, and how long each may be (about 600 tokens at most). */
+const SUMMARY_LINES = 10;
+const SUMMARY_WORDS = 40;
+
+function shorten(text: string, words: number): string {
+  const w = text.replace(/\s+/g, " ").trim().split(" ");
+  return w.length > words ? `${w.slice(0, words).join(" ")}…` : w.join(" ");
+}
+
 export function conversationSummary(history: readonly Turn[], stamina: number, maxTurns = 6): string | undefined {
   const turns = history.slice(1);
   const older = turns.slice(0, Math.max(0, turns.length - maxTurns * 2));
@@ -152,7 +182,14 @@ export function conversationSummary(history: readonly Turn[], stamina: number, m
   const asked = turns.filter((t) => t.role === "player").length;
   const parts = [`Earlier in this visit (before the messages above) you talked about these memories: ${facts.length ? facts.join(", ") : "none of them"}`];
   if (shown.length) parts.push(`they showed you: ${shown.join(", ")}`);
-  return `[${parts.join("; ")}. Stay consistent with what you told them then. Visit so far: ${asked} questions; your tea is at ${Math.round(stamina)} of 100.]`;
+  // Her own earlier words (iteration 64): the memory ids above don't carry the colour she added, so a long visit
+  // could contradict it ("Pickles hated everybody" … "Pickles loved everyone"). The last few, shortened.
+  const said = older
+    .filter((t) => t.role === "grandma" && t.text)
+    .slice(-SUMMARY_LINES)
+    .map((t) => `"${shorten(t.text, SUMMARY_WORDS)}"`);
+  const earlier = said.length ? ` Some of what you said then (don't repeat it, don't contradict it): ${said.join(" ")}` : "";
+  return `[${parts.join("; ")}. Stay consistent with what you told them then.${earlier} Visit so far: ${asked} questions; your tea is at ${Math.round(stamina)} of 100.]`;
 }
 
 export function buildMessages(history: readonly Turn[], input: TurnInput, stamina: number, maxTurns = 6): ChatMessage[] {
@@ -171,6 +208,14 @@ export function buildMessages(history: readonly Turn[], input: TurnInput, stamin
   let content = playerTurnText(input);
   if (input.kind === "show") {
     content += `\n[What they see: ${input.object.inspectText}]\n[Memories this object brings back: ${input.object.factIds.join(", ") || "none"}]`;
+  }
+  if (input.kind === "ask" && input.focus) {
+    const f = input.focus;
+    content +=
+      f.mode === "when"
+        ? `\n[They picked a topic card and asked when. Tell memory ${f.factId} and say when it happened, the way that memory says it. Nothing else.]`
+        : `\n[They picked a topic card. Tell memory ${f.factId}; you may add one short tangent.]`;
+    if (f.repeat) content += "\n[You told them this one already. Say so warmly, then tell it again.]";
   }
   const summary = conversationSummary(history, stamina, maxTurns);
   if (summary) content += `\n${summary}`;

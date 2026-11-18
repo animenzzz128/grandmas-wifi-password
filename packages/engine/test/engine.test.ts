@@ -179,6 +179,14 @@ describe("reply validator", () => {
     expect(validateReply(world, { ...ok, reply: "My very first dog was Biscuit, a beagle. Oh, for heaven's sake, he stole every sock." }, ctx())).toEqual([]);
   });
 
+  it("knows quoted names and plurals (iteration 62: 'Unchained Melody' and Tuesdays were rejected)", () => {
+    const song = { ...ok, fact_ids_used: ["f_song"] };
+    expect(validateReply(world, { ...song, reply: "Our wedding song was Unchained Melody, dear." }, ctx())).toEqual([]);
+    expect(validateReply(world, { ...song, reply: "Our song was 'Unchained Melody'. Walt stepped on my feet." }, ctx())).toEqual([]);
+    expect(validateReply(world, { ...ok, fact_ids_used: [], reply: "I bowl on Tuesdays, and I never give out my PIN." }, ctx())).toEqual([]);
+    expect(validateReply(world, { ...ok, fact_ids_used: [], reply: "I never went to Paris, dear." }, ctx()).join()).toMatch(/Paris/);
+  });
+
   it("rejects invented numbers, unknown names, unknown ids and leaks", () => {
     expect(validateReply(world, { ...ok, reply: "We married in 1959." }, ctx()).join()).toMatch(/1959/);
     expect(validateReply(world, { ...ok, reply: "My dog was named after Elvis Presley." }, ctx()).join()).toMatch(/Elvis/);
@@ -295,7 +303,37 @@ describe("messages for the LLM", () => {
     expect(last).toContain("8 questions; your tea is at 64 of 100");
     // Only the last 6 exchanges are sent as messages.
     expect(msgs.filter((m) => m.role === "assistant")).toHaveLength(6);
-    expect(msgs.map((m) => m.content).join()).not.toContain("Biscuit!");
+    expect(msgs.filter((m) => m.role === "assistant").map((m) => m.content).join()).not.toContain("Biscuit!");
+    // Her own older words come back in the summary, so colour she added stays consistent (iteration 64).
+    expect(last).toMatch(/Some of what you said then \(don't repeat it, don't contradict it\): "Biscuit!" "Buttons!"/);
+  });
+
+  it("keeps at most 10 older lines of hers in the summary, each cut to 40 words", () => {
+    const long = Array.from({ length: 60 }, (_, i) => `w${i}`).join(" ");
+    const history: { role: "grandma" | "player"; text: string }[] = [{ role: "grandma", text: "Hello dear" }];
+    for (let i = 0; i < 20; i++) history.push({ role: "player", text: `q${i}` }, { role: "grandma", text: `${i === 13 ? long : `line${i}`}` });
+    const summary = conversationSummary(history, 50)!;
+    expect(summary).not.toContain('"line3"');
+    expect(summary).toContain('"line4"');
+    expect(summary).toContain("w39…");
+    expect(summary).not.toContain("w40");
+  });
+
+  it("little things go in the world block, and only colour gets in (iteration 64)", async () => {
+    const { checkColour } = await import("../src/index.ts");
+    expect(world.colour?.length).toBeGreaterThanOrEqual(40);
+    expect(buildWorldBlock(world, easy)).toContain("LITTLE THINGS");
+    expect(buildWorldBlock(world, easy)).toContain("polka station");
+    const withColour = (text: string) => checkColour({ ...world, colour: [{ id: "c_x", about: ["walt"], text }] }).join();
+    expect(withColour("Your grandpa hums in the garden.")).toBe("");
+    expect(withColour("Your grandpa got his first tackle box in 1975.")).toMatch(/digit/);
+    expect(withColour("The beagle Biscuit howled at bells.")).toMatch(/password/);
+    expect(withColour("Your grandpa has fished since we married.")).toMatch(/since/);
+    expect(withColour("Your grandpa keeps his lures in the hall closet.")).toMatch(/closet/);
+    // The first draft had "I hide the good cookie tin behind the flour"; she turned it into where the recipe is kept.
+    expect(withColour("I hide the good cookie tin behind the flour.")).toMatch(/hide|behind the/);
+    expect(withColour("Your grandpa and Gerald bowl together.")).toMatch(/Gerald/);
+    expect(checkColour({ ...world, colour: [{ id: "c_x", about: ["nobody"], text: "Hello." }] }).join()).toMatch(/unknown entity/);
   });
 
   it("adds no summary while the whole visit still fits", () => {
@@ -388,7 +426,8 @@ describe("router and nudges (Phase 2)", () => {
   it("counts facts about the answer itself as progress (review, iteration 41)", () => {
     const medium = recipeById(world, "r_medium")!;
     expect([...progressFacts(world, easy)].filter((id) => !chainFacts(world, easy).has(id)).sort()).toEqual(["f_dog1_breed", "f_dog1_habit"]);
-    expect([...progressFacts(world, medium)].filter((id) => !chainFacts(world, medium).has(id))).toEqual(["f_michael_born"]);
+    // The note line's pointer (iteration 56: "Grandpa painted the number on our mailbox…") is about the answer too.
+    expect([...progressFacts(world, medium)].filter((id) => !chainFacts(world, medium).has(id)).sort()).toEqual(["f_michael_born", "f_number_ptr"]);
     expect(progressFacts(world, hard)).toEqual(chainFacts(world, hard)); // its answers are a word and a year
     // "Who stole the socks?" → Biscuit: that's progress on Easy, so no nudge.
     const s = createRunState({ id: "t", world, recipe: easy, sceneId: scene.id, greeting: "hi" });

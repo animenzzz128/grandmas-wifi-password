@@ -45,6 +45,27 @@
           "minLength": 1,
           "maxLength": 280
         },
+        "topic": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "about",
+                "when"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "mode"
+          ],
+          "additionalProperties": false
+        },
         "voice": {
           "type": "object",
           "properties": {
@@ -91,7 +112,8 @@
           "type": "string",
           "enum": [
             "cookie",
-            "glasses"
+            "glasses",
+            "phone"
           ]
         }
       },
@@ -225,6 +247,11 @@
           "minimum": -9007199254740991,
           "maximum": 9007199254740991
         },
+        "callsLeft": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
         "questionCount": {
           "type": "integer",
           "minimum": -9007199254740991,
@@ -249,6 +276,48 @@
           "type": "integer",
           "minimum": -9007199254740991,
           "maximum": 9007199254740991
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "note",
+                  "person",
+                  "pet",
+                  "place",
+                  "event",
+                  "thing"
+                ]
+              },
+              "fresh": {
+                "type": "boolean"
+              },
+              "readable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "kind",
+              "fresh",
+              "readable"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "noteId": {
+          "type": "string"
         },
         "result": {
           "type": "object",
@@ -283,6 +352,12 @@
             },
             "password": {
               "type": "string"
+            },
+            "explain": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "required": [
@@ -313,10 +388,12 @@
         "attemptsLeft",
         "maxAttempts",
         "cookies",
+        "callsLeft",
         "questionCount",
         "status",
         "greeting",
-        "relaxed"
+        "relaxed",
+        "topics"
       ],
       "additionalProperties": false
     },
@@ -405,220 +482,11 @@
           ],
           "additionalProperties": false
         },
-        "run": {
-          "type": "object",
-          "properties": {
-            "runId": {
-              "type": "string"
-            },
-            "grandma": {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "type": "string"
-                },
-                "nickname": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "name"
-              ],
-              "additionalProperties": false
-            },
-            "difficulty": {
-              "type": "string",
-              "enum": [
-                "easy",
-                "medium",
-                "hard",
-                "expert"
-              ]
-            },
-            "sceneId": {
-              "type": "string"
-            },
-            "note": {
-              "type": "object",
-              "properties": {
-                "text": {
-                  "type": "string"
-                },
-                "rules": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "smudged": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "text",
-                "rules",
-                "smudged"
-              ],
-              "additionalProperties": false
-            },
-            "glasses": {
-              "type": "boolean"
-            },
-            "slots": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            "suffix": {
-              "type": "string"
-            },
-            "passwordLength": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            "stamina": {
-              "type": "number"
-            },
-            "maxStamina": {
-              "type": "number"
-            },
-            "naps": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            "maxNaps": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            "attemptsLeft": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            "maxAttempts": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            "cookies": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            "questionCount": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            "status": {
-              "type": "string",
-              "enum": [
-                "playing",
-                "solved",
-                "failed",
-                "bedtime"
-              ]
-            },
-            "greeting": {
-              "type": "string"
-            },
-            "relaxed": {
-              "type": "boolean"
-            },
-            "daily": {
-              "type": "integer",
-              "minimum": -9007199254740991,
-              "maximum": 9007199254740991
-            },
-            "result": {
-              "type": "object",
-              "properties": {
-                "solved": {
-                  "type": "boolean"
-                },
-                "stars": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 3
-                },
-                "questions": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                "naps": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                "cookiesUsed": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                "par": {
-                  "type": "integer",
-                  "minimum": -9007199254740991,
-                  "maximum": 9007199254740991
-                },
-                "password": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "solved",
-                "stars",
-                "questions",
-                "naps",
-                "cookiesUsed",
-                "par"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "runId",
-            "grandma",
-            "difficulty",
-            "sceneId",
-            "note",
-            "glasses",
-            "slots",
-            "suffix",
-            "passwordLength",
-            "stamina",
-            "maxStamina",
-            "naps",
-            "maxNaps",
-            "attemptsLeft",
-            "maxAttempts",
-            "cookies",
-            "questionCount",
-            "status",
-            "greeting",
-            "relaxed"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "reply",
-        "mood",
-        "cost",
-        "napped",
-        "run"
-      ],
-      "additionalProperties": false
-    },
-    "ItemResponse": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "line": {
-          "type": "string"
+        "newTopics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "run": {
           "type": "object",
@@ -723,6 +591,11 @@
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
             },
+            "callsLeft": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
             "questionCount": {
               "type": "integer",
               "minimum": -9007199254740991,
@@ -747,6 +620,48 @@
               "type": "integer",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
+            },
+            "topics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "note",
+                      "person",
+                      "pet",
+                      "place",
+                      "event",
+                      "thing"
+                    ]
+                  },
+                  "fresh": {
+                    "type": "boolean"
+                  },
+                  "readable": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "kind",
+                  "fresh",
+                  "readable"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "noteId": {
+              "type": "string"
             },
             "result": {
               "type": "object",
@@ -781,6 +696,12 @@
                 },
                 "password": {
                   "type": "string"
+                },
+                "explain": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               },
               "required": [
@@ -811,10 +732,295 @@
             "attemptsLeft",
             "maxAttempts",
             "cookies",
+            "callsLeft",
             "questionCount",
             "status",
             "greeting",
-            "relaxed"
+            "relaxed",
+            "topics"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "reply",
+        "mood",
+        "cost",
+        "napped",
+        "run"
+      ],
+      "additionalProperties": false
+    },
+    "ItemResponse": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "line": {
+          "type": "string"
+        },
+        "who": {
+          "type": "string",
+          "enum": [
+            "grandma",
+            "michael"
+          ]
+        },
+        "newTopics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "run": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string"
+            },
+            "grandma": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "nickname": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            },
+            "difficulty": {
+              "type": "string",
+              "enum": [
+                "easy",
+                "medium",
+                "hard",
+                "expert"
+              ]
+            },
+            "sceneId": {
+              "type": "string"
+            },
+            "note": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "smudged": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "text",
+                "rules",
+                "smudged"
+              ],
+              "additionalProperties": false
+            },
+            "glasses": {
+              "type": "boolean"
+            },
+            "slots": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "suffix": {
+              "type": "string"
+            },
+            "passwordLength": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "stamina": {
+              "type": "number"
+            },
+            "maxStamina": {
+              "type": "number"
+            },
+            "naps": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "maxNaps": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "attemptsLeft": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "maxAttempts": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "cookies": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "callsLeft": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "questionCount": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "playing",
+                "solved",
+                "failed",
+                "bedtime"
+              ]
+            },
+            "greeting": {
+              "type": "string"
+            },
+            "relaxed": {
+              "type": "boolean"
+            },
+            "daily": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "topics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "note",
+                      "person",
+                      "pet",
+                      "place",
+                      "event",
+                      "thing"
+                    ]
+                  },
+                  "fresh": {
+                    "type": "boolean"
+                  },
+                  "readable": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "kind",
+                  "fresh",
+                  "readable"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "noteId": {
+              "type": "string"
+            },
+            "result": {
+              "type": "object",
+              "properties": {
+                "solved": {
+                  "type": "boolean"
+                },
+                "stars": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 3
+                },
+                "questions": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "naps": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "cookiesUsed": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "par": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "password": {
+                  "type": "string"
+                },
+                "explain": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "solved",
+                "stars",
+                "questions",
+                "naps",
+                "cookiesUsed",
+                "par"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "runId",
+            "grandma",
+            "difficulty",
+            "sceneId",
+            "note",
+            "glasses",
+            "slots",
+            "suffix",
+            "passwordLength",
+            "stamina",
+            "maxStamina",
+            "naps",
+            "maxNaps",
+            "attemptsLeft",
+            "maxAttempts",
+            "cookies",
+            "callsLeft",
+            "questionCount",
+            "status",
+            "greeting",
+            "relaxed",
+            "topics"
           ],
           "additionalProperties": false
         }
@@ -954,6 +1160,11 @@
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
             },
+            "callsLeft": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
             "questionCount": {
               "type": "integer",
               "minimum": -9007199254740991,
@@ -978,6 +1189,48 @@
               "type": "integer",
               "minimum": -9007199254740991,
               "maximum": 9007199254740991
+            },
+            "topics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "note",
+                      "person",
+                      "pet",
+                      "place",
+                      "event",
+                      "thing"
+                    ]
+                  },
+                  "fresh": {
+                    "type": "boolean"
+                  },
+                  "readable": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "kind",
+                  "fresh",
+                  "readable"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "noteId": {
+              "type": "string"
             },
             "result": {
               "type": "object",
@@ -1012,6 +1265,12 @@
                 },
                 "password": {
                   "type": "string"
+                },
+                "explain": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               },
               "required": [
@@ -1042,10 +1301,12 @@
             "attemptsLeft",
             "maxAttempts",
             "cookies",
+            "callsLeft",
             "questionCount",
             "status",
             "greeting",
-            "relaxed"
+            "relaxed",
+            "topics"
           ],
           "additionalProperties": false
         }
@@ -1079,6 +1340,13 @@
           "enum": [
             "budget",
             "kill"
+          ]
+        },
+        "voice": {
+          "type": "string",
+          "enum": [
+            "elevenlabs",
+            "browser"
           ]
         }
       },
@@ -1177,6 +1445,68 @@
           ],
           "additionalProperties": false
         },
+        "model": {
+          "type": "string"
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "pos": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "items": false,
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "look": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "items": false,
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "fov": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "pos",
+              "look",
+              "fov"
+            ],
+            "additionalProperties": false
+          }
+        },
         "props": {
           "type": "array",
           "items": {
@@ -1239,6 +1569,9 @@
               "collide": {
                 "default": true,
                 "type": "boolean"
+              },
+              "model": {
+                "type": "string"
               }
             },
             "required": [
@@ -1315,6 +1648,9 @@
                 "default": true,
                 "type": "boolean"
               },
+              "model": {
+                "type": "string"
+              },
               "kind": {
                 "type": "string",
                 "enum": [
@@ -1324,13 +1660,17 @@
                   "router",
                   "cookie_jar",
                   "glasses",
-                  "fixture"
+                  "fixture",
+                  "phone"
                 ]
               },
               "label": {
                 "type": "string"
               },
               "inspect_text": {
+                "type": "string"
+              },
+              "view": {
                 "type": "string"
               }
             },

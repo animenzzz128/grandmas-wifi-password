@@ -1,7 +1,10 @@
-/** Settings: look, text size and font, voice, retro filter, relaxed mode. Saved in this browser. */
+/** Settings: graphics, look, text size and font, voice, relaxed mode. Saved in this browser. */
 import { useEffect, useState } from "react";
 import { ACTIONS, DEFAULT_KEYS, keyLabel, rebind, useSettings } from "../settings.ts";
-import type { Action } from "../settings.ts";
+import type { Action, Quality } from "../settings.ts";
+
+/** Keys the player can move (the walking keys went with first-person walking in iteration 54). */
+const REBINDABLE: Action[] = ["notebook", "speak"];
 import { t } from "../strings.ts";
 
 /** Click an action, then press the key you want for it (Esc cancels). A key already in use swaps over. */
@@ -23,7 +26,7 @@ function KeyBindings() {
   return (
     <fieldset className="key-bindings">
       <legend>{t("settings.keys")}</legend>
-      {ACTIONS.map((a) => (
+      {ACTIONS.filter((a) => REBINDABLE.includes(a)).map((a) => (
         <label key={a} className="key-row">
           <span>{t(`settings.key.${a}`)}</span>
           <button type="button" className={waiting === a ? "waiting" : ""} onClick={() => setWaiting(waiting === a ? null : a)}>
@@ -48,9 +51,14 @@ export function SettingsCard({ onClose }: { onClose: () => void }) {
         <input type="range" min={0.3} max={2.5} step={0.1} value={s.sensitivity} onChange={(e) => s.set({ sensitivity: Number(e.target.value) })} />
       </label>
       <label>
-        {t("settings.fov")} <b>{s.fov}°</b>
-        <input type="range" min={60} max={95} step={1} value={s.fov} onChange={(e) => s.set({ fov: Number(e.target.value) })} />
+        {t("settings.quality")}
+        <select value={s.quality} onChange={(e) => s.set({ quality: e.target.value as Quality, autoQuality: false })}>
+          <option value="low">{t("settings.quality.low")}</option>
+          <option value="medium">{t("settings.quality.medium")}</option>
+          <option value="high">{t("settings.quality.high")}</option>
+        </select>
       </label>
+      <p className="hint">{t("settings.qualityHint")}</p>
       <label>
         {t("settings.textScale")} <b>{Math.round(s.textScale * 100)}%</b>
         <input type="range" min={0.85} max={1.6} step={0.05} value={s.textScale} onChange={(e) => s.set({ textScale: Number(e.target.value) })} />
@@ -83,7 +91,7 @@ export function SettingsCard({ onClose }: { onClose: () => void }) {
         <input type="checkbox" checked={s.roomSound} onChange={(e) => s.set({ roomSound: e.target.checked })} /> {t("settings.roomSound")}
       </label>
       <label className="check">
-        <input type="checkbox" checked={s.cameraAssist} onChange={(e) => s.set({ cameraAssist: e.target.checked })} /> {t("settings.cameraAssist")}
+        <input type="checkbox" checked={s.calmCamera} onChange={(e) => s.set({ calmCamera: e.target.checked })} /> {t("settings.calmCamera")}
       </label>
       <label className="check">
         <input type="checkbox" checked={s.highContrast} onChange={(e) => s.set({ highContrast: e.target.checked })} /> {t("settings.highContrast")}

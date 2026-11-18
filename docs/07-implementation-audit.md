@@ -474,3 +474,246 @@ Jacky found the blanket too thick.
 - **Measured:** hands 7.5 mm above the blanket, 6.2 cm apart; arms 9.2 cm inside the armrests.
 - **Checks:** screenshots from the front and a low three-quarter view, where holes would show (none); 222 tests; typecheck; build.
 
+### Iteration 53 (11/17): Grandma's voice from ElevenLabs
+Jacky found her voice too "AI". It was the browser's speech voice (Windows Zira or Aria), which can't be run through audio effects. Of the options offered (ElevenLabs; Kokoro in the browser plus an aging filter; a retro mumble), Jacky chose ElevenLabs.
+- **Server** (`apps/server/src/voice.ts`, `POST /api/runs/:id/voice`) speaks through ElevenLabs text-to-speech (default `eleven_flash_v2_5`, MP3 at 64 kbps).
+  - **Only her own words:** every line must be one Grandma said in that visit, or one of her canned `bark.*` reactions. Anything else is a 400, so nobody can spend the budget on their own text.
+  - **Mood:** sets stability, style and speed (slower and steadier when sleepy or nostalgic).
+  - **Cost:** lines are cached on disk by voice, model, mood and text, so repeats are free. A daily character cap applies (`VOICE_DAILY_CHARS`, default 3,000). A failed call doesn't count against it. Stage directions like *sips tea* are dropped.
+  - **Off by default:** it needs `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID`. The key is read from the repo's `.env` only, like the Anthropic key (or from the environment with `GRANDMA_VOICE=elevenlabs` on purpose).
+  - **Health** reports `voice: "elevenlabs" | "browser"`.
+- **Client** (`voice.ts`, `audio.ts`): plays the clip on the voice channel, so the voice volume setting applies, and drives her talking animation from it. A newer line cancels an older one that is still loading. If there's no key, the cap is reached or a request fails, the browser voice takes over.
+- **Her voice:** `tools/design-grandma-voice.mjs` uses ElevenLabs Voice Design ("late seventies, Buffalo, faint Polish-American accent, warm and teasing, slightly thin and wavering"). It writes three previews to `var/voice-design/`; `--save <id>` keeps one and prints the `.env` line. Correction after the first real calls: creating a voice through the API needs a paid plan (403 "feature_not_available" on free), so on the free plan she's designed on the ElevenLabs website and only her voice ID goes in `.env`. Text-to-speech through the API does work on free (a test line returned audio). Voice Library voices need a paid plan for API use.
+- **Found along the way:** another program on this laptop, Grok Bot, listens on 127.0.0.1:8787, so in dev every API call reached it ("Not found.").
+  - Fixed locally with `API_PORT=8788` in a new git-ignored `.env`, made from `.env.example`.
+  - The server now checks its own port at startup and warns if something else answers.
+- **Checks:** typecheck, 229 tests (7 new for the voice route: health, real lines only, cache, cap, failures, config), build.
+  - In the browser, a stand-in clip played through the voice channel with the talking flag on and then off, and the browser voice wasn't used.
+  - With no voice on the server, the request got a 404 and the browser voice spoke instead.
+- **Verified with a real key (11/17, free plan):** Jacky designed the voice on the ElevenLabs website and put its ID in `.env`. Through the game server, a new line took 0.4–0.7 s and a repeated line came from the cache in about 4 ms. In the browser, the greeting played as her recorded voice and the browser voice stayed silent. Jacky listened to two sample lines and approved the voice. The test used about 300 characters, about 150 of the free plan's 10,000 monthly credits on Flash.
+- **Dev port:** Vite now follows `PORT` (default 5173), so the preview can run on another port when 5173 is busy.
+
+### Iteration 56 (11/17): steady frame rate, a guided first visit, new music
+Jacky played the iteration 55 build and found it choppy, the onboarding thin and the music unpleasant.
+
+**Frame rate.** Measured in a debug Chrome on this laptop (Intel integrated GPU, 240 Hz screen, 1.5× scaling):
+- **Causes found:**
+  - The game drew as fast as the screen refreshed (90–240 fps), so the GPU had no headroom.
+  - It started on High on an integrated GPU. At 1920×1080, High (glow, richer materials) took 20–30 ms a frame; Medium and Low took 6–11 ms.
+  - Wallpaper Engine's web wallpaper was using about 66% of the GPU's 3D engine. Other game tabs left open also compete.
+  - Its spikes made the auto-scaler cut resolution down to 0.35×, a blurred picture that was no faster.
+  - Shader compiles were ruled out: visiting each view a second time cost no more than the first.
+- **Fixes:**
+  - **Frame cap:** at most about 60 fps, timed from the last drawn frame. Counting refreshes gave 48 fps on the 240 Hz screen, because the browser skips a refresh while drawing. `FrameCap` in `GameCanvas.tsx`, `shouldDraw` in `adaptive.ts`.
+  - **Default quality:** chosen by GPU (`qualityFor` in `settings.ts`): integrated GPUs start on Medium; software renderers and touch-only devices on Low. Saves still on automatic quality are re-checked once (`qualityRules`).
+  - **Auto-scaler:** judges each two-second window by its median frame, so outside spikes don't count, and never goes below 0.6×.
+- **Result:** a steady 60 fps on Medium (p95 16.9 ms, worst ~21 ms), standing still, while the camera moves, and at full HD. High still runs at 34–39 fps on this GPU, which is why integrated GPUs now start on Medium.
+
+**Guided first visit** (`tutorial.ts`, `ui/Tutorial.tsx`).
+- **What it is:** nine steps, each spotlighting the one thing to do and moving on when the player does it: read the note → close it → pick a note card → "Tell me about it" → her tea → the trail of names and free typing → look for proof in another view → the notebook → the router (and Uncle Michael's phone).
+- **Behaviour:** two steps only explain and wait for "Got it". Steps the player already did are skipped, and the tutorial can be skipped at any time. Clicks go through to the game. It waits while a close-up card is open.
+- **When it runs:** on the first visit; "How to play" on the title has "Show me how" to replay it. The old objective checklist and how-to line hide while it runs, and the one-time tea lesson in the chat is not repeated.
+- **Model:** small, guided first cases you solve rather than read (The Case of the Golden Idol), and one new idea at a time, learned by doing (Portal, Baba Is You, Nintendo's introduce–practise–test pattern).
+- **Checked:** the whole run in a real browser, with a screenshot of each step.
+
+**Music: "Rosie's Waltz"** (`music.ts`), replacing "Kolaczki Rag".
+- **Composition:** an original slow waltz (88 bpm). A curious D-minor phrase is answered by a warm F-major one.
+- **Instruments:** felt piano, music box, plucked bass and chords, and a quiet accordion pad in musette tuning, with a generated reverb and a gentle low-pass.
+- **Form:** a 32-bar loop (about a minute) in four passes, each with a different lead: piano, music box, none (only "thinking" arpeggios), then a thinned-out piano. Half the time or less there is a melody, so it stays behind the thinking.
+- **Basis:** described practice in puzzle scores: Layton's accordion-and-waltz whimsy, sparse music for concentration (Ashi), and loops with variation.
+- **Checks:** rendered offline (`renderMusicWav`, dev only), peak 0.18 with no clipping before the music volume. In game, it schedules about 15 oscillators a second with no errors and no frame-time cost.
+- **Tests:** 260 pass (new: tutorial steps, frame pacing on 60/120/144/240 Hz screens, median-based scaling, quality by GPU, the music's form).
+- **Not verified:** how the music and the tutorial feel to people (needs a listen and a playtest); other GPUs and phones.
+
+### Iteration 57 (11/17): review loop, round 1
+I played every view, every close-up and a full Easy visit, chatted with the offline Grandma on Medium, checked the keys in each mode, and looked at the phone layout. Then I fixed what I found:
+- **Answer leak (P1):** the offline Grandma's random aside could be a part of the password. "asdfgh qwerty" on Medium got "Our house number is 412", half of Maple412.
+  - **Fix:** asides never use the recipe's slot facts (`mock.ts`).
+  - **Test:** `packages/engine/test/mock.test.ts`, 7 off-topic questions × 40 seeds × every recipe.
+- **Small talk:** "How are you today?" got "Don't tell your grandfather I said that. I don't recall anything about that."
+  - **Fix:** greetings and small talk now get a warm line from `profile.small_talk` in `rosie.json` (new optional field), with no memory and no aside. The "don't know" case uses its own openers.
+- **Photos:** the room's photo frames showed the Godot model's grey silhouettes while their close-ups showed real photos.
+  - **Fix:** each frame now shows a generated photo (wedding, dogs, Cherry Street), with planar UVs facing into the room and a crop that doesn't stretch (`RoomPhotos` in `House.tsx`).
+- **Tap targets:** tapping the moon plate opened the TV, because the TV's enlarged hit box covered the plate.
+  - **Fix:** of the targets near the front, the smallest wins (`ViewRig.tsx`).
+- **View tabs:** the tab bar was cut off ("Living roo…"), because a `left: 50%` box shrink-wraps to half the window.
+  - **Fix:** `width: max-content`.
+- **Stale hover label:** a hover label stayed on screen after the camera moved ("moon-landing plate" in the kitchen).
+  - **Fix:** hover clears on every view change.
+- **Fridge and phone:** they had no sparkle.
+  - **Fix:** they sparkle now, until looked at (`looked` in the store, kept apart from the "Find proof" clues).
+- **Fridge colour:** the fridge close-up was cream while the room's fridge is mint. It is mint now.
+- **Grandma close up:**
+  - **Neck:** a thin neck stood in a ring-shaped collar. It is now fuller and set a little lower.
+  - **Chair doily:** the upright antimacassar smeared the flat lace pattern into torn-looking streaks. It is plain linen now.
+  - **Steam:** the cup's steam was square points. It is soft round puffs now.
+- **Dev aid:** the 3D crash screen now keeps its cause in `window.__gameError` (dev only).
+- **Checks:** 262 tests pass; typecheck, data validation and golden transcripts pass.
+
+### Iteration 58 (11/17): review loop, round 2 (after an independent review)
+A separate review agent played the build blind: tutorial, Easy, Easy 2, Medium and Hard solved, the attack set, phone layout, frame times. It scored **7.0 / 10** with no P0. Fixed from its findings:
+- **F1 (P1, deduction): note-line cards handed over a whole part** ("where we spent our honeymoon" → "Niagara Falls").
+  - **Pointer memories:** each word part now has one for its note line (`*_ptr` facts, tagged `pointer`, set in `note_facts`). Each points at the next step instead:
+    - "the big falls on the Canadian border";
+    - "the cocker spaniel we got after the kids";
+    - "Grandpa painted the number on the mailbox… the hall sign… a porch photo in the album";
+    - "like the little brown birds at the feeder… the back of our wedding photo";
+    - "our beagle… a picture of the rascal in the album";
+    - "my oldest friend from the switchboard days".
+  - **Free text and asides:** pointers answer only cards, never typed questions or random asides. Asides also never contain an answer word.
+  - **Test:** for all 8 notes, no note-line card says its part (`topics-api.test.ts`). The fairness bot still solves every note with cards alone.
+- **F3:** the router card now names which part is right ("Part 2 is right. Part 1 isn't."). It already kept the entries and marked them; the reviewer had called `guess()` from script, which skips the card.
+- **F4:** a card asked again, when she can only retell, costs 2 tea, not 8 (`RULES.retellCost`).
+- **F5:** the notebook now:
+  - reads letters in any alphabet ("Kraków") and keeps names together ("Niagara Falls", "Marge Novak");
+  - reads "Cherry St." as Cherry Street, and stops counting "St" or "Summer" as names;
+  - records '64 and '69 as years;
+  - quotes only the sentence a clue came from.
+- **F6:**
+  - **Keyboard mash** ("asdkj qwe zxcmn") is free and gets "Say it again, dear" (`isGibberish`).
+  - **Rudeness** gets an answer in character; the +6 penalty stays.
+  - **Openers:** "Don't tell your grandfather I said that" no longer opens a reply.
+- **F7:** tutorial bubbles never cover the chat or the view tabs. A target in the bottom panel gets the bubble above the panel; a target up top gets it below the tabs.
+- **F8:** the hint line has a dark backing; "Drag to turn it" is readable; on phones the view tabs fade at the edge to show they scroll.
+- **F9:** each album page has its own description.
+- **F10:** a lost visit says "Out of guesses" or "Bedtime", not "Gave up", and explains each part. For hidden years it shows the memories that resolve them (`explainParts`, sent with the password once it is revealed).
+- **F11:** the result card waits 1.8 s so Grandma's reaction is seen first (shown at once with calm camera).
+- **F12:** N closes the note it opened. Tab stays inside an open card.
+- **F13:** the music ducks about 6 dB while she speaks. A quiet wind past the snowy window joins the clock (room sound).
+- **F14:** Uncle Michael now quotes Grandma ("You know how Grandma tells it: ‘…’"), so the voices don't run together.
+- **Not changed:**
+  - **F2:** the note's character count rules out the decoys. This is a puzzle-data decision for the team.
+  - **F15:** High is slow on integrated GPUs, which now start on Medium.
+  - **F16:** the checklist and the pinned note follow the same flag; I couldn't reproduce it.
+- **Checks:** 268 tests, three full runs in a row; typecheck, data validation, golden transcripts and build pass.
+
+### Iteration 59 (11/17): review loop, round 3 (after a second independent review)
+A second, fresh review agent scored **7.3 / 10**, with no P0. Fixed from its findings:
+- **F1:** clicking a topic card while typing did nothing. The press blurred the box, the chat log collapsed, and the card jumped from under the pointer. Pressing a card no longer takes focus from the box.
+- **F2:** the plate shows about ten kolaczki, but its text said "one last" and she said "I had two". The text now says they're for Sunday and she may have one.
+- **F3:** the result card states the star rule with this visit's numbers.
+- **F4:**
+  - **Unmatched questions:** they no longer get a random memory at full price. The offline Grandma says she doesn't recall and asks for a name.
+  - **Cost:** any brain reply that tells no memory costs 4 (`RULES.noFactCost`); canned lines keep their price.
+  - **Asides:** they prefer memories she hasn't told this visit.
+  - **Other languages:** Spanish, French, German and Italian count as not English, so they're free.
+- **F5:** in Grandma's view, tutorial bubbles move to the side away from her. A step waits until her latest line has typed out.
+- **F6:** on screens held upright, each view aims at the weighted middle of its objects (tools count three times), so the hall shows the phone, router and note.
+- **F7:** "Show Grandma" shows its cost.
+- **F8:** a card for something her last reply mentioned counts as a follow-up (−3), as the tutorial says.
+- **F9:** asides avoid memories easily confused with the one she's telling (Cherry Street next to "number 412").
+- **F15:** the how-to line goes once anything has been looked at, not only a clue.
+- **Not changed:**
+  - **F10, F2 (round 1):** each Medium has one part a direct question answers, and the character count rules out the decoys. These are puzzle-data decisions for the team.
+  - **F11:** queueing system lines behind her typing.
+  - **F12:** prop art: the album cover, the mannequin-like figures in the wedding photo.
+  - **F14:** Tab stays the focus key inside cards; Esc closes them.
+- **Checks:** 269 tests, typecheck, data validation, golden transcripts and build pass.
+
+**Where it stands.** Both reviewers say the rest of the way to 9 can't come from code alone:
+- **Conversation (5):** needs the LLM Grandma run with a key: eval, attack set and transcripts.
+- **Deduction, fairness, onboarding:** need human playtest data: solve rate, questions to solve, time to first question.
+- **Character and audio:** need eyes and ears on her moods, the ElevenLabs voice and the mix.
+
+### Iteration 60 (11/17): feel, character, accessibility, robustness, art
+Another loop, on the dimensions the reviews hadn't reached:
+- **Feel:**
+  - **Message order:** lines after the one typing out ("New topic cards", a nap) now wait for it (`revealPlan`).
+  - **Title music:** the waltz plays from the first click or key there.
+- **Character:**
+  - **Mood emote:** a small bubble beside her face as each line arrives (😊 😏 💭 ❓ 🤨 😟), so her mood reads with the sound off.
+  - **Fixed along the way:** the "z z Z" and the emote were placed relative to the chair, which put them above the frame in her close view. They're attached to her head now.
+- **Accessibility:**
+  - **"Things here" (H, or the button under the tabs):** lists what can be opened in this view as buttons. Keyboard and screen-reader players had no way to open anything in the room.
+  - **Enter and Space:** on a focused button they press that button, never a game shortcut (Enter on a list item used to open the chat instead).
+  - **Esc:** closes the list.
+  - **High contrast:** the chat kept its dark ink on the new black background, and the stat line too. Both are light now.
+  - **Large text:** the tea panel ran into the view tabs. The tabs get their own row at large sizes (`big-text`).
+- **Robustness:**
+  - **Going offline mid-visit:** checked. It shows "can't hear you", costs nothing, and recovers.
+  - **Resume:** a reload or a closed tab now offers "Continue your visit" on the title. New `GET /api/runs/:id` returns the run and what was said; the notebook is rebuilt from her lines.
+- **Art:**
+  - **Metals:** they were near black, because three.js metal with nothing to reflect stays dark. They now reflect a soft room map (metals only, so the lighting is unchanged). The album's gold label, the trophy, frames, handles and glasses read as gold and brass, still at 60 fps.
+  - **Title on a phone held upright:** it aims lower, so Grandma and the room show above the text instead of the ceiling.
+- **Probe (`npm run eval:probe`, offline):** 2/8 notes still fall to direct typed questions, both Mediums with two word parts (puzzle data, team decision). The other 6 need a hop on the year and a step on the word.
+
+### Iteration 61 (11/17): review loop, round 4 (third independent review)
+A third fresh review agent scored **7.1 / 10** with no P0. The three reviews (7.0, 7.3, 7.1) agree within the rubric's ±1. Fixed:
+- **F1 (P1, keyboard):** Tab was the notebook key, so keyboard players could never reach the cards or the "Things here" items.
+  - **Notebook key:** now **J**; saves still on Tab migrate.
+  - **Tab:** never a game key now; it moves focus.
+  - **Cards:** picking one with the keyboard focuses "Tell me about it".
+  - **Checked:** in the browser, Shift+Tab from the question box reaches the cards, and J opens and closes the notebook.
+- **F3 (fixed truth):** Biscuit was her childhood dog (1949), yet lines spoke of "our beagle" in 1968 and later. They now say "the beagle I had as a girl", "my old beagle's memory", and "he still blames the cocker spaniel".
+- **F10 (fixed truth):** the wedding song "Moon River" came out in October 1961, after the June 1961 wedding. It's now "Unchained Melody" (1955) in the data, the frame plate, the topic card and the golden transcripts.
+- **F15:** the sled's "cracked runner" didn't match the model; it's now "the red paint on the runners is worn thin".
+- **F11:** taps pick the object actually under the pointer (its meshes) before the enlarged hit boxes. Tapping the router opens the router, except where the note is stuck on it.
+- **F9:** a capitalised card name must appear capitalised. "Dill pickles" in the fridge no longer unlocks "Pickles the cat" (test added).
+- **F6:** canned lines go round in order per visit (random start), so no deflection repeats before the others have been said.
+- **F12:** ← and → turn album pages.
+- **F16:** on phones, only the hall's must-reach tools pull the framing, so the album stays on screen in the coffee table view.
+- **F17:** a solve cuts to Grandma for her reaction.
+- **F4:** at large text sizes the pinned note gives way to the tabs (it's still under Note).
+- **Tests:** two seed-dependent tests that failed about 1 run in 4 now test the property, not a lucky path. 271 tests pass, three full runs in a row.
+- **Not changed (puzzle data, for the team):**
+  - **F2:** "Where did you spend your honeymoon?" and "What did Grandpa call you?" each give a word part directly.
+  - **F8:** Medium's per-part router feedback plus the half-visible sign make 412 easy to brute-force.
+  - **Not done:**
+    - **F7:** "Spoken" falls back to browser speech without a server voice; with the ElevenLabs voice configured, as planned for the deploy, it plays her voice.
+    - **F5:** the HUD covers about 40% of each view.
+    - **F13:** a resumed visit loses the cost tags.
+    - **F14:** some tutorial bubbles still cover their target.
+
+## Iteration 62 (2026-11-18): the course key is an OpenRouter key
+
+- **Found:** the key in `.env` is an OpenRouter key (`sk-or-…`), not an Anthropic one. The server would have sent it to Anthropic and every turn would have fallen back to her "lost my train of thought" line.
+- **OpenRouter client** (`apps/server/src/openrouter.ts`): same `messages.parse` shape as the Anthropic SDK, so the Grandma brain, the eval, the judge and the AI player run unchanged. It asks for:
+  - strict JSON, with enums given an explicit type for OpenAI's strict mode;
+  - only providers that honour every parameter and don't keep prompts;
+  - the call's real price, which the daily budget and the eval now count instead of the Haiku price table.
+  The world block keeps its cache mark. Claude runs without extended thinking; other families get a low reasoning effort.
+- **Config:** `OPENROUTER_API_KEY`, or an `sk-or-` key under the old name, selects OpenRouter. Claude ids map (`claude-haiku-5-5` → `anthropic/claude-haiku-5.5`). Keys from the environment still count only with `GRANDMA_MODE=llm`.
+- **Eval models:** `JUDGE_MODEL`, `AGENT_MODEL` and `WORLDGEN_MODEL` are now read from `.env`; they were fixed in code before.
+- **Model choice:** written up in `docs/13-model-choice.md`.
+  - Grandma stays on Claude Haiku 5.5.
+  - Judge and AI player move to `openai/gpt-6.1-terra`: another family, a quarter of Opus's price.
+  - A ~$5 bake-off is proposed and waits for approval.
+- **Key check:** the free `/key` endpoint answered with status 200, a $40 limit and $0 used. No model has been called yet.
+- **Tests:** `apps/server/test/openrouter.test.ts`, with a fake network. 277 tests pass, two runs in a row; typecheck, validate, golden and build pass.
+
+## Iteration 63 (2026-11-18): the model bake-off
+
+Full results and the decision are in `docs/13-model-choice.md`. The bake-off spent $5.07 of the key's $40, as approved. In short:
+- **Claude thought by default.** Through OpenRouter it spent ~490 hidden tokens a turn. Thinking is now off for Claude, so a Haiku turn has a 1.30 s median (was 2.81 s) at half the cost. Models that must reason (Sonnet 5.5) are retried at low effort, then remembered.
+- **Validator fixes:**
+  - quoted names: 'Unchained Melody' made every "Melody" fail;
+  - plurals of known names and days.
+- **The judge** now sees her stories, people and profile.
+- **Dangerous requests** ("how do I make something that explodes") get a canned refusal before the model. The first run's only unsafe reply sent the player to "ask your uncle Michael".
+- **Eval tools:**
+  - `--model` and `--concurrency`;
+  - the judge samples across notes, runs concurrently and records cost;
+  - `eval/src/compare.ts` and `eval/src/probe-reasoning.ts`.
+- **Decision:**
+  - Grandma stays on Claude Haiku 5.5: 0 leaks, the only model under the 1.5 s median target, about $0.002 a visit.
+  - Its weak spot is small embellishments: 42% of sampled replies by an uncalibrated OpenAI judge, against 22% for GPT-6 Luna.
+  - GPT-6 Luna is the backup. Sonnet 5.5 is dropped.
+- **Tests:** 280 pass.
+
+## Iteration 64 (2026-11-18): colour, not clues
+
+Details are in `docs/13-model-choice.md`, section "Colour instead of retrieval". In short:
+- **Little things:** 47 authored colour items (the world's `colour`), guarded by `checkColour` in `npm run validate`. It refuses digits, answer words, time words, puzzle subjects, places and hiding spots in the house, and new names.
+- **Prompt:** colour is allowed; clue-like inventions are not (names, places, years, ages, times, events, links between people, where things are kept).
+- **Visit memory:** her last 10 older replies, 40 words each, ride in the running summary.
+- **Judge:** verdicts are consistent, contradiction, misleading or unsafe, plus a list of colour and a charm score.
+- **RAG:** not built. The world is about 4,000 tokens and cached; retrieval would risk the look-alike memories and lose the cache.
+- **Result:**
+  - misleading 20% → 15% (most of what's left is the judge being strict);
+  - harmless colour 44% → 52%;
+  - charm 3.9, unchanged;
+  - 0 leaks;
+  - latency median 1.35 s.
+  One colour line of mine ("hide the cookie tin behind the flour") caused a misleading reply; it is reworded and the validator now catches hiding words.
+- **Spend:** $1.12 this round, $6.21 in total of the key's $40 (about $0.40 over the approved $5.80).
+- **Tests:** 282 pass.

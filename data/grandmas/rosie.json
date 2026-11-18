@@ -20,6 +20,12 @@
       "Now where was I",
       "Sweetheart",
       "Don't tell your grandfather I said that"
+    ],
+    "small_talk": [
+      "Oh, I'm fine, sweetheart. The knees complain when it snows, but the tea helps. Now, you wanted the internet thing? Ask me about Michael's note.",
+      "Hello, dear! Come in, come in, you're letting the cold in. Sit. What did you want to ask me?",
+      "Better now you're here. Your grandfather would say I talk too much, so go on, you ask the questions.",
+      "Oh, you're sweet. Don't butter me up, though, I can see that sticky note in your hand."
     ]
   },
   "entities": [
@@ -440,7 +446,7 @@
       "predicate": "broke_arm",
       "object": "sledding",
       "year": 1977,
-      "text": "Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
+      "text": "Michael broke his arm sledding the year he turned eleven, and he still blames the cocker spaniel.",
       "tags": [
         "family",
         "funny"
@@ -596,8 +602,8 @@
       "id": "f_song",
       "subject": "rosie",
       "predicate": "wedding_song",
-      "object": "Moon River",
-      "text": "Our wedding song was 'Moon River'. Walt stepped on my feet the whole time.",
+      "object": "Unchained Melody",
+      "text": "Our wedding song was 'Unchained Melody'. Walt stepped on my feet the whole time.",
       "tags": [
         "romance"
       ],
@@ -635,6 +641,82 @@
       "tags": [
         "family",
         "heritage"
+      ],
+      "salience": 2
+    },
+    {
+      "id": "f_honeymoon_ptr",
+      "subject": "rosie",
+      "predicate": "honeymoon_story",
+      "object": "falls_trip",
+      "text": "Our honeymoon! We took the train to the big falls on the Canadian border, the ones every newlywed goes to see. Walt got soaked on the boat and sulked for an hour.",
+      "tags": [
+        "romance",
+        "funny",
+        "pointer"
+      ],
+      "salience": 2
+    },
+    {
+      "id": "f_dog2_ptr",
+      "subject": "rosie",
+      "predicate": "favorite_dog_story",
+      "object": "cocker_spaniel",
+      "text": "My favorite? Oh, the cocker spaniel, the one we got after the kids came along. Sweetest dog that ever lived. Don't tell my old beagle's memory I said so.",
+      "tags": [
+        "pets",
+        "pointer"
+      ],
+      "salience": 2
+    },
+    {
+      "id": "f_number_ptr",
+      "subject": "maple_ave",
+      "predicate": "number_story",
+      "object": "mailbox",
+      "text": "Your grandpa painted the house number on our mailbox himself, crooked as can be. Bits of it have flaked off since, and the sign in the front hall is no better. There's a photo of the porch in the album.",
+      "tags": [
+        "home",
+        "funny",
+        "pointer"
+      ],
+      "salience": 2
+    },
+    {
+      "id": "f_nickname_ptr",
+      "subject": "walt",
+      "predicate": "pet_name_story",
+      "object": "bird_name",
+      "text": "Your grandpa's name for me? He said I never stop chirping, like the little brown birds at the feeder. He wrote something about it on the back of our wedding photo, too.",
+      "tags": [
+        "romance",
+        "pointer"
+      ],
+      "salience": 2
+    },
+    {
+      "id": "f_sockthief_ptr",
+      "subject": "rosie",
+      "predicate": "sock_thief_story",
+      "object": "beagle",
+      "text": "The sock thief! That was the beagle I had as a girl, the one with the floppy ear. Every sock in the house ended up buried in the garden. There's a picture of the rascal in the album.",
+      "tags": [
+        "pets",
+        "funny",
+        "pointer"
+      ],
+      "salience": 2
+    },
+    {
+      "id": "f_bowling_ptr",
+      "subject": "rosie",
+      "predicate": "bowling_friend_story",
+      "object": "oldest_friend",
+      "text": "Every Tuesday, rain or shine, I bowl with my oldest friend. We go back to the switchboard days, the two of us. She cheats at cards, mind you.",
+      "tags": [
+        "friends",
+        "funny",
+        "pointer"
       ],
       "salience": 2
     }
@@ -745,6 +827,348 @@
       "text": "The winter of the big snowstorm, Stan was stuck in his outhouse for two hours and Michael broke his arm on the sled hill, all in the same week."
     }
   ],
+  "colour": [
+    {
+      "id": "c_knees",
+      "about": [
+        "rosie"
+      ],
+      "text": "My knees know it's going to rain a full day ahead of the weatherman."
+    },
+    {
+      "id": "c_tea",
+      "about": [
+        "rosie"
+      ],
+      "text": "I take my tea with two sugars and a splash of milk, and I don't care what the doctor says."
+    },
+    {
+      "id": "c_crossword",
+      "about": [
+        "rosie"
+      ],
+      "text": "I do the crossword in pen. Pencil is for people who expect to be wrong."
+    },
+    {
+      "id": "c_radio",
+      "about": [
+        "rosie"
+      ],
+      "text": "I keep the kitchen radio on the polka station, just for the company."
+    },
+    {
+      "id": "c_hum",
+      "about": [
+        "rosie"
+      ],
+      "text": "I hum while I bake. Your grandpa says it's always the same tune, and he's right."
+    },
+    {
+      "id": "c_coupons",
+      "about": [
+        "rosie"
+      ],
+      "text": "I clip coupons every Sunday, even for things I'd never buy. It's the principle."
+    },
+    {
+      "id": "c_pew",
+      "about": [
+        "rosie"
+      ],
+      "text": "I sit in the same pew every Sunday. If somebody takes it, I sit right next to them and sing louder."
+    },
+    {
+      "id": "c_notes",
+      "about": [
+        "rosie"
+      ],
+      "text": "I still write my thank-you notes by hand. An email isn't a thank-you, it's a receipt."
+    },
+    {
+      "id": "c_charging",
+      "about": [
+        "rosie"
+      ],
+      "text": "I don't trust anything that needs charging. The toaster doesn't need charging, and it works just fine."
+    },
+    {
+      "id": "c_phone_voice",
+      "about": [
+        "rosie",
+        "phone_co"
+      ],
+      "text": "All those days on the switchboard, and I still answer the telephone like I'm putting a call through."
+    },
+    {
+      "id": "c_fast_calls",
+      "about": [
+        "rosie",
+        "phone_co"
+      ],
+      "text": "I could connect a call faster than you kids can type a message, and with a smile in my voice too."
+    },
+    {
+      "id": "c_sloppy_joes",
+      "about": [
+        "rosie",
+        "lincoln_elem"
+      ],
+      "text": "Grown men still stop me at the grocery store to say they miss my sloppy joes from the school cafeteria."
+    },
+    {
+      "id": "c_lunch_line",
+      "about": [
+        "rosie",
+        "lincoln_elem"
+      ],
+      "text": "In the cafeteria I always knew which children skipped breakfast. They got the bigger scoop."
+    },
+    {
+      "id": "c_walt_tv",
+      "about": [
+        "walt"
+      ],
+      "text": "Your grandpa argues with the news on the television, as if the anchorman can hear him."
+    },
+    {
+      "id": "c_walt_snore",
+      "about": [
+        "walt"
+      ],
+      "text": "Your grandpa snores like a lawn mower, and he swears he's never snored a day in his life."
+    },
+    {
+      "id": "c_walt_lures",
+      "about": [
+        "walt"
+      ],
+      "text": "Your grandpa has a tackle box full of lures he's never used, and he still comes home with a new one."
+    },
+    {
+      "id": "c_walt_jokes",
+      "about": [
+        "walt"
+      ],
+      "text": "Your grandpa tells the same three jokes at every family dinner, and I laugh every time, because somebody has to."
+    },
+    {
+      "id": "c_walt_coffee",
+      "about": [
+        "walt"
+      ],
+      "text": "Your grandpa makes coffee so strong the spoon could stand up in it."
+    },
+    {
+      "id": "c_walt_car",
+      "about": [
+        "walt",
+        "bel_air"
+      ],
+      "text": "Your grandpa used to polish that green car at red lights. People honked, and he waved like a movie star."
+    },
+    {
+      "id": "c_walt_dance",
+      "about": [
+        "walt"
+      ],
+      "text": "Your grandpa can't dance, but he'll ask me anyway. I love him for asking."
+    },
+    {
+      "id": "c_walt_cookies",
+      "about": [
+        "walt"
+      ],
+      "text": "Your grandpa can't find a thing in my kitchen, and that's the only reason my cookies last the week."
+    },
+    {
+      "id": "c_stan_laugh",
+      "about": [
+        "stan"
+      ],
+      "text": "Uncle Stan laughs so loud the neighbours' dog starts barking."
+    },
+    {
+      "id": "c_stan_cards",
+      "about": [
+        "stan"
+      ],
+      "text": "Uncle Stan can't play cards with a straight face. You can always tell if he's got a good hand."
+    },
+    {
+      "id": "c_stan_fish",
+      "about": [
+        "stan",
+        "walt"
+      ],
+      "text": "Uncle Stan and your grandpa argue about fishing like it's politics. Neither one ever catches anything."
+    },
+    {
+      "id": "c_dot_hats",
+      "about": [
+        "dot"
+      ],
+      "text": "My sister Dot wears a hat to everything, even the grocery store."
+    },
+    {
+      "id": "c_dot_calls",
+      "about": [
+        "dot"
+      ],
+      "text": "Dot calls me every Sunday night, and we talk until one of us dozes off."
+    },
+    {
+      "id": "c_dot_tease",
+      "about": [
+        "dot"
+      ],
+      "text": "Dot still teases me about tripping at her wedding. I tell her I was only trying to steal the show."
+    },
+    {
+      "id": "c_linda_bossy",
+      "about": [
+        "linda"
+      ],
+      "text": "Your mom was the bossiest little girl on the block. She lined up her dolls and gave them homework."
+    },
+    {
+      "id": "c_linda_pills",
+      "about": [
+        "linda"
+      ],
+      "text": "Your mom calls every evening to make sure I've taken my pills. I tell her the pills should be checking on me."
+    },
+    {
+      "id": "c_michael_toaster",
+      "about": [
+        "michael"
+      ],
+      "text": "Your uncle Michael takes apart anything with a screw in it. He fixed my toaster once, and it's never toasted the same."
+    },
+    {
+      "id": "c_michael_loud",
+      "about": [
+        "michael"
+      ],
+      "text": "Your uncle Michael explains the computer to me very slowly and very loudly, as if the trouble were my ears."
+    },
+    {
+      "id": "c_michael_pierogi",
+      "about": [
+        "michael"
+      ],
+      "text": "Your uncle Michael could eat a whole pan of pierogi as a boy, and then ask what was for dessert."
+    },
+    {
+      "id": "c_friend_rummy",
+      "about": [
+        "marge",
+        "bowling"
+      ],
+      "text": "My best friend and I have the same argument about the rules of gin rummy every single week."
+    },
+    {
+      "id": "c_friend_talks",
+      "about": [
+        "marge",
+        "bowling"
+      ],
+      "text": "My best friend talks through every frame at the bowling alley, and she still beats me half the time."
+    },
+    {
+      "id": "c_pickles_paper",
+      "about": [
+        "pickles"
+      ],
+      "text": "Pickles used to sit on the newspaper the minute anybody opened it."
+    },
+    {
+      "id": "c_pickles_walt",
+      "about": [
+        "pickles",
+        "walt"
+      ],
+      "text": "Pickles hated everybody except your grandpa, and your grandpa pretended not to like him back."
+    },
+    {
+      "id": "c_beagle_bells",
+      "about": [
+        "biscuit"
+      ],
+      "text": "That beagle of mine howled whenever the church bells rang, like he was joining the choir."
+    },
+    {
+      "id": "c_spaniel_ears",
+      "about": [
+        "buttons"
+      ],
+      "text": "The cocker spaniel's ears dragged in her water bowl, so the kitchen floor was always wet."
+    },
+    {
+      "id": "c_pierogi_pinch",
+      "about": [
+        "rosie"
+      ],
+      "text": "I make pierogi by hand the way my mother did, and I pinch every edge twice so they don't burst."
+    },
+    {
+      "id": "c_pie_secret",
+      "about": [
+        "rosie",
+        "county_fair"
+      ],
+      "text": "The secret to a good cherry pie is a pinch of almond, and not telling anybody about the almond."
+    },
+    {
+      "id": "c_candy_apples",
+      "about": [
+        "county_fair"
+      ],
+      "text": "The best thing at the county fair is still the candy apples, and I've tried everything they sell."
+    },
+    {
+      "id": "c_kochanie",
+      "about": [
+        "rosie",
+        "walt"
+      ],
+      "text": "I call your grandpa 'kochanie' if I'm happy with him. If I'm not, I use his whole name."
+    },
+    {
+      "id": "c_empty_chair",
+      "about": [
+        "rosie"
+      ],
+      "text": "On Christmas Eve we leave an empty chair at the table for a stranger, the old Polish way."
+    },
+    {
+      "id": "c_tomatoes_talk",
+      "about": [
+        "rosie"
+      ],
+      "text": "I talk to my tomatoes every morning. The squirrels listen better than your grandpa does."
+    },
+    {
+      "id": "c_lake_smell",
+      "about": [
+        "erie"
+      ],
+      "text": "On a windy day you can smell the lake from our backyard."
+    },
+    {
+      "id": "c_presque_sunset",
+      "about": [
+        "presque_isle"
+      ],
+      "text": "Presque Isle has the prettiest sunsets on the whole lake, and I'll argue with anybody who says otherwise."
+    },
+    {
+      "id": "c_bowling_shoes",
+      "about": [
+        "bowling"
+      ],
+      "text": "I bring my own bowling shoes. I'm not putting my feet where a hundred strangers have been."
+    }
+  ],
   "recipes": [
     {
       "id": "r_easy",
@@ -785,6 +1209,14 @@
       "nudges": [
         "You know, I keep meaning to put names under those dog pictures in my album. It's on the coffee table, dear.",
         "Did I ever show you my wedding picture on the sideboard? Turn it over sometime."
+      ],
+      "note_facts": [
+        [
+          "f_sockthief_ptr"
+        ],
+        [
+          "f_wedding"
+        ]
       ]
     },
     {
@@ -830,6 +1262,14 @@
       "nudges": [
         "That moon-landing plate by the TV, your grandpa bought it the same summer as the TV itself. Have a look.",
         "We've lived in a couple of places, you know. Ask me about the homes we had."
+      ],
+      "note_facts": [
+        [
+          "f_tv"
+        ],
+        [
+          "f_number_ptr"
+        ]
       ]
     },
     {
@@ -873,7 +1313,15 @@
         "Michael's old sled is still by the door. That boy and that sled, I tell you.",
         "Ask me what your grandpa calls me, dear. He's had a pet name for me since the day we met."
       ],
-      "smudged_text": "the bird Grandpa named me after + year of the big █████████ + !"
+      "smudged_text": "the bird Grandpa named me after + year of the big █████████ + !",
+      "note_facts": [
+        [
+          "f_nickname_ptr"
+        ],
+        [
+          "f_snowstorm"
+        ]
+      ]
     },
     {
       "id": "r_easy_2",
@@ -914,6 +1362,14 @@
       "nudges": [
         "Your grandpa got soaked on our honeymoon, did I ever tell you? That wedding picture brings it all back.",
         "Your mom was my very first baby, you know. Ask me when she came along, sweetheart."
+      ],
+      "note_facts": [
+        [
+          "f_honeymoon_ptr"
+        ],
+        [
+          "f_linda_born"
+        ]
       ]
     },
     {
@@ -955,6 +1411,14 @@
       "nudges": [
         "Did you see the spaniel in my album? Oh, she was my favorite. Ask me her name.",
         "That blue ribbon on the wall is my proudest moment, sweetheart. Ask me about it."
+      ],
+      "note_facts": [
+        [
+          "f_dog2_ptr"
+        ],
+        [
+          "f_pie"
+        ]
       ]
     },
     {
@@ -1000,6 +1464,14 @@
       "nudges": [
         "That bowling trophy is from the Tuesday league. I haven't missed a Tuesday in forty years.",
         "Two of my best days were at the county fair, you know. Ask me about the fair, sweetheart."
+      ],
+      "note_facts": [
+        [
+          "f_bowling_ptr"
+        ],
+        [
+          "f_met_walt"
+        ]
       ]
     },
     {
@@ -1040,6 +1512,14 @@
       "nudges": [
         "We got our first color TV just for the moon landing. Our dog loved lying in front of it.",
         "Our first little apartment had stairs that squeaked something awful. Ask me about it."
+      ],
+      "note_facts": [
+        [
+          "f_moon"
+        ],
+        [
+          "f_apt"
+        ]
       ]
     },
     {
@@ -1078,7 +1558,437 @@
       "nudges": [
         "Biscuit came home when I was just a little girl, you know. Ask me how old I was.",
         "I'm an Erie girl, born and raised. Ask me when I was born, sweetheart."
+      ],
+      "note_facts": [
+        [
+          "f_sockthief_ptr"
+        ],
+        [
+          "f_dog1"
+        ]
       ]
     }
+  ],
+  "topics": [
+    {
+      "id": "grandma",
+      "label": "You, Grandma",
+      "kind": "person",
+      "facts": [
+        "f_birth",
+        "f_polish",
+        "f_sister",
+        "f_job1",
+        "f_job2",
+        "f_garden",
+        "f_cookie",
+        "f_bowling"
+      ]
+    },
+    {
+      "id": "walt",
+      "label": "Grandpa Walt",
+      "kind": "person",
+      "match": [
+        "Walt",
+        "your grandpa",
+        "Grandpa"
+      ],
+      "facts": [
+        "f_met_walt",
+        "f_nickname",
+        "f_engaged",
+        "f_car",
+        "f_walt_hobby",
+        "f_stan"
+      ]
+    },
+    {
+      "id": "linda",
+      "label": "Mom (Linda)",
+      "kind": "person",
+      "match": [
+        "Linda",
+        "your mom"
+      ],
+      "facts": [
+        "f_linda_born"
+      ]
+    },
+    {
+      "id": "michael",
+      "label": "Uncle Michael",
+      "kind": "person",
+      "match": [
+        "Michael",
+        "Mikey"
+      ],
+      "facts": [
+        "f_michael_born",
+        "f_michael_arm",
+        "f_router"
+      ]
+    },
+    {
+      "id": "dot",
+      "label": "Great-aunt Dot",
+      "kind": "person",
+      "match": [
+        "Dot",
+        "Dorothy"
+      ],
+      "facts": [
+        "f_sister",
+        "f_dot_married"
+      ]
+    },
+    {
+      "id": "stan",
+      "label": "Uncle Stan",
+      "kind": "person",
+      "match": [
+        "Stan"
+      ],
+      "facts": [
+        "f_stan",
+        "f_stan_cabin",
+        "f_snowstorm"
+      ]
+    },
+    {
+      "id": "marge",
+      "label": "Marge Novak",
+      "kind": "person",
+      "match": [
+        "Marge"
+      ],
+      "facts": [
+        "f_marge",
+        "f_bowling"
+      ]
+    },
+    {
+      "id": "pets",
+      "label": "Your pets",
+      "kind": "pet",
+      "facts": [
+        "f_dog2",
+        "f_dog1",
+        "f_cat"
+      ]
+    },
+    {
+      "id": "biscuit",
+      "label": "Biscuit",
+      "kind": "pet",
+      "match": [
+        "Biscuit"
+      ],
+      "facts": [
+        "f_dog1",
+        "f_dog1_habit",
+        "f_dog1_breed"
+      ]
+    },
+    {
+      "id": "buttons",
+      "label": "Buttons",
+      "kind": "pet",
+      "match": [
+        "Buttons"
+      ],
+      "facts": [
+        "f_dog2"
+      ]
+    },
+    {
+      "id": "pickles",
+      "label": "Pickles the cat",
+      "kind": "pet",
+      "match": [
+        "Pickles"
+      ],
+      "facts": [
+        "f_cat"
+      ]
+    },
+    {
+      "id": "homes",
+      "label": "Your homes",
+      "kind": "place",
+      "facts": [
+        "f_house",
+        "f_apt"
+      ]
+    },
+    {
+      "id": "cherry_st",
+      "label": "Cherry Street",
+      "kind": "place",
+      "match": [
+        "Cherry Street",
+        "Cherry St"
+      ],
+      "facts": [
+        "f_apt",
+        "f_apt_number",
+        "f_linda_born"
+      ]
+    },
+    {
+      "id": "maple_ave",
+      "label": "Maple Avenue",
+      "kind": "place",
+      "match": [
+        "Maple Avenue"
+      ],
+      "facts": [
+        "f_house",
+        "f_house_number",
+        "f_michael_born"
+      ]
+    },
+    {
+      "id": "erie",
+      "label": "Erie",
+      "kind": "place",
+      "match": [
+        "Erie"
+      ],
+      "facts": [
+        "f_birth",
+        "f_walt_hobby"
+      ]
+    },
+    {
+      "id": "niagara",
+      "label": "Niagara Falls",
+      "kind": "place",
+      "match": [
+        "Niagara"
+      ],
+      "facts": [
+        "f_honeymoon"
+      ]
+    },
+    {
+      "id": "cabin",
+      "label": "Stan's fishing cabin",
+      "kind": "place",
+      "match": [
+        "fishing cabin",
+        "outhouse",
+        "Presque Isle"
+      ],
+      "facts": [
+        "f_stan_cabin",
+        "f_snowstorm"
+      ]
+    },
+    {
+      "id": "fair",
+      "label": "The county fair",
+      "kind": "event",
+      "match": [
+        "county fair",
+        "the fair"
+      ],
+      "facts": [
+        "f_met_walt",
+        "f_pie"
+      ]
+    },
+    {
+      "id": "wedding",
+      "label": "The wedding",
+      "kind": "event",
+      "match": [
+        "married",
+        "wedding",
+        "said 'I do'"
+      ],
+      "facts": [
+        "f_wedding",
+        "f_song",
+        "f_honeymoon"
+      ]
+    },
+    {
+      "id": "proposal",
+      "label": "Walt's proposal",
+      "kind": "event",
+      "match": [
+        "proposed",
+        "proposal",
+        "pierogi"
+      ],
+      "facts": [
+        "f_engaged"
+      ]
+    },
+    {
+      "id": "snowstorm",
+      "label": "The big snowstorm",
+      "kind": "event",
+      "match": [
+        "snowstorm"
+      ],
+      "facts": [
+        "f_snowstorm"
+      ]
+    },
+    {
+      "id": "moon",
+      "label": "The moon landing",
+      "kind": "event",
+      "match": [
+        "moon landing",
+        "on the moon"
+      ],
+      "facts": [
+        "f_moon",
+        "f_tv"
+      ]
+    },
+    {
+      "id": "tv",
+      "label": "The color TV",
+      "kind": "thing",
+      "match": [
+        "color TV"
+      ],
+      "facts": [
+        "f_tv",
+        "f_moon"
+      ]
+    },
+    {
+      "id": "sled",
+      "label": "Michael's sled",
+      "kind": "thing",
+      "match": [
+        "sled"
+      ],
+      "facts": [
+        "f_michael_arm",
+        "f_snowstorm"
+      ]
+    },
+    {
+      "id": "switchboard",
+      "label": "The switchboard job",
+      "kind": "event",
+      "match": [
+        "switchboard",
+        "telephone exchange"
+      ],
+      "facts": [
+        "f_job1",
+        "f_marge"
+      ]
+    },
+    {
+      "id": "lincoln",
+      "label": "Lincoln Elementary",
+      "kind": "place",
+      "match": [
+        "Lincoln Elementary",
+        "cafeteria"
+      ],
+      "facts": [
+        "f_job2",
+        "f_pie"
+      ]
+    },
+    {
+      "id": "bowling",
+      "label": "Tuesday bowling",
+      "kind": "event",
+      "match": [
+        "bowling",
+        "bowl"
+      ],
+      "facts": [
+        "f_bowling",
+        "f_bowling_score",
+        "f_marge"
+      ]
+    },
+    {
+      "id": "pie",
+      "label": "The blue ribbon",
+      "kind": "thing",
+      "match": [
+        "blue ribbon",
+        "cherry pie"
+      ],
+      "facts": [
+        "f_pie"
+      ]
+    },
+    {
+      "id": "car",
+      "label": "The Bel Air",
+      "kind": "thing",
+      "match": [
+        "Bel Air",
+        "Chevy"
+      ],
+      "facts": [
+        "f_car"
+      ]
+    },
+    {
+      "id": "song",
+      "label": "\"Unchained Melody\"",
+      "kind": "thing",
+      "match": [
+        "Unchained Melody"
+      ],
+      "facts": [
+        "f_song"
+      ]
+    },
+    {
+      "id": "sparrow",
+      "label": "Grandpa's pet name",
+      "kind": "thing",
+      "match": [
+        "pet name",
+        "calls me",
+        "songbird"
+      ],
+      "facts": [
+        "f_nickname"
+      ]
+    },
+    {
+      "id": "kolaczki",
+      "label": "Kolaczki",
+      "kind": "thing",
+      "match": [
+        "kolaczki"
+      ],
+      "facts": [
+        "f_cookie"
+      ]
+    },
+    {
+      "id": "wifi",
+      "label": "The Wi-Fi",
+      "kind": "thing",
+      "facts": [
+        "f_router"
+      ]
+    }
+  ],
+  "start_topics": [
+    "grandma",
+    "walt",
+    "linda",
+    "michael",
+    "pets",
+    "homes",
+    "wifi"
   ]
 }

@@ -15,7 +15,7 @@ import type { AskResponse, GuessResponse, ItemResponse, RunView } from "@gwp/eng
 const dotenv = loadEnv();
 const config = readConfig(process.env, dotenv, process.argv);
 const data = loadGameData(config.dataDir);
-const brain: GrandmaBrain = config.grandmaMode === "llm" ? new LlmBrain(config.grandmaModel, { apiKey: config.apiKey!, baseURL: config.apiBaseUrl }) : new MockBrain();
+const brain: GrandmaBrain = config.grandmaMode === "llm" ? new LlmBrain(config.grandmaModel, { apiKey: config.apiKey!, baseURL: config.apiBaseUrl, provider: config.provider }) : new MockBrain();
 const app = createApp({ data, brain, store: new RunStore(config.varDir), asksPerMinute: 1000 });
 
 const call = async <T>(path: string, payload: unknown): Promise<T> => {

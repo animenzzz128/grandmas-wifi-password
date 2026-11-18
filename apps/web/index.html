@@ -2,7 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#3a2418" />
+    <meta name="description" content="The password is on a sticky note. The answers are in Grandma." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Grandma's Wi-Fi" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- The house and the fonts start downloading with the page, not after the game's code. -->
+    <link rel="preload" href="/models/house/room.glb" as="fetch" crossorigin />
+    <link rel="preload" href="/fonts/Fraunces.ttf" as="font" type="font/ttf" crossorigin />
     <title>Grandma's Wi-Fi Password</title>
   </head>
   <body>

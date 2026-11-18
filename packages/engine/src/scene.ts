@@ -20,16 +20,32 @@ const Prop = z.strictObject({
   rotation_y: z.number().optional(),
   color: z.string(),
   collide: z.boolean().default(true),
+  /**
+   * The node in the room model (room.glb, built in Blender) that draws this object, e.g. "PROP_album". Without
+   * it the client draws the object itself (models.ts).
+   */
+  model: z.string().optional(),
+});
+
+/** A camera view of the room (tap-to-look play): where the camera stands, what it looks at, its field of view. */
+const View = z.strictObject({
+  id: z.string(),
+  label: z.string(),
+  pos: Vec3,
+  look: Vec3,
+  fov: z.number(),
 });
 
 /** `fixture`: something you open and look into (the fridge), but can't carry. */
-export const InteractKind = z.enum(["grandma", "clue", "note", "router", "cookie_jar", "glasses", "fixture"]);
+export const InteractKind = z.enum(["grandma", "clue", "note", "router", "cookie_jar", "glasses", "fixture", "phone"]);
 export type InteractKind = z.infer<typeof InteractKind>;
 
 const Interactable = Prop.extend({
   kind: InteractKind,
   label: z.string(),
   inspect_text: z.string().optional(),
+  /** The view it's best seen from (tapping it from elsewhere moves the camera there first). */
+  view: z.string().optional(),
   /** SERVER-ONLY: which of Grandma's facts this object brings to mind when shown to her. */
   fact_ids: z.array(z.string()).optional(),
 });
@@ -47,6 +63,10 @@ export const SceneManifest = z.strictObject({
     fog_color: z.string(),
   }),
   spawn: z.strictObject({ position: Vec3, yaw: z.number() }),
+  /** The room model the props live in (a glTF under the web client's public folder), if any. */
+  model: z.string().optional(),
+  /** Camera views, the first one the overview. */
+  views: z.array(View).optional(),
   props: z.array(Prop),
   interactables: z.array(Interactable),
 });

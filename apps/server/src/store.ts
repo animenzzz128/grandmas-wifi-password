@@ -28,7 +28,7 @@ export interface TurnLog {
   attempts?: number;
   validatorErrors?: string[];
   fallback?: boolean;
-  usage?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  usage?: { input: number; output: number; cacheRead: number; cacheWrite: number; costUsd?: number };
   /** Model cost of this turn in USD (list prices). */
   costUsd?: number;
   /** Daily Grandma number, for visits to the daily puzzle. */
