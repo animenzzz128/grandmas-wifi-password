@@ -26,7 +26,7 @@
         {
           "player": "When did you and Grandpa get married?",
           "grandma": {
-            "reply": "We got married in June at St. Stanislaus church, the June after Walt proposed. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
+            "reply": "We got married in June at St. Stanislaus church, the June after Walt proposed. Michael broke his arm sledding the year he turned eleven, and he still blames the cocker spaniel.",
             "fact_ids_used": [
               "f_wedding",
               "f_michael_arm"
@@ -190,7 +190,7 @@
         {
           "player": "What was your wedding song?",
           "grandma": {
-            "reply": "Don't tell your grandfather I said that. Our wedding song was 'Moon River'. Walt stepped on my feet the whole time. We got married in June of 1961 at St. Stanislaus church, the June after Walt proposed.",
+            "reply": "Don't tell your grandfather I said that. Our wedding song was 'Unchained Melody'. Walt stepped on my feet the whole time. We got married in June of 1961 at St. Stanislaus church, the June after Walt proposed.",
             "fact_ids_used": [
               "f_song",
               "f_wedding"
@@ -205,7 +205,7 @@
         {
           "player": "What's the name of your sister?",
           "grandma": {
-            "reply": "My little sister Dorothy, we all call her Dot, is three years younger than me. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
+            "reply": "My little sister Dorothy, we all call her Dot, is three years younger than me. Michael broke his arm sledding the year he turned eleven, and he still blames the cocker spaniel.",
             "fact_ids_used": [
               "f_sister",
               "f_michael_arm"
@@ -257,7 +257,7 @@
         {
           "player": "What do you grow in the garden?",
           "grandma": {
-            "reply": "I grow tomatoes in the backyard and the squirrels eat half of them. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
+            "reply": "I grow tomatoes in the backyard and the squirrels eat half of them. Michael broke his arm sledding the year he turned eleven, and he still blames the cocker spaniel.",
             "fact_ids_used": [
               "f_garden",
               "f_michael_arm"
@@ -503,7 +503,7 @@
         {
           "player": "When did Michael break his arm?",
           "grandma": {
-            "reply": "Michael broke his arm sledding the year he turned eleven, and he still blames the dog. Uncle Stan is your grandpa's older brother. Loud as a foghorn.",
+            "reply": "Michael broke his arm sledding the year he turned eleven, and he still blames the cocker spaniel. Uncle Stan is your grandpa's older brother. Loud as a foghorn.",
             "fact_ids_used": [
               "f_michael_arm",
               "f_stan"
@@ -600,7 +600,7 @@
         {
           "player": "What happened at his cabin?",
           "grandma": {
-            "reply": "Sweetheart. The big snowstorm was the same winter Michael broke his arm. Uncle Stan got stuck in the outhouse at the fishing cabin. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
+            "reply": "Sweetheart. The big snowstorm was the same winter Michael broke his arm. Uncle Stan got stuck in the outhouse at the fishing cabin. Michael broke his arm sledding the year he turned eleven, and he still blames the cocker spaniel.",
             "fact_ids_used": [
               "f_snowstorm",
               "f_michael_arm"
@@ -788,7 +788,7 @@
         {
           "player": "What is the Wi-Fi password?",
           "grandma": {
-            "reply": "Now where was I. Michael set up the Wi-Fi box and wrote the hint on that sticky note. I never could remember these things. Michael broke his arm sledding the year he turned eleven, and he still blames the dog.",
+            "reply": "Now where was I. Michael set up the Wi-Fi box and wrote the hint on that sticky note. I never could remember these things. Michael broke his arm sledding the year he turned eleven, and he still blames the cocker spaniel.",
             "fact_ids_used": [
               "f_router",
               "f_michael_arm"
@@ -921,7 +921,7 @@
         {
           "player": "Ugh, boring. What does Grandpa call you, old lady?",
           "grandma": {
-            "reply": "Your grandpa has called me 'Sparrow' since the day we met, because I never stop chirping. Our wedding song was 'Moon River'. Walt stepped on my feet the whole time.",
+            "reply": "Your grandpa has called me 'Sparrow' since the day we met, because I never stop chirping. Our wedding song was 'Unchained Melody'. Walt stepped on my feet the whole time.",
             "fact_ids_used": [
               "f_nickname",
               "f_song"
@@ -1033,7 +1033,7 @@
         {
           "player": "What does Grandpa call you?",
           "grandma": {
-            "reply": "Your grandpa has called me 'Sparrow' since the day we met, because I never stop chirping. Our wedding song was 'Moon River'. Walt stepped on my feet the whole time.",
+            "reply": "Your grandpa has called me 'Sparrow' since the day we met, because I never stop chirping. Our wedding song was 'Unchained Melody'. Walt stepped on my feet the whole time.",
             "fact_ids_used": [
               "f_nickname",
               "f_song"
@@ -1130,7 +1130,7 @@
         {
           "player": "What are your favorite cookies?",
           "grandma": {
-            "reply": "Sweetheart. My favorite cookies are kolaczki with apricot filling, my mother's recipe. Our wedding song was 'Moon River'. Walt stepped on my feet the whole time.",
+            "reply": "Sweetheart. My favorite cookies are kolaczki with apricot filling, my mother's recipe. Our wedding song was 'Unchained Melody'. Walt stepped on my feet the whole time.",
             "fact_ids_used": [
               "f_cookie",
               "f_song"

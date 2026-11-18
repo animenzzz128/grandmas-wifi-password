@@ -7,6 +7,7 @@
  * Colours given as hex are sRGB (three converts them); constants inside the shader code are linear, as in Godot.
  */
 import { AdditiveBlending, Color, DoubleSide, MeshBasicMaterial, MeshPhysicalMaterial, ShaderMaterial } from "three";
+import type { Texture } from "three";
 import type { Material, WebGLProgramParametersWithUniforms } from "three";
 
 /** Shared clock for animated materials (sky stars, the TV picture, glints). Advanced by the room each frame. */
@@ -430,7 +431,27 @@ export const highlightMaterial = new ShaderMaterial({
 // ---------------------------------------------------------------- tuned standard materials
 
 function std(color: string, roughness: number, extra: Partial<ConstructorParameters<typeof MeshPhysicalMaterial>[0]> = {}) {
-  return new MeshPhysicalMaterial({ color, roughness, ...extra });
+  const m = new MeshPhysicalMaterial({ color, roughness, ...extra });
+  if ((extra.metalness ?? 0) >= 0.9) metals.add(m);
+  if (metalEnv && metals.has(m)) Object.assign(m, { envMap: metalEnv, envMapIntensity: METAL_ENV_INTENSITY });
+  return m;
+}
+
+/**
+ * Metals (brass, gold, chrome) reflect a soft room (iteration 56). three.js metal with nothing to reflect is
+ * near black: the album's gold label read as a black square and the teapot's gold band as soot. Only metals
+ * get it, so the room's lighting is unchanged.
+ */
+const metals = new Set<MeshPhysicalMaterial>();
+let metalEnv: Texture | null = null;
+const METAL_ENV_INTENSITY = 0.75;
+export function setMetalEnvironment(env: Texture) {
+  metalEnv = env;
+  for (const m of metals) {
+    m.envMap = env;
+    m.envMapIntensity = METAL_ENV_INTENSITY;
+    m.needsUpdate = true;
+  }
 }
 
 /** Material names that use object-space patterns: their meshes can't be merged into one world-space mesh. */

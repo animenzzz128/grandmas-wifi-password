@@ -8,7 +8,8 @@ import type { GrandmaWorld, Recipe } from "./world.ts";
 import type { RunState } from "./run.ts";
 import { RULES } from "./rules.ts";
 import { noteText, stars } from "./run.ts";
-import { noteTopics, topicReadable, worldTopics } from "./topics.ts";
+import { noteParts, noteTopics, topicReadable, worldTopics } from "./topics.ts";
+import { factById, slotParts } from "./world.ts";
 
 export const MoodSchema = z.enum(["happy", "nostalgic", "teasing", "confused", "sleepy", "suspicious", "worried"]);
 
@@ -70,6 +71,8 @@ export const RunResult = z.strictObject({
    * failing on purpose with three free guesses would give away today’s answer (security review E).
    */
   password: z.string().optional(),
+  /** With the password: how each part follows from the clues (iteration 56, review F10). */
+  explain: z.array(z.string()).optional(),
 });
 
 /** A topic card as the player sees it. */
@@ -126,6 +129,13 @@ export const NoteChoice = z.strictObject({
   text: z.string(),
 });
 export const NotesResponse = z.strictObject({ notes: z.array(NoteChoice) });
+
+/** A visit still in progress, to pick it up again after a reload (iteration 56): the run and what was said. */
+export const ResumeResponse = z.strictObject({
+  run: RunView,
+  history: z.array(z.strictObject({ role: z.enum(["player", "grandma"]), text: z.string(), mood: z.string().optional() })),
+});
+export type ResumeResponse = z.infer<typeof ResumeResponse>;
 
 /** Looking at an object can bring up new topic cards (names on a photo, a label). */
 export const LookResponse = z.strictObject({ newTopics: z.array(z.string()), run: RunView });
@@ -264,10 +274,26 @@ export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe, 
           naps: state.naps,
           cookiesUsed: state.cookiesUsed,
           par: recipe.par ?? RULES.defaultPar[recipe.difficulty],
-          ...(opts.hidePassword ? {} : { password: recipe.password }),
+          ...(opts.hidePassword ? {} : { password: recipe.password, explain: explainParts(world, recipe) }),
         }
       : undefined,
   };
+}
+
+/**
+ * After the visit: each note line, its answer, and the memories that lead there for the hidden years
+ * ("year of the big snowstorm → 1977: the winter Michael broke his arm sledding…").
+ */
+export function explainParts(world: GrandmaWorld, recipe: Recipe): string[] {
+  const lines = noteParts(recipe.note_text);
+  const answers = slotParts(world, recipe);
+  return recipe.slots.map((slot, i) => {
+    const head = `${lines[i] ?? `part ${i + 1}`} → ${answers[i]}`;
+    const anchor = slot.requires_anchor ? (world.anchors ?? []).find((a) => a.id === slot.requires_anchor) : undefined;
+    if (!anchor) return head;
+    const via = (anchor.via_fact_ids ?? []).map((id) => factById(world, id)?.text).filter(Boolean);
+    return `${head}: ${anchor.phrase}${via.length ? `. ${via.join(" ")}` : ""}`;
+  });
 }
 
 /** The player's cards, note parts first, labelled as they can read them now. */

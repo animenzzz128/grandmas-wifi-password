@@ -77,7 +77,7 @@ input { border-radius: 10px; border-color: rgba(58, 42, 30, 0.25); }
 .cup-fill { position: absolute; left: 0; right: 0; bottom: 0; background: #8a4a1c; transition: height 0.5s; }
 .stats .stat-row { color: var(--ink-soft); }
 
-.top-center { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: min(760px, 60vw); }
+.top-center { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: max-content; display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: min(760px, 60vw); }
 .view-tabs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: safe center; }
 .view-tabs button { background: rgba(255, 250, 240, 0.86); color: var(--ink); padding: 5px 12px; font-size: 14px; box-shadow: inset 0 0 0 1px rgba(58, 42, 30, 0.2); }
 .view-tabs button.on { background: #fff; box-shadow: inset 0 0 0 2px var(--accent); }
@@ -185,3 +185,61 @@ html, body, #root { background: radial-gradient(ellipse at 60% 40%, #3a2618, #12
 
 /* The close-up card's own loading line sits in the middle of its canvas. */
 .examine-stage .loading-pill { position: static; transform: none; white-space: nowrap; }
+
+/* Guided first visit (iteration 56): a spotlight on the next thing to do and a speech bubble. Clicks pass through. */
+.tutorial { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+.tutorial-ring {
+  position: fixed; border-radius: 14px; pointer-events: none;
+  box-shadow: 0 0 0 3px #ffd36b, 0 0 18px 6px rgba(255, 211, 107, 0.55), 0 0 0 9999px rgba(20, 12, 8, 0.38);
+  animation: tutorial-pulse 1.6s ease-in-out infinite;
+  transition: left 0.25s ease, top 0.25s ease, width 0.25s ease, height 0.25s ease;
+}
+@keyframes tutorial-pulse { 50% { box-shadow: 0 0 0 5px #ffd36b, 0 0 26px 10px rgba(255, 211, 107, 0.7), 0 0 0 9999px rgba(20, 12, 8, 0.38); } }
+.tutorial-bubble {
+  position: fixed; pointer-events: auto; zoom: var(--text-scale, 1);
+  background: var(--paper); color: var(--ink); border-radius: 14px; padding: 12px 14px 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(58, 42, 30, 0.15);
+  animation: tutorial-in 0.25s ease-out;
+}
+.tutorial-bubble small { color: var(--ink-soft); font-weight: 700; letter-spacing: 0.02em; }
+.tutorial-bubble p { margin: 4px 0 10px; font-size: 15px; line-height: 1.4; }
+.tutorial-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.tutorial-actions button { padding: 6px 14px; font-size: 14px; }
+@keyframes tutorial-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .tutorial-ring, .tutorial-bubble { animation: none; transition: none; } }
+.contrast .tutorial-ring { box-shadow: 0 0 0 4px #ffeb3b, 0 0 0 9999px rgba(0, 0, 0, 0.6); }
+
+/* Iteration 56 (review F8): hints readable over any wallpaper; a cue that the view tabs scroll on narrow screens. */
+.how-line { background: rgba(30, 20, 12, 0.5); padding: 3px 12px; border-radius: 999px; }
+.examine-hint { opacity: 0.9; color: #f3e6cf; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+@media (max-width: 820px) {
+  .view-tabs { -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent); mask-image: linear-gradient(90deg, #000 82%, transparent); padding-right: 28px; }
+}
+.modal .explain { text-align: left; font-size: 14px; line-height: 1.4; margin: 6px 0 10px; padding-left: 18px; color: var(--ink-soft); max-width: 46ch; }
+
+/* Grandma's mood emote (iteration 56): a little speech bubble that pops in and floats away. */
+.emote { font-size: 30px; line-height: 1; padding: 6px 8px; background: #fffaf0; border-radius: 16px 16px 16px 4px; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3); animation: emote 2.6s ease-out forwards; }
+@keyframes emote { 0% { opacity: 0; transform: translateY(6px) scale(0.6); } 12% { opacity: 1; transform: translateY(0) scale(1.08); } 20% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
+@media (prefers-reduced-motion: reduce) { .emote { animation: none; } }
+
+/* "Things here" (iteration 56): the hotspot list for keyboard and screen-reader players, or anyone who can't spot a sparkle. */
+.things-here { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.things-toggle { font-size: 12px; padding: 2px 10px; color: #fff8ea; background: rgba(30, 20, 12, 0.5); border-radius: 999px; }
+.things-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: min(720px, 92vw); }
+.things-list button { font-size: 14px; padding: 5px 12px; }
+.things-list span { color: #fff8ea; text-shadow: 0 1px 3px #000; font-size: 13px; }
+
+/* Accessibility fixes (iteration 56): high contrast kept the chat's dark ink on its new black background, and
+   large text pushed the tea panel into the view tabs. */
+.contrast .dialog .chat-log, .contrast .dialog .chat-log .line { color: #fff !important; }
+.contrast .dialog .chat-log .line.grandma { color: #ffe08a !important; }
+.contrast .dialog .chat-log .line.system { color: #9fd3ff !important; }
+.contrast .dialog .chat-log .line.player { color: #c8f0c8 !important; }
+.contrast .how-line, .contrast .things-toggle { background: #000; color: #fff; outline: 1px solid #fff; }
+.big-text .top-center { top: calc(108px * var(--text-scale, 1)); }
+.big-text .top-left .objectives { margin-top: calc(56px * var(--text-scale, 1)); }
+.contrast .hud-panel .stat-row, .contrast .hud-panel .stat-row span, .contrast .hud-panel small { color: #fff !important; }
+.big-text .how-line { margin-top: 2px; }
+.title-buttons .resume small { display: block; font-size: 13px; font-weight: 600; opacity: 0.85; margin-top: 2px; }
+.hud .things-here .things-toggle { background: rgba(30, 20, 12, 0.6); color: #fff8ea; text-decoration: none; box-shadow: none; }
+.big-text .top-right .sticky.pinned { display: none; } /* large text: the note is one tap away (Note), not over the tabs (review 3, F4) */

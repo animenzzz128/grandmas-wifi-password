@@ -4,7 +4,7 @@
  * ("how much does the LLM add over a keyword matcher?").
  */
 import type { Fact, GrandmaWorld, Recipe } from "./world.ts";
-import { chainFacts, containsAllSlots, entityById, factById, hiddenYears } from "./world.ts";
+import { chainFacts, containsAllSlots, entityById, factById, hiddenYears, slotAnswers } from "./world.ts";
 import type { TurnInput } from "./prompt.ts";
 import type { GrandmaOutput } from "./validator.ts";
 import { expandedTokens, factKeywords, hashString, pick, rng, scrubYears, tokens } from "./text.ts";
@@ -35,6 +35,8 @@ export function scoreFacts(world: GrandmaWorld, query: Set<string>, text = ""): 
   const typed = new Set(tokens(text));
   const aboutHer = /\byou(rs?|rself)?\b/i.test(text);
   return world.facts
+    // Pointer memories ("the falls everyone honeymoons at…") answer a note line's card only, never a typed question.
+    .filter((fact) => !(fact.tags ?? []).includes("pointer"))
     .map((fact) => {
       let score = 0;
       for (const k of factKeywords(world, fact)) if (query.has(k) && !NOT_A_TOPIC.has(k)) score += 1;
@@ -53,16 +55,41 @@ export function scoreFacts(world: GrandmaWorld, query: Set<string>, text = ""): 
     .sort((a, b) => b.score - a.score || b.fact.salience - a.fact.salience);
 }
 
+/** Greetings and small talk: short, and about her, not about any memory ("How are you today, Grandma?"). */
+export function isSmallTalk(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (t.split(/\s+/).length > 8) return false;
+  return /^(hi|hello|hey|hiya|morning|good (morning|afternoon|evening)|nice to see you|thank(s| you)|i love you|love you|bye|goodbye)\b/.test(t) || /\bhow (are|r) (you|u)\b|\bhow('?s| is) it going\b|\bhow do you feel\b|\bhow have you been\b/.test(t);
+}
+
 export function mockGrandmaReply(args: {
   world: GrandmaWorld;
   recipe: Recipe;
   input: TurnInput;
   seed: string;
   recentFactIds: readonly string[];
+  /** Everything she has told this visit: asides prefer memories she hasn't (review 2, F4: one filler told 3 times). */
+  heardFactIds?: readonly string[];
 }): GrandmaOutput {
   const { world, input } = args;
   const rand = rng(hashString(args.seed));
   const hidden = hiddenYears(world, args.recipe);
+
+  // The password's own parts never come up as a random aside: a tangent that says "our house number is 412"
+  // to a question about nothing hands over half of Medium (iteration 56). Asked for, they're fine.
+  const slotIds = new Set(args.recipe.slots.map((s) => s.fact_id));
+  for (const f of world.facts) if ((f.tags ?? []).includes("pointer")) slotIds.add(f.id); // not as asides either
+  // Nor any memory that says an answer word in passing ("bowling league with Marge" on the Marge note).
+  const answerWords = slotAnswers(world, args.recipe)
+    .flat()
+    .map((a) => String(a).toLowerCase())
+    .filter((a) => a.length >= 3);
+  for (const f of world.facts) if (answerWords.some((a) => f.text.toLowerCase().includes(a))) slotIds.add(f.id);
+
+  const small = world.profile.small_talk;
+  if (input.kind === "ask" && !input.focus && small?.length && isSmallTalk(input.text)) {
+    return { reply: pick(small, rand), fact_ids_used: [], distractor_ids: [], mood: "happy" };
+  }
 
   let main: Fact | undefined;
   const focus = input.kind === "ask" ? input.focus : undefined;
@@ -96,16 +123,11 @@ export function mockGrandmaReply(args: {
 
   const tic = pick(world.profile.verbal_tics, rand);
   if (!main) {
-    const tangent = pick(
-      world.facts.filter((f) => f.salience >= 4 && !args.recentFactIds.includes(f.id)),
-      rand,
-    );
-    return {
-      reply: `${tic}. I don't recall anything about that, sweetheart. ${scrub(tangent.text)}`,
-      fact_ids_used: [tangent.id],
-      distractor_ids: [tangent.id],
-      mood: "confused",
-    };
+    // Nothing matched: she says so and points at what she does know, without a random memory (review 2, F4:
+    // "What was the beagle called" got an unrelated story at full price). The server charges less for it.
+    const lost = pick(["Hmm. I don't recall anything about that, sweetheart.", "Oh, my memory. I don't know about that one, dear.", "Now where was I. That one's gone, sweetheart."], rand);
+    const steer = pick(["Ask me about the people on your cards, I'm good at those.", "Try me on the family, or the old days. Names help.", "Use a name, dear. My memory hangs everything on names."], rand);
+    return { reply: `${lost} ${steer}`, fact_ids_used: [], distractor_ids: [], mood: "confused" };
   }
 
   // One tangent: prefer a fact sharing a tag, never the confusable partner (that would be too helpful),
@@ -126,12 +148,23 @@ export function mockGrandmaReply(args: {
   }
   const chained = (args.recipe.separate ?? []).filter((g) => g.includes(main!.id)).flat();
   const avoid = new Set([main.id, ...(main.confusable_with ?? []), ...args.recentFactIds, ...chained]);
+  // Nor anything easily mixed up with a memory like this one: "our first home, Cherry Street" next to "our house
+  // number is 412" reads as one place (review 2, F9).
+  for (const f of world.facts)
+    if ((f.confusable_with ?? []).includes(main.id) || ((f.confusable_with?.length ?? 0) > 0 && (main.confusable_with?.length ?? 0) > 0 && (f.tags ?? []).some((t) => (main!.tags ?? []).includes(t)))) avoid.add(f.id);
   const tags = new Set(main.tags ?? []);
-  const pool = world.facts.filter((f) => !avoid.has(f.id) && f.salience >= 2 && !containsAllSlots(world, args.recipe, `${main!.text} ${f.text}`));
+  // Nor an aside that repeats a number she just said ("My best score was 212. My best bowling score ever was 212").
+  const saidNumbers = new Set(main.text.match(/\d{2,}/g) ?? []);
+  const pool = world.facts.filter((f) => !avoid.has(f.id) && !slotIds.has(f.id) && f.salience >= 2 && !(f.text.match(/\d{2,}/g) ?? []).some((n) => saidNumbers.has(n)) && !containsAllSlots(world, args.recipe, `${main!.text} ${f.text}`));
+  const heard = new Set(args.heardFactIds ?? []);
+  const fresh = pool.filter((f) => !heard.has(f.id));
+  if (fresh.length) pool.splice(0, pool.length, ...fresh);
   const related = pool.filter((f) => (f.tags ?? []).some((t) => tags.has(t)));
   const tangent = related.length && rand() < 0.7 ? pick(related, rand) : pool.length ? pick(pool, rand) : undefined;
 
-  const opener = rand() < 0.5 ? `${tic}. ` : "";
+  // A tic that comments on what she just said ("Don't tell your grandfather I said that") can't open a reply.
+  const openers = world.profile.verbal_tics.filter((x) => !/said that/i.test(x));
+  const opener = rand() < 0.5 && openers.length ? `${pick(openers, rand)}. ` : "";
   const reply = tangent ? `${opener}${say(main)} ${say(tangent)}` : `${opener}${say(main)}`;
   const mood = MOOD_BY_TAG[(main.tags ?? []).find((t) => t in MOOD_BY_TAG) ?? ""] ?? "happy";
   return {

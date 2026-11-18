@@ -101,6 +101,20 @@
         }
       }
     },
+    "colour": {
+      "description": "Little things: everyday colour, not clues. No digits, answer words, time phrases or new names (checked by npm run validate).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "about", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "about": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "text": { "type": "string" }
+        }
+      }
+    },
     "topics": {
       "type": "array",
       "description": "Topic cards. Without them, cards are made from the entities.",

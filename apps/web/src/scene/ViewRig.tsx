@@ -69,6 +69,18 @@ export function ViewRig({ scene, info }: { scene: PublicScene; info: HouseInfo |
     r.layers.set(HITBOX_LAYER);
     return r;
   }, []);
+  /** The tappable objects' own meshes, for exact picking before the generous boxes (review 3, F11). */
+  const meshRay = useMemo(() => new Raycaster(), []);
+  const targets = useMemo(() => {
+    const list: Object3D[] = [];
+    const idOf = new Map<Object3D, string>();
+    for (const it of scene.interactables)
+      for (const m of (it.model ? info?.meshes.get(it.model) : undefined) ?? []) {
+        list.push(m);
+        idOf.set(m, it.id);
+      }
+    return { list, idOf };
+  }, [scene, info]);
 
   /** Shot for a view id, or for "focus:<object id>". */
   const shotFor = (id: string): Shot | null => {
@@ -82,7 +94,23 @@ export function ViewRig({ scene, info }: { scene: PublicScene; info: HouseInfo |
       return focusShot(c, s, from);
     }
     const v = views.get(id);
-    return v ? { pos: new Vector3(...v.pos), look: new Vector3(...v.look), fov: v.fov } : null;
+    if (!v) return null;
+    const look = new Vector3(...v.look);
+    // A phone held upright sees a narrow slice of a view composed for 4:3. Aim it at the middle of that view's
+    // things instead, the tools the player must reach (note, router, phone, glasses) counting three times
+    // (review 2, F6: the hall phone was off-screen on a phone).
+    if (typeof window !== "undefined" && window.innerWidth / Math.max(1, window.innerHeight) < 0.9) {
+      const items = scene.interactables.filter((i) => i.view === id);
+      // Only the hall's must-reach tools pull harder; elsewhere every object counts the same (review 3, F16: the
+      // album sat off the edge of the coffee table view on a phone).
+      const weight = (k: string) => (["note", "router", "phone"].includes(k) ? 3 : 1);
+      const total = items.reduce((a, i) => a + weight(i.kind), 0);
+      if (total > 0) {
+        look.x = items.reduce((a, i) => a + i.position[0] * weight(i.kind), 0) / total;
+        look.z = items.reduce((a, i) => a + i.position[2] * weight(i.kind), 0) / total;
+      }
+    }
+    return { pos: new Vector3(...v.pos), look, fov: v.fov };
   };
 
   // A new view: move the camera there (instantly with reduced motion).
@@ -114,8 +142,17 @@ export function ViewRig({ scene, info }: { scene: PublicScene; info: HouseInfo |
       const r = el.getBoundingClientRect();
       ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ndc, camera);
-      const hit = ray.intersectObject(root, true)[0];
-      return hit ? interactIdOf(hit.object) : null;
+      // The object actually under the pointer wins: the router, not the note stuck to it (review 3, F11).
+      meshRay.setFromCamera(ndc, camera);
+      const exact = meshRay.intersectObjects(targets.list, false)[0];
+      if (exact) return targets.idOf.get(exact.object) ?? null;
+      // Else the generous boxes (small things on a phone); of those near the front, the smallest wins: a plate
+      // standing on the TV, not the TV (iteration 56).
+      const hits = ray.intersectObject(root, true).filter((h) => interactIdOf(h.object));
+      if (!hits.length) return null;
+      const near = hits[0]!.distance + 0.35;
+      const best = hits.filter((h) => h.distance <= near).reduce((a, b) => ((b.object.userData.vol ?? Infinity) < (a.object.userData.vol ?? Infinity) ? b : a));
+      return interactIdOf(best.object);
     };
     const blocked = () => {
       const g = useGame.getState();
@@ -175,7 +212,7 @@ export function ViewRig({ scene, info }: { scene: PublicScene; info: HouseInfo |
       el.removeEventListener("pointerup", up);
       el.removeEventListener("pointerleave", leave);
     };
-  }, [gl, camera, ray, root]);
+  }, [gl, camera, ray, root, meshRay, targets]);
 
   // The bottom dock's height (cards and conversation), to frame views above it.
   const size = useThree((s) => s.size);
@@ -208,7 +245,10 @@ export function ViewRig({ scene, info }: { scene: PublicScene; info: HouseInfo |
       // Title screen: a slow drift around the room (main.gd title_mode).
       const a = c.t * 0.05;
       c.pos.set(0.3 + Math.cos(a) * 2.6, 1.55 + Math.sin(c.t * 0.13) * 0.1, 0.2 + Math.sin(a) * 1.7);
-      c.look.set(-1.2, 0.9, -0.6);
+      // On a phone held upright the title text covers the lower half: aim lower so the room and Grandma fill the
+      // upper half instead of the ceiling (iteration 56).
+      const upright = size.width / Math.max(1, size.height) < 0.9;
+      c.look.set(-1.2, upright ? -0.9 : 0.9, -0.6);
       c.fov = 55;
     } else if (move.current) {
       const m = move.current;

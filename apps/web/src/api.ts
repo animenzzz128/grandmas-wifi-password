@@ -1,5 +1,5 @@
 /** Thin client for the server API. Responses are checked against the shared zod contract. */
-import { AskResponse, DailyInfo, GuessResponse, HealthResponse, ItemResponse, LookResponse, NotesResponse, PublicScene, RunView } from "@gwp/engine";
+import { AskResponse, DailyInfo, GuessResponse, HealthResponse, ItemResponse, LookResponse, NotesResponse, PublicScene, ResumeResponse, RunView } from "@gwp/engine";
 import type { z } from "zod";
 import { t } from "./strings.ts";
 
@@ -46,6 +46,8 @@ export const api = {
   /** A visit to one chosen sticky note (the title screen's note picker). */
   createRunFor: (recipeId: string, relaxed = false) => request(RunView, "/api/runs", { recipeId, relaxed }),
   notes: () => request(NotesResponse, "/api/notes"),
+  /** A visit still in progress (after a reload). */
+  resume: (runId: string) => request(ResumeResponse, `/api/runs/${runId}`),
   /** Look closely at an object: names on it may become topic cards. */
   look: (runId: string, objectId: string) => request(LookResponse, `/api/runs/${runId}/look`, { kind: "inspect", objectId }),
   createDaily: (relaxed = false) => request(RunView, "/api/runs", { daily: true, relaxed }),

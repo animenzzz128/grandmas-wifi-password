@@ -7,8 +7,9 @@ const p = (seq: number) => ({ who: "player" as const, seq });
 describe("type-out of Grandma's lines", () => {
   it("types the oldest unread line and holds the ones after it", () => {
     const log = [g(), p(1), g(2), g(3), { who: "system" as const, seq: 4 }];
-    expect(revealPlan(log, 0)).toEqual(["full", "full", "typing", "hidden", "full"]);
-    expect(revealPlan(log, 2)).toEqual(["full", "full", "full", "typing", "full"]);
+    // The system line after them waits too (iteration 56, review 2 F11).
+    expect(revealPlan(log, 0)).toEqual(["full", "full", "typing", "hidden", "hidden"]);
+    expect(revealPlan(log, 2)).toEqual(["full", "full", "full", "typing", "hidden"]);
     expect(revealPlan(log, 3)).toEqual(["full", "full", "full", "full", "full"]);
   });
 

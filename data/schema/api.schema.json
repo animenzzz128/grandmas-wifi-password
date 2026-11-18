@@ -352,6 +352,12 @@
             },
             "password": {
               "type": "string"
+            },
+            "explain": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "required": [
@@ -690,6 +696,12 @@
                 },
                 "password": {
                   "type": "string"
+                },
+                "explain": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               },
               "required": [
@@ -967,6 +979,12 @@
                 },
                 "password": {
                   "type": "string"
+                },
+                "explain": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               },
               "required": [
@@ -1247,6 +1265,12 @@
                 },
                 "password": {
                   "type": "string"
+                },
+                "explain": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               },
               "required": [

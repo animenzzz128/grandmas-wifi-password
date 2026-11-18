@@ -439,7 +439,7 @@
       ],
       "color": "#e6e0d0",
       "collide": false,
-      "inspect_text": "A black-and-white wedding photo on church steps. Grandpa is squinting. The frame is engraved 'Moon River', and on the back, in Grandpa's handwriting: 'To my little songbird. Married the June after the pierogi.'",
+      "inspect_text": "A black-and-white wedding photo on church steps. Grandpa is squinting. The frame is engraved 'Unchained Melody', and on the back, in Grandpa's handwriting: 'To my little songbird. Married the June after the pierogi.'",
       "fact_ids": [
         "f_wedding",
         "f_nickname",
@@ -520,7 +520,7 @@
         2.72
       ],
       "color": "#a0522d",
-      "inspect_text": "An old wooden sled leaning by the door. One runner is cracked, and someone carved MIKEY into the seat.",
+      "inspect_text": "An old wooden sled leaning by the door. The red paint on the runners is worn thin, and someone carved MIKEY into the seat.",
       "fact_ids": [
         "f_michael_arm",
         "f_snowstorm",
@@ -674,7 +674,7 @@
       ],
       "color": "#d98c5f",
       "collide": false,
-      "inspect_text": "A plate on a doily with one last apricot kolaczki under a snowfall of powdered sugar. Grandma counts them.",
+      "inspect_text": "A plate of apricot kolaczki on a doily, under a snowfall of powdered sugar. They're for Sunday, and Grandma has counted them, but one for her when she's flagging wouldn't hurt.",
       "fact_ids": [
         "f_cookie"
       ]

@@ -55,13 +55,13 @@ function useEased(target: number, rate: number, apply: (value: number) => void) 
 // ---- Wedding photo ---------------------------------------------------------------------------------------------
 
 /**
- * A standing frame: the generated wedding photo in front, a brass plate engraved "Moon River", and on the back
+ * A standing frame: the generated wedding photo in front, a brass plate engraved "Unchained Melody", and on the back
  * Grandpa's handwriting. `flipped` turns it round (examine view).
  */
 export function WeddingFrame({ size: [w, h, d], flipped = false }: { size: Vec3; flipped?: boolean }) {
   const photo = usePhoto("wedding");
   const back = useCard("wedding_back");
-  const plate = useLabel("Moon River", { bg: "#c9a648", fg: "#4a3410", font: "italic bold 20px Georgia, serif" });
+  const plate = useLabel("Unchained Melody", { bg: "#c9a648", fg: "#4a3410", font: "italic bold 20px Georgia, serif" });
   const turn = useRef<Group>(null);
   useEased(flipped ? Math.PI : 0, 6, (v) => {
     if (turn.current) turn.current.rotation.y = v;
@@ -306,7 +306,7 @@ export function Fridge({ size: [w, h, d], open = false }: { size: Vec3; open?: b
     return t;
   }, []);
   const t = 0.035; // wall thickness
-  const cream = "#ece5d2";
+  const cream = "#b9d0c0"; // mint, like the fridge in the room (iteration 56)
   const freezerH = h * 0.24;
   const mainH = h - freezerH - 0.02;
   const lit = open ? "#5e5a50" : "#000000";

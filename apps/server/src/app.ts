@@ -19,6 +19,7 @@ import {
   RULES,
   ShowRequest,
   asksForPassword,
+  asksForHarm,
   mentionsSelfHarm,
   costUsd,
   notEnglish,
@@ -36,6 +37,7 @@ import {
   playerTurnText,
   typedText,
   questionCost,
+  isGibberish,
   recipeById,
   rng,
   spendStamina,
@@ -209,8 +211,18 @@ export function createApp(deps: AppDeps) {
     bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.json({ error: "That's far too long for Grandma." }, 413) }),
   );
 
-  const lineFor = (run: RunState, bank: readonly string[], salt: string) =>
-    pick(bank, rng(hashString(`${run.id}:${run.questionCount}:${run.guesses.length}:${salt}`)));
+  /**
+   * A canned line from a bank: each bank starts somewhere random for the visit and then goes round in order, so
+   * the same line doesn't come up twice before the others have (review 3, F6: one deflection three times running).
+   */
+  const lineFor = (run: RunState, bank: readonly string[], salt: string) => {
+    if (bank.length <= 1) return bank[0] ?? "";
+    const turns = (run.lineTurns ??= {});
+    const start = Math.floor(rng(hashString(`${run.id}:${salt}`))() * bank.length);
+    const n = turns[salt] ?? 0;
+    turns[salt] = n + 1;
+    return bank[(start + n) % bank.length]!;
+  };
 
   function loadRun(id: string): { run: RunState; world: GrandmaWorld; recipe: Recipe } {
     const run = store.get(id);
@@ -336,6 +348,15 @@ export function createApp(deps: AppDeps) {
   });
 
   /** Browser-only steps of the play funnel: read the note, inspect an object, pin, open the notebook, share. */
+  // Pick a visit up again after a reload (iteration 56). The visit id is the key, as for every other call.
+  app.get("/api/runs/:id", (c) => {
+    limitActions(clientIp(c));
+    const { run, world, recipe } = loadRun(c.req.param("id"));
+    requirePlaying(run);
+    const history = run.history.map((t) => ({ role: t.role, text: t.text, ...(t.mood ? { mood: t.mood } : {}) }));
+    return c.json({ run: view(run, world, recipe), history });
+  });
+
   app.post("/api/runs/:id/event", async (c) => {
     limitActions(clientIp(c));
     const req = await body(c, EventRequest);
@@ -402,7 +423,8 @@ export function createApp(deps: AppDeps) {
       const topic = topicById(world, recipe, noteText(run, recipe).text, card.id);
       if (!topic) throw new HttpError(400, "You haven't heard about that yet, dear.");
       // A card follows up the last card: asking the same card again is cheaper, like any follow-up.
-      cost.followUp = card.id === run.lastTopic ? -RULES.followUpDiscount : 0;
+      // So is a card for something her last reply mentioned ("…Walt proposed…" → the proposal card).
+      cost.followUp = card.id === run.lastTopic || (run.lastMentioned ?? []).includes(card.id) ? -RULES.followUpDiscount : 0;
       cost.total = Math.max(1, cost.base + cost.long + cost.rude + cost.followUp);
       if (!topicReadable(topic)) cardLine = { reply: lineFor(run, lines.smudged_card, "smudged"), mood: "confused", free: true };
       else {
@@ -410,7 +432,10 @@ export function createApp(deps: AppDeps) {
         if (picked.kind === "no_year") {
           cardLine = { reply: lineFor(run, lines.no_year, "noyear"), mood: "confused" };
           Object.assign(cost, { base: RULES.noYearCost, followUp: 0, total: RULES.noYearCost });
-        } else if (picked.kind === "fact") input.focus = { factId: picked.factId, mode: card.mode, ...(picked.repeat ? { repeat: true } : {}) };
+        } else if (picked.kind === "fact") {
+          input.focus = { factId: picked.factId, mode: card.mode, ...(picked.repeat ? { repeat: true } : {}) };
+          if (picked.repeat) Object.assign(cost, { base: RULES.retellCost, long: 0, followUp: 0, total: RULES.retellCost + cost.rude });
+        }
       }
       run.freshTopics = (run.freshTopics ?? []).filter((id) => id !== card.id);
     }
@@ -418,6 +443,8 @@ export function createApp(deps: AppDeps) {
     let reply: string;
     let mood: AskResponse["mood"];
     let factIds: string[] = [];
+    /** The reply came from her brain (model or mock), not a canned line. */
+    let fromBrain = false;
     let meta: Partial<Parameters<RunStore["log"]>[0]> = {};
     /** Turns that are Grandma's fault, not the player's, cost no tea and don't count: mishears and fallbacks. */
     let free = false;
@@ -450,7 +477,21 @@ export function createApp(deps: AppDeps) {
     } else if (!card && asksForPassword(said)) {
       reply = lineFor(run, lines.password_deflect, "pw");
       mood = "suspicious";
+    } else if (!card && lines.harm && asksForHarm(said)) {
+      // How to make something dangerous or hurt someone: a firm no in her voice, no model call (iteration 62).
+      reply = lineFor(run, lines.harm, "harm");
+      mood = "worried";
+    } else if (!card && input.kind === "ask" && lines.gibberish && isGibberish(input.text)) {
+      // A keyboard mash: she asks again, free, like a mishearing (iteration 56). No model call, no facts.
+      reply = lineFor(run, lines.gibberish, "gibberish");
+      mood = "confused";
+      free = true;
+    } else if (!card && input.kind === "ask" && lines.rude && cost.rude > 0) {
+      // Rude words at her: an answer in character, not a memory as if nothing happened. The penalty stands.
+      reply = lineFor(run, lines.rude, "rude");
+      mood = "suspicious";
     } else {
+      fromBrain = true;
       const result = await brain.reply({ world, recipe, run, input, lines });
       // She lost her train of thought (the model failed or every try was rejected): the player shouldn't pay for that.
       // Only up to a point, though: questions built to fail every check would otherwise buy model calls for nothing
@@ -474,6 +515,11 @@ export function createApp(deps: AppDeps) {
       };
     }
 
+    // She told no memory at all (didn't know, small talk): it costs less than a question that got one (review 2, F4).
+    if (fromBrain && !free && !card && input.kind === "ask" && !factIds.length && cost.base > RULES.noFactCost) {
+      cost.base = RULES.noFactCost;
+      cost.total = Math.max(1, cost.base + cost.long + cost.rude + cost.followUp);
+    }
     run.history.push(
       { role: "player", text: misheard ? typedText(misheard.heard) : playerText, objectId: input.kind === "show" ? input.object.id : undefined },
       { role: "grandma", text: reply, factIds, mood },
@@ -497,6 +543,7 @@ export function createApp(deps: AppDeps) {
     if (nudge) run.history.push({ role: "grandma", text: nudge, mood: "nostalgic" });
     // Names she just said become topic cards.
     const newTopics = unlockTopics(run, world, [reply, after ?? "", nudge ?? ""].join(" "));
+    run.lastMentioned = discoverTopics(world, reply, []);
     store.save(run);
     store.log({
       ts: new Date().toISOString(),
@@ -553,7 +600,8 @@ export function createApp(deps: AppDeps) {
         if ("none" in call) {
           return c.json({ line: lineFor(run, lines.phone_none, "phone"), who: "michael", run: view(run, world, recipe) } satisfies ItemResponse);
         }
-        line = `${lineFor(run, lines.phone_lead, "phone")} ${call.hint}”`;
+        // He's quoting her, so her words sit in inner quotes (review F14: the voices ran together).
+        line = `${lineFor(run, lines.phone_lead, "phone")} ‘${call.hint}’”`;
         const newTopics = unlockTopics(run, world, call.hint);
         store.save(run);
         store.log({ ts: new Date().toISOString(), runId: run.id, worldId: world.id, recipeId: recipe.id, kind: "item", input: "phone", reply: line, stamina: run.stamina, status: run.status, ...(run.daily ? { daily: run.daily } : {}) });

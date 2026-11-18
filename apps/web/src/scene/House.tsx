@@ -7,10 +7,10 @@
  * Objects the player can tap are named PROP_<id> in the model; the scene manifest links each interactable to
  * its node (`model`). Static meshes are merged per material at load (578 meshes → a few dozen draw calls).
  */
-import { useEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import { Box3, BufferAttribute, BufferGeometry, Color, Float32BufferAttribute, Group, Mesh, PlaneGeometry, Points, PointsMaterial, Vector3 } from "three";
+import { Box3, BufferAttribute, BufferGeometry, CanvasTexture, Color, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, PlaneGeometry, Points, PointsMaterial, SRGBColorSpace, Vector3 } from "three";
 import type { Material, Object3D, PointLight } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { PublicScene } from "@gwp/engine";
@@ -18,6 +18,9 @@ import { useGame } from "../store.ts";
 import { useSettings } from "../settings.ts";
 import { OBJECT_SPACE, TIME, highlightMaterial, materialFor, sparkleMaterial } from "./materials.ts";
 import { Art, HITBOX_LAYER } from "./Room.tsx";
+import { BODY_URL, HAIR_URL } from "./body.ts";
+import { photoCanvas } from "./photos.ts";
+import type { PhotoId } from "./photos.ts";
 
 /** Nodes that move, so they stay separate meshes. */
 const ANIMATED = /^(ClockPendulum|ClockHands|RouterLED\d)$/;
@@ -78,6 +81,7 @@ function prepare(source: Object3D, linked: Set<string>) {
   });
   const groups = new Map<string, { material: Material; geos: BufferGeometry[] }>();
   const loose: Mesh[] = [];
+  const photos: { mesh: Mesh; frame: string }[] = [];
   root.traverse((o) => {
     const mesh = o as Mesh;
     if (!mesh.isMesh) return;
@@ -86,6 +90,10 @@ function prepare(source: Object3D, linked: Set<string>) {
     mesh.material = mat;
     mesh.castShadow = !/glass|bulb|lampshade|sky|lace/.test(src.name);
     mesh.receiveShadow = true;
+    if (keyOf(src) === "photo_print") photos.push({ mesh, frame: mesh.parent?.name ?? "" });
+    // The chair-back antimacassar stands upright, and the lace pattern is drawn on the flat (x, z) plane, so on it
+    // the holes smeared into torn-looking white streaks (iteration 56). Plain linen there.
+    if (mesh.name === "Antimacassar") mesh.material = new MeshStandardMaterial({ color: "#efe7d6", roughness: 0.95 });
     if (keep.has(mesh) || OBJECT_SPACE.has(keyOf(src)) || (mat as { transparent?: boolean }).transparent) {
       loose.push(mesh);
       return;
@@ -123,7 +131,7 @@ function prepare(source: Object3D, linked: Set<string>) {
     merged.add(m);
   }
   const seat = root.getObjectByName("GRANDMA_SEAT") ?? null;
-  return { root, merged, info: { boxes, meshes, seat } satisfies HouseInfo, loose: loose.length };
+  return { root, merged, photos, info: { boxes, meshes, seat } satisfies HouseInfo, loose: loose.length };
 }
 
 /** The room's lights at the model's markers. Quality decides shadows. */
@@ -185,12 +193,13 @@ function Snow() {
 /** A glint over each clue not looked at yet (Godot: sparkle.gdshader). */
 function Glints({ scene, info }: { scene: PublicScene; info: HouseInfo }) {
   const inspected = useGame((s) => s.inspected);
+  const looked = useGame((s) => s.looked);
   const noteSeen = useGame((s) => s.noteSeen);
   const playing = useGame((s) => s.run?.status === "playing");
   const items = useMemo(
     () =>
       scene.interactables
-        .filter((i) => ["clue", "note", "router", "glasses", "cookie_jar"].includes(i.kind))
+        .filter((i) => ["clue", "note", "router", "glasses", "cookie_jar", "fixture", "phone"].includes(i.kind))
         .map((it, k) => {
           const box = it.model ? info.boxes.get(it.model) : undefined;
           const c = box ? box.getCenter(new Vector3()) : new Vector3(...it.position);
@@ -204,7 +213,7 @@ function Glints({ scene, info }: { scene: PublicScene; info: HouseInfo }) {
   return (
     <>
       {items.map(({ it, pos, mat }) =>
-        inspected.includes(it.id) || (it.kind === "note" && noteSeen) ? null : <mesh key={it.id} position={pos} geometry={quad} material={mat} renderOrder={10} frustumCulled={false} />,
+        inspected.includes(it.id) || looked.includes(it.id) || (it.kind === "note" && noteSeen) ? null : <mesh key={it.id} position={pos} geometry={quad} material={mat} renderOrder={10} frustumCulled={false} />,
       )}
     </>
   );
@@ -229,7 +238,7 @@ function HitBoxes({ scene, info }: { scene: PublicScene; info: HouseInfo }) {
   return (
     <group>
       {boxes.map((b) => (
-        <mesh key={b.id} position={b.c} layers={HITBOX_LAYER} userData={{ interactId: b.id }}>
+        <mesh key={b.id} position={b.c} layers={HITBOX_LAYER} userData={{ interactId: b.id, vol: b.s[0] * b.s[1] * b.s[2] }}>
           <boxGeometry args={b.s} />
           <meshBasicMaterial visible={false} />
         </mesh>
@@ -293,6 +302,91 @@ export function RoomNode({ name }: { name: string }) {
   return obj ? <primitive object={obj} /> : null;
 }
 
+/**
+ * Real photos in the room's frames (iteration 56): the Godot model's frames held a shader of grey
+ * silhouettes, while their close-ups showed the generated photos (photos.ts). Each frame now shows one of
+ * Grandma's photos, the same pictures as in the album and the close-ups. Made a moment after the room
+ * appears (each takes a little GPU time), one at a time.
+ */
+const FRAME_PHOTOS: Record<string, PhotoId> = {
+  PROP_wedding_photo: "wedding",
+  PROP_family_frames: "cocker",
+  WallFrameA: "beagle",
+  WallFrameB: "cocker",
+  WallFrameC: "cherry",
+  WallFrameD: "beagle",
+};
+
+/** Planar UVs facing into the room (upright, not mirrored), and the crop that fills the frame without stretching. */
+function photoUVs(mesh: Mesh, centre: Vector3, aspect: number): { repeat: [number, number]; offset: [number, number] } {
+  mesh.updateWorldMatrix(true, false);
+  const geo = mesh.geometry.clone();
+  const pos = geo.getAttribute("position");
+  const p = new Vector3();
+  const box = new Box3().setFromBufferAttribute(pos as BufferAttribute).applyMatrix4(mesh.matrixWorld);
+  const c = box.getCenter(new Vector3());
+  // The print faces along its thinnest horizontal side, towards the middle of the room.
+  const size = box.getSize(new Vector3());
+  const n = size.x < size.z ? new Vector3(Math.sign(centre.x - c.x) || 1, 0, 0) : new Vector3(0, 0, Math.sign(centre.z - c.z) || 1);
+  // The viewer looks along -n; their right is (-n) × up.
+  const right = new Vector3().crossVectors(n.clone().negate(), new Vector3(0, 1, 0));
+  const us: number[] = [];
+  const vs: number[] = [];
+  for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos as BufferAttribute, i).applyMatrix4(mesh.matrixWorld);
+    us.push(p.dot(right));
+    vs.push(p.y);
+  }
+  const [u0, u1, v0, v1] = [Math.min(...us), Math.max(...us), Math.min(...vs), Math.max(...vs)];
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    uv[i * 2] = (us[i]! - u0) / (u1 - u0 || 1);
+    uv[i * 2 + 1] = (vs[i]! - v0) / (v1 - v0 || 1);
+  }
+  geo.setAttribute("uv", new Float32BufferAttribute(uv, 2));
+  mesh.geometry = geo;
+  const plane = (u1 - u0) / (v1 - v0 || 1);
+  return plane > aspect ? { repeat: [1, aspect / plane], offset: [0, (1 - aspect / plane) / 2] } : { repeat: [plane / aspect, 1], offset: [(1 - plane / aspect) / 2, 0] };
+}
+
+function RoomPhotos({ photos, root }: { photos: { mesh: Mesh; frame: string }[]; root: Object3D }) {
+  const [go, setGo] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setGo(true), 1500);
+    return () => clearTimeout(t);
+  }, []);
+  return go ? <RoomPhotosNow photos={photos} root={root} /> : null;
+}
+
+function RoomPhotosNow({ photos, root }: { photos: { mesh: Mesh; frame: string }[]; root: Object3D }) {
+  const gl = useThree((s) => s.gl);
+  const invalidate = useThree((s) => s.invalidate);
+  const body = useGLTF(BODY_URL);
+  const hair = useGLTF(HAIR_URL);
+  useEffect(() => {
+    const centre = new Box3().setFromObject(root).getCenter(new Vector3());
+    const todo = photos.filter((p) => FRAME_PHOTOS[p.frame]);
+    let i = 0;
+    let timer = 0;
+    const next = () => {
+      const item = todo[i++];
+      if (!item) return;
+      const c = photoCanvas(gl, FRAME_PHOTOS[item.frame]!, { body: body.scene, hair: hair.scene });
+      const map = new CanvasTexture(c);
+      map.colorSpace = SRGBColorSpace;
+      const crop = photoUVs(item.mesh, centre, c.width / c.height);
+      map.repeat.set(...crop.repeat);
+      map.offset.set(...crop.offset);
+      item.mesh.material = new MeshStandardMaterial({ map, roughness: 0.45 });
+      invalidate();
+      timer = window.setTimeout(next, 120);
+    };
+    next();
+    return () => clearTimeout(timer);
+  }, [photos, root, gl, body, hair, invalidate]);
+  return null;
+}
+
 export function House({ scene, onReady }: { scene: PublicScene; onReady: (info: HouseInfo) => void }) {
   const gltf = useGLTF(scene.model ?? "/models/house/room.glb");
   const linked = useMemo(() => new Set(scene.interactables.map((i) => i.model).filter((m): m is string => Boolean(m))), [scene]);
@@ -328,6 +422,9 @@ export function House({ scene, onReady }: { scene: PublicScene; onReady: (info: 
       <Extras scene={scene} />
       <Glints scene={scene} info={built.info} />
       <HitBoxes scene={scene} info={built.info} />
+      <Suspense fallback={null}>
+        <RoomPhotos photos={built.photos} root={built.root} />
+      </Suspense>
       <Highlight scene={scene} info={built.info} />
     </group>
   );

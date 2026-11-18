@@ -1,9 +1,10 @@
 /**
- * Grandma's "brain": the LLM (Claude Haiku 5.5) or the offline mock. Both go through the same
+ * Grandma's "brain": the LLM (Claude Haiku 5.5, directly or through OpenRouter) or the offline mock. Both go through the same
  * validator, one retry, and a safe fallback line (technical design §5, steps ⑤–⑥).
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { OpenRouterError, openRouterClient } from "./openrouter.ts";
 import { z } from "zod";
 import {
   MoodSchema,
@@ -34,7 +35,8 @@ export interface BrainResult {
   validatorErrors: string[];
   fallback: boolean;
   latencyMs: number;
-  usage?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  /** Tokens, plus the provider's own price for the calls when it reports one (OpenRouter does). */
+  usage?: { input: number; output: number; cacheRead: number; cacheWrite: number; costUsd?: number };
 }
 
 export interface GrandmaBrain {
@@ -69,7 +71,7 @@ async function withValidation(args: ReplyArgs, generate: Generate, validate = tr
   const ctx = validationContext(args.world, args.recipe);
   const allErrors: string[] = [];
   let errors: string[] = [];
-  const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const usage: NonNullable<BrainResult["usage"]> = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   for (let attempt = 1; attempt <= (validate ? MAX_ATTEMPTS : 1); attempt++) {
     const { output, usage: u } = await generate(args, errors);
     if (u) {
@@ -77,6 +79,7 @@ async function withValidation(args: ReplyArgs, generate: Generate, validate = tr
       usage.output += u.output;
       usage.cacheRead += u.cacheRead;
       usage.cacheWrite += u.cacheWrite;
+      if (u.costUsd !== undefined) usage.costUsd = (usage.costUsd ?? 0) + u.costUsd;
     }
     errors = output ? validateReply(args.world, output, ctx) : ["no parseable output"];
     allErrors.push(...errors.map((e) => `attempt ${attempt}: ${e}`));
@@ -106,6 +109,7 @@ export class MockBrain implements GrandmaBrain {
         input: args.input,
         seed: `${args.run.id}:${args.run.questionCount}`,
         recentFactIds: args.run.lastFactIds,
+        heardFactIds: args.run.heard ?? [],
       }),
     }), this.options.validate ?? true);
   }
@@ -120,13 +124,18 @@ export class LlmBrain implements GrandmaBrain {
 
   constructor(
     public model: string,
-    opts: { apiKey: string; baseURL: string } | { client: Anthropic },
+    opts: { apiKey: string; baseURL: string; provider?: "anthropic" | "openrouter" } | { client: Anthropic },
     private options: BrainOptions = {},
   ) {
     // Explicit key and base URL: only the project's key from .env, never other credentials in the environment.
     // A player is waiting: give up on a slow call after LLM_TIMEOUT_MS (the validation loop already tries twice) and let the free fallback line answer,
     // instead of the SDK default of 10 minutes with two retries.
-    this.client = "client" in opts ? opts.client : new Anthropic({ apiKey: opts.apiKey, authToken: null, baseURL: opts.baseURL, timeout: LLM_TIMEOUT_MS, maxRetries: 0 });
+    this.client =
+      "client" in opts
+        ? opts.client
+        : opts.provider === "openrouter"
+          ? (openRouterClient({ apiKey: opts.apiKey, baseURL: opts.baseURL, timeoutMs: LLM_TIMEOUT_MS }) as unknown as Anthropic)
+          : new Anthropic({ apiKey: opts.apiKey, authToken: null, baseURL: opts.baseURL, timeout: LLM_TIMEOUT_MS, maxRetries: 0 });
   }
 
   reply(args: ReplyArgs): Promise<BrainResult> {
@@ -169,11 +178,18 @@ export class LlmBrain implements GrandmaBrain {
         output: response.usage.output_tokens,
         cacheRead: response.usage.cache_read_input_tokens ?? 0,
         cacheWrite: response.usage.cache_creation_input_tokens ?? 0,
+        // Only the OpenRouter client sets this: what the call really cost, whichever model answered.
+        ...(typeof (response.usage as { cost_usd?: number }).cost_usd === "number" ? { costUsd: (response.usage as { cost_usd?: number }).cost_usd } : {}),
       };
       if (response.stop_reason === "refusal") return { output: null, usage };
       return { output: response.parsed_output ?? null, usage };
     } catch (err) {
-      if (err instanceof Anthropic.RateLimitError) console.warn("[grandma] rate limited");
+      if (err instanceof OpenRouterError)
+        console.error(
+          err.status === 401 ? "[grandma] OpenRouter key rejected; check the key in .env" : err.status === 402 ? "[grandma] OpenRouter account is out of credits" : `[grandma] OpenRouter error ${err.status}: ${err.message}`,
+        );
+      else if (err instanceof Error && err.name === "TimeoutError") console.warn(`[grandma] no reply within ${LLM_TIMEOUT_MS} ms`);
+      else if (err instanceof Anthropic.RateLimitError) console.warn("[grandma] rate limited");
       else if (err instanceof Anthropic.AuthenticationError) console.error("[grandma] API key rejected; check ANTHROPIC_API_KEY in .env");
       else if (err instanceof Anthropic.APIError) console.error(`[grandma] API error ${err.status}: ${err.message}`);
       else console.error("[grandma] unexpected error", err);

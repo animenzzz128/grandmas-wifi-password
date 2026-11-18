@@ -21,6 +21,9 @@ export function revealPlan(log: readonly Line[], revealed: number): Reveal[] {
   for (const l of log) if (l.who === "player" && l.seq !== undefined) upTo = Math.max(upTo, l.seq);
   let typing = false;
   return log.map((l) => {
+    // Lines after the one typing out wait for it: "New topic cards" or a nap notice used to appear before her
+    // answer had finished (review 2, F11).
+    if (typing && l.who !== "player") return "hidden";
     if (l.who !== "grandma" || l.seq === undefined || l.seq <= upTo) return "full";
     if (typing) return "hidden";
     typing = true;

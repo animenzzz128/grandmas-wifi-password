@@ -1,16 +1,17 @@
 /** HTML overlay on top of the 3D canvas. Text comes from data/i18n via t(). */
+import { Tutorial } from "./Tutorial.tsx";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useGame } from "../store.ts";
+import { useGame, partsLine } from "../store.ts";
 import { api } from "../api.ts";
 import { t } from "../strings.ts";
-import { babble, chime, snore, startClock, startMusic, stopClock, stopMusic, toggleMute } from "../audio.ts";
+import { babble, chime, duckMusic, snore, startClock, startMusic, startWind, stopClock, stopMusic, toggleMute } from "../audio.ts";
 import { canListen, listen, speak, stopSpeaking } from "../voice.ts";
 import { useSettings } from "../settings.ts";
 import { SettingsCard } from "./Settings.tsx";
 import { CardStrip } from "./Cards.tsx";
 import { Smudged } from "./Smudged.tsx";
-import { HoverLabel, KeyboardControls, TopButtons, ViewTabs } from "./Controls.tsx";
+import { HoverLabel, KeyboardControls, ThingsHere, TopButtons, ViewTabs } from "./Controls.tsx";
 import { saveNoteStars } from "../noteStars.ts";
 import { ExamineCard } from "./Examine.tsx";
 import { saveDailyRecord } from "../daily.ts";
@@ -64,14 +65,17 @@ function PinnedNote() {
 
 /** One line under the view tabs saying how to play, until the player has asked and looked at something. */
 function HowLine() {
+  const guided = useGame((s) => s.tutorial !== null);
   const asked = useGame((s) => (s.run?.questionCount ?? 0) > 0);
-  const looked = useGame((s) => s.inspected.length > 0);
-  if (asked && looked) return null;
+  // Any close-up counts here (the glasses, the fridge), not only clues (review 2, F15).
+  const looked = useGame((s) => s.looked.length > 0);
+  if ((asked && looked) || guided) return null;
   return <div className="how-line">{t("hud.how")}</div>;
 }
 
 /** First-visit objectives, ticked off as the player does them (onboarding by doing). */
 function Objectives() {
+  const guided = useGame((s) => s.tutorial !== null);
   const run = useGame((s) => s.run)!;
   const noteSeen = useGame((s) => s.noteSeen);
   const inspected = useGame((s) => s.inspected);
@@ -81,7 +85,7 @@ function Objectives() {
     { done: inspected.length > 0, label: t("goal.proof") },
     { done: run.attemptsLeft < run.maxAttempts || run.status === "solved", label: t("goal.router") },
   ];
-  if (run.status !== "playing" || steps.every((s) => s.done)) return null;
+  if (run.status !== "playing" || steps.every((s) => s.done) || guided) return null;
   return (
     <div className="hud-panel objectives">
       {steps.map((s) => (
@@ -152,6 +156,7 @@ function Ambience() {
   useEffect(() => {
     if (!playing || !roomSound) return;
     startClock();
+    startWind();
     return stopClock;
   }, [playing, roomSound]);
   const musicOn = useSettings((s) => s.musicVolume > 0);
@@ -211,6 +216,8 @@ function Confetti() {
 
 /** Plays sounds for game events: Grandma's lines, notebook entries, router results. M toggles sound. */
 function AudioDirector() {
+  const speaking = useGame((s) => s.grandmaSpeaking);
+  useEffect(() => duckMusic(speaking), [speaking]);
   const lastSeq = useGame((s) => s.log.at(-1)?.seq ?? 0);
   const notes = useGame((s) => s.notebook.length);
   const status = useGame((s) => s.run?.status);
@@ -559,7 +566,8 @@ function RouterCard() {
           if (!ready) return;
           const res = await guess(parts.map((p) => p.trim()));
           if (!res || res.correct) return;
-          setFeedback(t("router.partial", { n: res.partsCorrect ?? 0, total: res.partsTotal ?? run.slots }));
+          // Which part, when the difficulty says (Easy, Medium); else how many (iteration 56: shown here, not only in the chat).
+          setFeedback(res.partsRight ? partsLine(res.partsRight) : t("router.partial", { n: res.partsCorrect ?? 0, total: res.partsTotal ?? run.slots }));
           setMarks(res.partsRight ?? parts.map(() => false));
         }}
       >
@@ -636,7 +644,7 @@ function ResultCard() {
   const card = t("result.card", {
     name: run.daily ? t("daily.cardName", { n: run.daily }) : (run.grandma.nickname ?? run.grandma.name),
     difficulty: t(`difficulty.${run.difficulty}`),
-    outcome: r.solved ? t("result.cardSolved", { n: r.questions }) : t("result.cardFailed", { n: r.questions }),
+    outcome: r.solved ? t("result.cardSolved", { n: r.questions }) : t(run.status === "bedtime" ? "result.cardBedtime" : "result.cardOutOfGuesses", { n: r.questions }),
     cups: "☕".repeat(Math.min(r.questions, 12)),
     naps: r.naps,
     cookies: r.cookiesUsed,
@@ -649,9 +657,19 @@ function ResultCard() {
         <div className="stars" role="img" aria-label={t("result.starsLabel", { n: r.stars })}>
           {stars}
         </div>
+        {/* How stars are earned, with this visit's numbers (review 2, F3). */}
+        {r.solved && <p className="hint">{t("result.starRule", { par: r.par, double: r.par * 2, q: r.questions, naps: r.naps })}</p>}
         {run.relaxed && <p className="hint">{t("result.relaxed")}</p>}
         {run.daily !== undefined && firstDaily === false && <p className="hint">{t("daily.practice")}</p>}
         <p>{r.password ? t("result.password", { password: r.password }) : t("result.passwordHidden")}</p>
+        {/* Not solved: how it fitted together, so the next try teaches something (review F10). */}
+        {!r.solved && r.explain && (
+          <ul className="explain">
+            {r.explain.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
         <pre ref={preRef}>{card}</pre>
         {copied === "manual" && (
           <p className="hint" role="status">
@@ -676,8 +694,22 @@ function ResultCard() {
   );
 }
 
+/** The result card waits a moment, so Grandma's reaction to the end of the visit is seen first (review F11). */
+function useResultDelay(ended: boolean): boolean {
+  const calm = useSettings((s) => s.calmCamera);
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    if (!ended) return setShow(false);
+    if (calm) return setShow(true);
+    const id = setTimeout(() => setShow(true), 1800);
+    return () => clearTimeout(id);
+  }, [ended, calm]);
+  return show;
+}
+
 export function Hud() {
   const panel = useGame((s) => s.panel);
+  const showResult = useResultDelay(useGame((s) => Boolean(s.run && s.run.status !== "playing")));
   const error = useGame((s) => s.error);
   const run = useGame((s) => s.run);
   const talking = useGame((s) => s.talking);
@@ -691,6 +723,7 @@ export function Hud() {
       </div>
       <div className="top-center">
         <ViewTabs />
+        <ThingsHere />
         <HowLine />
       </div>
       <div className="top-right">
@@ -724,7 +757,8 @@ export function Hud() {
       </div>
       <Ambience />
       <Confetti />
-      {run.status !== "playing" && <ResultCard />}
+      <Tutorial />
+      {run.status !== "playing" && showResult && <ResultCard />}
     </div>
   );
 }

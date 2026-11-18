@@ -9,6 +9,7 @@ import { hasString, t } from "./strings.ts";
 import { addPin, costWhy, extractNotes } from "./notebook.ts";
 import { useSettings } from "./settings.ts";
 import { firstTime, markVisited } from "./firsts.ts";
+import { storage } from "./storage.ts";
 import { cardFlick, fridgeDoor } from "./audio.ts";
 import type { AskResponse, NoteChoice } from "@gwp/engine";
 import { topicQuestion } from "@gwp/engine";
@@ -59,6 +60,8 @@ interface GameState {
   mishear: { as: string; at: number } | null;
   /** Clue objects the player has inspected this visit (for the objectives strip). */
   inspected: string[];
+  /** Everything the player has opened a close-up of this visit (its sparkle goes out). */
+  looked: string[];
   /** Fixtures standing open (the fridge door). */
   opened: string[];
   notebook: NoteEntry[];
@@ -78,6 +81,14 @@ interface GameState {
   pickedTopic: string | null;
   /** The card of the last question (asking it again is a cheaper follow-up), as the server counts it. */
   lastTopic: string | null;
+  /** A visit that was in progress when the page was closed or reloaded (iteration 56). */
+  resumable: { runId: string; note: string; questions: number } | null;
+  /** Pick that visit up again. */
+  resume(): Promise<void>;
+  /** The "Things here" list is open (H; iteration 56). */
+  thingsOpen: boolean;
+  /** The guided first visit (iteration 56; tutorial.ts), or null when it isn't running. */
+  tutorial: { step: number; seen: string[]; acked: string[] } | null;
 
   init(): Promise<void>;
   start(difficulty: "easy" | "medium" | "hard"): Promise<void>;
@@ -121,8 +132,16 @@ interface GameState {
   unpin(index: number): void;
   /** Esc: back out of exactly one layer (card, then talk). Returns false if there was nothing to close. */
   back(): boolean;
+  /** Move the guided tutorial on (null ends it). */
+  setTutorialStep(step: number | null): void;
+  /** "Got it" on an explain-only tutorial step. */
+  ackTutorial(id: string): void;
   leave(): void;
 }
+
+/** "Part 1 is right, part 2 isn't." (Easy and Medium; design plan A5.) Also shown in the router card. */
+export const partsLine = (right: readonly boolean[]) =>
+  right.every((r) => !r) ? t("router.noneRight") : right.map((r, i) => t(r ? "router.partRight" : "router.partWrong", { n: i + 1 })).join(" ");
 
 export const useGame = create<GameState>((set, get) => {
   /** Run an API action with the busy flag and error capture. */
@@ -140,9 +159,6 @@ export const useGame = create<GameState>((set, get) => {
   }
 
   let seq = 0;
-  /** "Part 1 is right, part 2 isn't." (Easy and Medium; design plan A5.) */
-  const partsLine = (right: readonly boolean[]) =>
-    right.every((r) => !r) ? t("router.noneRight") : right.map((r, i) => t(r ? "router.partRight" : "router.partWrong", { n: i + 1 })).join(" ");
   /** Objects Grandma has already reacted to this visit. */
   const barked = new Set<string>();
   const push = (...lines: LogLine[]) => set((s) => ({ log: [...s.log, ...lines.map((l) => ({ ...l, seq: ++seq }))].slice(-60) }));
@@ -191,7 +207,9 @@ export const useGame = create<GameState>((set, get) => {
   const enter = async (run: RunView) => {
     const scene = get().scene?.id === run.sceneId ? get().scene : await api.scene(run.sceneId);
     barked.clear();
-    set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy", seq: ++seq }], panel: null, noteSeen: false, talking: false, inspected: [], opened: [], notebook: [], pins: [], hint: null, mishear: null, view: "grandma", pickedTopic: null });
+    // The guided tutorial runs on a player's first visit (or when they asked for it again from the title).
+    const tutorial = firstTime("tutorial") ? { step: 0, seen: [], acked: [] } : null;
+    set({ run, scene, log: [{ who: "grandma", text: run.greeting, mood: "happy", seq: ++seq }], panel: null, noteSeen: false, talking: false, inspected: [], looked: [], opened: [], notebook: [], pins: [], hint: null, mishear: null, view: "grandma", pickedTopic: null, tutorial });
   };
 
   return {
@@ -210,7 +228,7 @@ export const useGame = create<GameState>((set, get) => {
     talking: false,
     hint: null,
     mishear: null,
-    inspected: [], opened: [],
+    inspected: [], looked: [], opened: [],
     notebook: [],
     pins: [],
     grandmaSpeaking: false,
@@ -220,6 +238,9 @@ export const useGame = create<GameState>((set, get) => {
     notes: null,
     pickedTopic: null,
     lastTopic: null,
+    resumable: null,
+    tutorial: null,
+    thingsOpen: false,
 
     async init() {
       void api.notes().then(
@@ -236,6 +257,13 @@ export const useGame = create<GameState>((set, get) => {
         (daily) => set({ daily, dailyAt: Date.now() }),
         () => set({ daily: null }),
       );
+      // A visit left half-way (a reload, a phone closing the tab): offer to carry on.
+      const saved = storage.getItem(RUN_KEY);
+      if (saved)
+        void api.resume(saved).then(
+          (r) => set({ resumable: { runId: saved, note: r.run.note.text, questions: r.run.questionCount } }),
+          () => storage.setItem(RUN_KEY, ""),
+        );
       try {
         set({ health: await api.health() });
       } catch (e) {
@@ -253,8 +281,23 @@ export const useGame = create<GameState>((set, get) => {
       await act(async () => enter(await api.createRunFor(recipeId, useSettings.getState().relaxed)));
     },
 
+    async resume() {
+      const saved = get().resumable;
+      if (!saved) return;
+      await act(async () => {
+        const r = await api.resume(saved.runId);
+        const scene = get().scene?.id === r.run.sceneId ? get().scene : await api.scene(r.run.sceneId);
+        barked.clear();
+        const log: LogLine[] = r.history.map((h) => ({ who: h.role, text: h.text, ...(h.mood ? { mood: h.mood as LogLine["mood"] } : {}), seq: ++seq }));
+        set({ run: r.run, scene, log, panel: null, noteSeen: r.run.questionCount > 0, talking: false, inspected: [], looked: [], opened: [], notebook: [], pins: [], hint: null, mishear: null, view: "grandma", pickedTopic: null, tutorial: null, resumable: null });
+        for (const h of r.history) if (h.role === "grandma") learn(h.text, "grandma");
+        get().showHint(t("resume.welcomeBack"));
+      });
+    },
+
     goView(view) {
-      if (get().view !== view) set({ view });
+      // The camera moves: whatever was under the pointer isn't any more (iteration 56: a stale hover label).
+      if (get().view !== view) set({ view, focusId: null, thingsOpen: false });
     },
 
     tapObject(id) {
@@ -265,7 +308,7 @@ export const useGame = create<GameState>((set, get) => {
         set({ view: "grandma" });
         return g.focusChat();
       }
-      if (it.view) set({ view: it.view });
+      if (it.view && it.view !== g.view) set({ view: it.view, focusId: null });
       if (it.kind === "note") return g.openPanel({ type: "note" });
       if (it.kind === "router") return g.openPanel({ type: "router" });
       if (it.kind === "fixture") g.setOpened(it.id, true);
@@ -359,7 +402,9 @@ export const useGame = create<GameState>((set, get) => {
       if (run.stamina > 30 && res.run.stamina <= 30 && res.run.status === "playing" && !res.napped) push({ who: "grandma", text: t("bark.yawn"), mood: "sleepy" });
       set({ run: res.run });
       // Teach each rule the first time it happens, once per browser (plan A4), not in a wall of text up front.
-      const lesson = (key: string, when: boolean) => when && firstTime(key) && push({ who: "system", text: t(`lesson.${key}`) });
+      // The guided tutorial already teaches the tea and follow-ups (iteration 56): count those lessons as seen, quietly.
+      const taught = (key: string) => get().tutorial !== null && (key === "tea" || key === "followUp");
+      const lesson = (key: string, when: boolean) => when && firstTime(key) && !taught(key) && push({ who: "system", text: t(`lesson.${key}`) });
       lesson("tea", res.cost > 0 && !res.run.relaxed);
       lesson("followUp", (res.costParts?.followUp ?? 0) < 0);
       lesson("nap", res.napped && res.run.status === "playing");
@@ -392,7 +437,8 @@ export const useGame = create<GameState>((set, get) => {
         push({ who: "system", text: `${tried}${count}` });
       }
       push({ who: "grandma", text: res.line, mood: res.correct ? "happy" : "confused" });
-      set({ run: res.run, panel: res.run.status === "playing" ? get().panel : null });
+      // Solved: cut to Grandma, so her reaction is seen wherever the router was (review 3, F17).
+      set({ run: res.run, panel: res.run.status === "playing" ? get().panel : null, ...(res.correct ? { view: "grandma", focusId: null } : {}) });
       return { correct: res.correct, partsCorrect: res.partsCorrect, partsTotal: res.partsTotal, partsRight: res.partsRight };
     },
 
@@ -425,9 +471,12 @@ export const useGame = create<GameState>((set, get) => {
         );
       }
       set({ panel, noteSeen: get().noteSeen || panel?.type === "note" });
+      const tut = get().tutorial;
+      if (tut && panel && !tut.seen.includes(panel.type)) set({ tutorial: { ...tut, seen: [...tut.seen, panel.type] } });
       if (panel?.type === "inspect") {
         const obj = get().scene?.interactables.find((i) => i.id === panel.objectId);
         if (obj?.kind === "clue" && !get().inspected.includes(obj.id)) set({ inspected: [...get().inspected, obj.id] });
+        if (obj && !get().looked.includes(obj.id)) set({ looked: [...get().looked, obj.id] });
         if (obj?.inspect_text) learn(obj.inspect_text, "object");
         if (obj) bark(obj.id);
       }
@@ -451,10 +500,25 @@ export const useGame = create<GameState>((set, get) => {
     showHint(text) {
       set({ hint: { text, at: Date.now() } });
     },
+    setTutorialStep(step) {
+      const tut = get().tutorial;
+      if (step === null) return set({ tutorial: null });
+      if (tut && tut.step !== step) set({ tutorial: { ...tut, step } });
+    },
+    ackTutorial(id) {
+      const tut = get().tutorial;
+      if (tut && !tut.acked.includes(id)) set({ tutorial: { ...tut, acked: [...tut.acked, id] } });
+    },
     back() {
-      const { panel, talking } = get();
+      const { panel, talking, thingsOpen } = get();
       if (panel) {
         set({ panel: null });
+        return true;
+      }
+      // Then the "Things here" list (iteration 56): close it and hand the keys back to the game.
+      if (thingsOpen) {
+        set({ thingsOpen: false });
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         return true;
       }
       // Leave the text box: by what has focus, not only the talking flag (focus events can be missed).
@@ -468,7 +532,7 @@ export const useGame = create<GameState>((set, get) => {
     },
     leave() {
       window.speechSynthesis?.cancel();
-      set({ run: null, log: [], panel: null, talking: false, grandmaSpeaking: false, hint: null, mishear: null });
+      set({ run: null, log: [], panel: null, talking: false, grandmaSpeaking: false, hint: null, mishear: null, tutorial: null });
       get().refreshDaily();
     },
 
@@ -479,4 +543,12 @@ export const useGame = create<GameState>((set, get) => {
       );
     },
   };
+});
+
+/** The visit in progress, remembered in this browser so a reload can pick it up again (iteration 56). */
+const RUN_KEY = "gwp-run";
+useGame.subscribe((s, prev) => {
+  if (s.run === prev.run) return;
+  if (s.run?.status === "playing") storage.setItem(RUN_KEY, s.run.runId);
+  else if (s.run) storage.setItem(RUN_KEY, ""); // finished: nothing to resume
 });

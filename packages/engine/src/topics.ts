@@ -91,10 +91,21 @@ export function hasPhrase(haystack: string, needle: string): boolean {
 }
 
 /** Cards that `text` unlocks and the player doesn't have yet, in the world's order. */
+/**
+ * A capitalised name must appear capitalised: "a jar of dill pickles" in the fridge mustn't unlock "Pickles the
+ * cat" (review 3, F9). Her replies and the object texts are written properly, so names always are.
+ */
+function capitalisedIn(text: string, name: string): boolean {
+  const lower = text.toLowerCase();
+  const n = name.toLowerCase();
+  for (let at = lower.indexOf(n); at >= 0; at = lower.indexOf(n, at + 1)) if (text[at] === name[0]) return true;
+  return false;
+}
+
 export function discoverTopics(world: GrandmaWorld, text: string, known: readonly string[]): string[] {
   const have = new Set(known);
   return worldTopics(world)
-    .filter((t) => !have.has(t.id) && t.match.some((m) => hasPhrase(text, m)))
+    .filter((t) => !have.has(t.id) && t.match.some((m) => hasPhrase(text, m) && (!/^\p{Lu}/u.test(m) || capitalisedIn(text, m))))
     .map((t) => t.id);
 }
 

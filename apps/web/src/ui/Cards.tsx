@@ -27,7 +27,9 @@ export function CardStrip() {
   const card = run.topics.find((c) => c.id === picked);
   const cost = (id: string) => (id === lastAsked ? 5 : 8);
   return (
-    <div className="cards" aria-label={t("cards.label")}>
+    // A mouse press here mustn't take focus from the question box: the chat log would collapse, the cards would
+    // jump down under the pointer, and the click would land on nothing (review 2, F1). Keyboard focus still works.
+    <div className="cards" aria-label={t("cards.label")} onMouseDown={(e) => e.preventDefault()}>
       {card && (
         <div className="card-ask" role="group" aria-label={card.label}>
           <span className="card-ask-label">{card.kind === "note" ? <>“<Smudged text={card.label} />”</> : card.label}</span>
@@ -57,7 +59,11 @@ export function CardStrip() {
             role="option"
             aria-selected={c.id === picked}
             className={`topic ${c.kind} ${c.id === picked ? "picked" : ""} ${c.fresh ? "fresh" : ""}`}
-            onClick={() => pickTopic(c.id === picked ? null : c.id)}
+            onClick={(e) => {
+              pickTopic(c.id === picked ? null : c.id);
+              // Picked with the keyboard (a click with no pointer): focus its first ask button (review 3, F1).
+              if (e.detail === 0 && c.id !== picked) requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".card-ask button")?.focus());
+            }}
           >
             {c.fresh && <span className="new-badge">{t("cards.newBadge")}</span>}
             {c.kind === "note" ? <>“<Smudged text={c.label} />”</> : c.label}

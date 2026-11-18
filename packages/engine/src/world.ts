@@ -22,6 +22,8 @@ const Profile = z.strictObject({
   }),
   humor_style: z.string().optional(),
   verbal_tics: z.array(z.string()).min(1),
+  /** Answers to small talk ("How are you?") for the offline Grandma: warm, no memories, a nudge back to the note. */
+  small_talk: z.array(z.string()).optional(),
 });
 
 const Entity = z.strictObject({
@@ -59,6 +61,17 @@ const Story = z.strictObject({
   id: z.string(),
   title: z.string(),
   fact_ids: z.array(z.string()).min(1),
+  text: z.string(),
+});
+
+/**
+ * A "little thing": everyday colour she may use to make a reply warmer or funnier (iteration 64). Not a clue and
+ * never an answer: checkWorld keeps every answer word, digit, time phrase and new name out of it.
+ */
+const Colour = z.strictObject({
+  id: z.string(),
+  /** Entity ids it is about (for review, and so the judge and future retrieval can group them). */
+  about: z.array(z.string()).min(1),
   text: z.string(),
 });
 
@@ -124,6 +137,8 @@ export const GrandmaWorld = z.strictObject({
   facts: z.array(Fact).min(10),
   anchors: z.array(Anchor).optional(),
   stories: z.array(Story).optional(),
+  /** Little things: colour, not clues (iteration 64). */
+  colour: z.array(Colour).optional(),
   recipes: z.array(Recipe).min(1),
   /** Topic cards. Without them, cards are made from the entities (topics.ts). */
   topics: z.array(Topic).optional(),
@@ -255,6 +270,51 @@ export function hiddenYears(world: GrandmaWorld, recipe: Recipe): Set<number> {
   return years;
 }
 
+/**
+ * Words that tie a "little thing" to the puzzles or to time, so it can't be colour (iteration 64): when things
+ * happened, the note's subjects (streets, house numbers, birds, the falls, the snowstorm, the color TV), and where
+ * things are kept in the house (a player would go looking for them).
+ */
+const COLOUR_FORBIDDEN =
+  /\b(year|years|summer|winter|spring|autumn|fall|when (we|i|he|she|you)|since|before|after|ago|age|old enough|born|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|street|avenue|apartment|house number|mailbox|door number|bird|birds|sparrow|chirp\w*|falls|honeymoon|snowstorm|blizzard|moon|color tv|drawer|closet|attic|basement|cupboard|shelf|album|hide|hides|hid|hidden|hiding|tuck\w*|stash\w*|behind the|under the|password|wi-?fi|router)\b/i;
+
+/** Problems with the world's little things: they must stay colour and never become clues or answers. */
+export function checkColour(world: GrandmaWorld): string[] {
+  const problems: string[] = [];
+  const entityIds = new Set(world.entities.map((e) => e.id));
+  // Names she already knows (capitalised words anywhere in her world); a little thing may not add one.
+  const known = new Set<string>(["I", "Christmas", "Eve", "Easter", "Sunday", "Sundays", "Saturday", "Tuesday", "Tuesdays", "Grandma", "Grandpa", "Uncle", "Aunt"]);
+  const texts = [world.profile.name, world.profile.hometown, ...world.entities.flatMap((e) => [e.name, ...(e.aliases ?? [])]), ...world.facts.map((f) => f.text), ...(world.stories ?? []).map((s) => s.text)];
+  for (const t of texts) for (const w of t.match(/[A-Z][a-zA-Z-]+/g) ?? []) known.add(w);
+  // Every word of every answer, from every recipe.
+  const answers = new Set<string>();
+  for (const r of world.recipes) {
+    try {
+      for (const part of slotAnswers(world, r)) for (const a of part) answers.add(String(a).toLowerCase());
+    } catch {
+      /* reported elsewhere */
+    }
+  }
+  const seen = new Set<string>();
+  for (const c of world.colour ?? []) {
+    if (seen.has(c.id)) problems.push(`duplicate colour id ${c.id}`);
+    seen.add(c.id);
+    for (const id of c.about) if (!entityIds.has(id)) problems.push(`colour ${c.id}: unknown entity ${id}`);
+    if (/\d/.test(c.text)) problems.push(`colour ${c.id}: has a digit (numbers and years are facts, not colour)`);
+    const bad = COLOUR_FORBIDDEN.exec(c.text);
+    if (bad) problems.push(`colour ${c.id}: "${bad[0]}" ties it to time, a puzzle or a place in the house`);
+    const words: string[] = c.text.toLowerCase().match(/[a-z]+/g) ?? [];
+    for (const a of answers) if (/^[a-z]+$/.test(a) && words.includes(a)) problems.push(`colour ${c.id}: says "${a}", a part of a password`);
+    for (const sentence of c.text.split(/(?<=[.!?])\s+/)) {
+      for (const w of (sentence.match(/[A-Za-z][a-zA-Z'-]*/g) ?? []).slice(1)) {
+        const bare = w.replace(/'s$/, "").replace(/'+$/, "");
+        if (/^[A-Z]/.test(bare) && !/^I'/.test(bare) && !known.has(bare)) problems.push(`colour ${c.id}: "${bare}" is a name she doesn't otherwise know`);
+      }
+    }
+  }
+  return problems;
+}
+
 /** Cross-reference checks the JSON Schema can't express. Returns a list of problems (empty = valid). */
 export function checkWorld(world: GrandmaWorld): string[] {
   const problems: string[] = [];
@@ -300,6 +360,7 @@ export function checkWorld(world: GrandmaWorld): string[] {
   for (const s of world.stories ?? []) {
     for (const id of s.fact_ids) if (!factIds.has(id)) problems.push(`story ${s.id}: unknown fact ${id}`);
   }
+  problems.push(...checkColour(world));
   for (const r of world.recipes) {
     try {
       const computed = computePassword(world, r);

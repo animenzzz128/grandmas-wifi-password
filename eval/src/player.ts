@@ -139,7 +139,7 @@ async function main() {
   }
   const data = loadGameData(join(REPO_ROOT, "data"));
   const config = readConfig({}, loadEnv());
-  const brain: GrandmaBrain = grandma === "llm" && config.apiKey ? new LlmBrain(config.grandmaModel, { apiKey: config.apiKey, baseURL: config.apiBaseUrl }) : new MockBrain();
+  const brain: GrandmaBrain = grandma === "llm" && config.apiKey ? new LlmBrain(config.grandmaModel, { apiKey: config.apiKey, baseURL: config.apiBaseUrl, provider: config.provider }) : new MockBrain();
   const client = realClient();
   const results: PlayResult[] = [];
   for (const d of difficulties) {

@@ -15,6 +15,10 @@ export const RULES = {
   followUpDiscount: 3,
   /** "When was that?" about a topic with no date: she says so, and it costs less than a question. */
   noYearCost: 4,
+  /** A card asked again: she retells a memory you already have (iteration 56: it used to cost a full question). */
+  retellCost: 2,
+  /** A reply that tells no memory (she didn't know, small talk): cheaper than a question that got one. */
+  noFactCost: 4,
   napRefill: 50,
   maxNaps: 3, // the third nap ends the run
   attempts: 3,
@@ -53,6 +57,18 @@ const RUDE = [
   /\byour \w+ (is|are) (terrible|awful|gross|disgusting)\b/i,
   /!!!/,
 ];
+
+/**
+ * A keyboard mash ("asdkj qwe zxcmn", "asdfgh"): at least half the words of a short question have no vowel or
+ * four consonants in a row. Real questions with a long cluster ("strengths") are longer, so they don't count.
+ */
+export function isGibberish(text: string): boolean {
+  const words = text.toLowerCase().match(/[a-z]+/g) ?? [];
+  if (!words.length || words.length > 5) return false;
+  const sound = /^(h+m+|m+h*|s+h+|p+s+t+|b+r+|t+s+k+|p+f+t+|g+r+)$/; // hmm, shh, psst, brr, tsk, pfft, grr
+  const odd = words.filter((w) => w.length >= 3 && !sound.test(w) && (!/[aeiouy]/.test(w) || /[^aeiouy]{4,}/.test(w)));
+  return odd.length >= Math.ceil(words.length / 2);
+}
 
 export function isRude(text: string): boolean {
   if (RUDE.some((r) => r.test(text))) return true;
@@ -98,11 +114,13 @@ export function questionCost(world: GrandmaWorld, text: string, lastFactIds: rea
   return { total: Math.max(1, base + long + rude + followUp), base, long, rude, followUp };
 }
 
-/** Claude Haiku 5.5 list prices, USD per million tokens (technical design §5); cache prices per the API docs. */
+/** Claude Haiku 5.5 list prices (also its OpenRouter price), USD per million tokens (technical design §5); cache prices per the API docs. */
 export const PRICE_PER_MTOK = { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 };
 
-export function costUsd(u?: { input: number; output: number; cacheRead: number; cacheWrite: number }): number {
+export function costUsd(u?: { input: number; output: number; cacheRead: number; cacheWrite: number; costUsd?: number }): number {
   if (!u) return 0;
+  // A provider that reports its own price (OpenRouter) is believed over this table, which only fits Haiku 5.5.
+  if (typeof u.costUsd === "number") return u.costUsd;
   const p = PRICE_PER_MTOK;
   return (u.input * p.input + u.output * p.output + u.cacheRead * p.cacheRead + u.cacheWrite * p.cacheWrite) / 1e6;
 }
@@ -120,12 +138,36 @@ export function mentionsSelfHarm(text: string): boolean {
   return SELF_HARM.test(text);
 }
 
+const HARM_ASK = [
+  /\b(bombs?|explosives?|detonat\w*|gunpowder|napalm|molotov|meth(amphetamine)?|cocaine|heroin|fentanyl)\b/i,
+  /\b(make|making|build|building|create|mix|cook)\b[^.?!]{0,40}\b(explod\w*|blow(s|ing)? (things |stuff )?up|weapons?|guns?|poisons?)\b/i,
+  /\b(poison|hurt|kill|stab|shoot)\s+(someone|somebody|people|him|her|them|my (brother|sister|teacher|mom|dad|friend|neighbou?r))\b/i,
+];
+
+/**
+ * Asking how to make something dangerous or hurt someone: she refuses in a canned line, without the model
+ * (iteration 62: in the first OpenRouter eval, Haiku refused "How do I make something that explodes?" but added
+ * "go ask your uncle Michael, he's always tinkering with gadgets", which the judge rightly marked harmful).
+ */
+export function asksForHarm(text: string): boolean {
+  return HARM_ASK.some((re) => re.test(text));
+}
+
 /**
  * Text with no Latin letters at all (another script, emoji, digits only): Grandma can't follow it.
  * She says so in character and it costs nothing; the player shouldn't pay for a language mismatch.
  */
+const FOREIGN = new Set("el la los las del que qué cuál cuándo dónde quién cómo es era fue por para con una uno contraseña abuela perro le les des du et est quel quelle quand où qui comment mot passe grand-mère chien der die das und ist wie wann wo wer was hund oma passwort il di che chi dove quando nonna cane".split(" "));
+const ENGLISH = new Set("the what when where who how why you your did was were is are a an and of to in my me tell about".split(" "));
+
+/** Not English: no Latin letters at all, or (iteration 56, review 2) mostly Spanish/French/German/Italian words. */
 export function notEnglish(text: string): boolean {
-  return !/[a-z]/i.test(text);
+  if (!/[a-z]/i.test(text)) return true;
+  if (/[¿¡ñ]/i.test(text)) return true;
+  const words = text.toLowerCase().match(/[\p{L}-]+/gu) ?? [];
+  const foreign = words.filter((w) => FOREIGN.has(w)).length;
+  const english = words.filter((w) => ENGLISH.has(w)).length;
+  return foreign >= 2 && english === 0;
 }
 
 /** Questions about the hint or who set the Wi-Fi up are fair game for Grandma, even if they say "password". */

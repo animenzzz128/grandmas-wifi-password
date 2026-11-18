@@ -5,9 +5,10 @@ import { applyTextSettings, useSettings } from "./settings.ts";
 import { useGame } from "./store.ts";
 import { t } from "./strings.ts";
 import { dailyStreak, formatCountdown, loadDailyRecords } from "./daily.ts";
-import { hasVisited } from "./firsts.ts";
+import { forgetLesson, hasVisited } from "./firsts.ts";
 import { loadNoteStars } from "./noteStars.ts";
 import { Smudged } from "./ui/Smudged.tsx";
+import { startMusic } from "./audio.ts";
 
 /** The 3D room and HUD are their own chunk; the title screen shows while it loads. */
 const loadGame = () => import("./Game.tsx");
@@ -106,7 +107,7 @@ function NotePicker({ onBack }: { onBack: () => void }) {
   );
 }
 
-function HowToPlay({ onClose }: { onClose: () => void }) {
+function HowToPlay({ onClose, onGuided }: { onClose: () => void; onGuided: () => void }) {
   return (
     <div className="card howto" role="dialog" aria-labelledby="howto-title">
       <h3 id="howto-title">{t("howto.title")}</h3>
@@ -118,19 +119,45 @@ function HowToPlay({ onClose }: { onClose: () => void }) {
         <li>{t("howto.5")}</li>
       </ol>
       <p className="hint">{t("howto.keys")}</p>
-      <button autoFocus onClick={onClose}>
-        {t("close")}
-      </button>
+      <div className="title-buttons">
+        <button autoFocus onClick={onGuided}>
+          {t("howto.guided")}
+        </button>
+        <button className="secondary" onClick={onClose}>
+          {t("close")}
+        </button>
+      </div>
     </div>
   );
 }
 
 /** The title over the live room (the camera drifts behind it), as in the Godot edition. */
+/**
+ * The waltz on the title too (iteration 56), from the player's first click or key there: browsers only allow
+ * sound after an interaction. It carries on into the visit, which starts the same loop.
+ */
+function useTitleMusic() {
+  const musicOn = useSettings((s) => s.musicVolume > 0);
+  useEffect(() => {
+    if (!musicOn) return;
+    const go = () => startMusic();
+    window.addEventListener("pointerdown", go, { once: true });
+    window.addEventListener("keydown", go, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", go);
+      window.removeEventListener("keydown", go);
+    };
+  }, [musicOn]);
+}
+
 function TitleScreen() {
+  useTitleMusic();
   const busy = useGame((s) => s.busy);
   const error = useGame((s) => s.error);
   const health = useGame((s) => s.health);
   const start = useGame((s) => s.start);
+  const resumable = useGame((s) => s.resumable);
+  const resume = useGame((s) => s.resume);
   const [step, setStep] = useState<"home" | "pick">("home");
   const [panel, setPanel] = useState<"settings" | "howto" | null>(null);
   const [firstVisit] = useState(() => !hasVisited());
@@ -138,7 +165,7 @@ function TitleScreen() {
     <div className="title-screen over-room">
       {panel && (
         <div className="panel-wrap" role="dialog" aria-labelledby="panel-title">
-          {panel === "settings" ? <SettingsCard onClose={() => setPanel(null)} /> : <HowToPlay onClose={() => setPanel(null)} />}
+          {panel === "settings" ? <SettingsCard onClose={() => setPanel(null)} /> : <HowToPlay onClose={() => setPanel(null)} onGuided={() => { forgetLesson("tutorial"); setPanel(null); void start("easy"); }} />}
         </div>
       )}
       {step === "home" ? (
@@ -148,8 +175,15 @@ function TitleScreen() {
           <h1>{t("title").replace("-", "‑")}</h1>
           <p className="premise">{t("premise")}</p>
           <div className="title-buttons">
+            {/* A visit left half-way (reload, a phone closing the tab) can be picked up again (iteration 56). */}
+            {resumable && (
+              <button className="primary big resume" autoFocus disabled={busy} onClick={() => void resume()}>
+                {t("resume.button")}
+                <small>{t("resume.detail", { note: resumable.note, n: resumable.questions })}</small>
+              </button>
+            )}
             {/* The very first visit goes straight in on Easy: playing within seconds (plan A1). */}
-            <button className="primary big" autoFocus disabled={busy} onClick={() => (firstVisit ? void start("easy") : setStep("pick"))}>
+            <button className="primary big" autoFocus={!resumable} disabled={busy} onClick={() => (firstVisit ? void start("easy") : setStep("pick"))}>
               {t("title.firstVisit")}
             </button>
             {firstVisit && (
@@ -214,6 +248,9 @@ class GameErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
   }
   override componentDidCatch(err: unknown) {
     console.error("[game] the room failed to start:", err);
+    // Dev only: keep the cause where automated playtests can read it.
+    if (import.meta.env.DEV) Object.assign(window, { __gameError: err instanceof Error ? `${err.message}
+${err.stack}` : String(err) });
   }
   override render() {
     if (!this.state.failed) return this.props.children;

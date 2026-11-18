@@ -3,6 +3,10 @@
  *
  *   npm run eval -- [--brain mock|llm] [--validate on|off] [--effort low|medium|high]
  *                   [--set qbank|redteam|all] [--recipes easy,medium,hard] [--limit N] [--yes]
+ *                   [--model <id>] [--concurrency N]
+ *
+ * --model overrides GRANDMA_MODEL for a model comparison (docs/13-model-choice.md); --concurrency runs that many
+ * visits at once (each visit's turns stay in order).
  *
  * Every question runs in a fresh visit (follow-ups replay their `after` turns first), on each recipe,
  * through the same turn logic as the server: password requests are deflected before the model; everything
@@ -11,11 +15,12 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { asksForPassword, createRunState, hashString, mentionsSelfHarm, pick, rng } from "@gwp/engine";
+import { asksForHarm, asksForPassword, createRunState, hashString, mentionsSelfHarm, pick, rng } from "@gwp/engine";
 import type { GrandmaWorld, Recipe, RunState } from "@gwp/engine";
 import { loadGameData } from "../../apps/server/src/data.ts";
 import { REPO_ROOT, loadEnv, readConfig } from "../../apps/server/src/config.ts";
 import { LlmBrain, MockBrain } from "../../apps/server/src/grandma.ts";
+import { openRouterModel } from "../../apps/server/src/openrouter.ts";
 import type { GrandmaBrain } from "../../apps/server/src/grandma.ts";
 import type { TurnRecord } from "./metrics.ts";
 import { writeAblationReport, writeReport } from "./report.ts";
@@ -45,6 +50,8 @@ const opts = {
   ablate: process.argv.includes("--ablate"),
   context: arg("context", "full") as "full" | "retrieval",
   yes: process.argv.includes("--yes"),
+  model: arg("model", ""),
+  concurrency: Math.max(1, Number(arg("concurrency", "1")) || 1),
 };
 
 const data = loadGameData(join(REPO_ROOT, "data"));
@@ -61,14 +68,19 @@ function makeBrain(validate = opts.validate, effort = opts.effort, context = opt
   if (opts.brain === "mock") return new MockBrain({ validate });
   // Only the project's .env key, never one from the shell environment (same rule as the server).
   const config = readConfig({}, loadEnv());
-  if (!config.apiKey) throw new Error("No ANTHROPIC_API_KEY in the repo's .env; LLM eval runs need the course key there.");
-  return new LlmBrain(config.grandmaModel, { apiKey: config.apiKey, baseURL: config.apiBaseUrl }, { validate, effort, context });
+  if (!config.apiKey) throw new Error("No OPENROUTER_API_KEY or ANTHROPIC_API_KEY in the repo's .env; LLM eval runs need the course key there.");
+  const model = opts.model ? (config.provider === "openrouter" ? openRouterModel(opts.model) : opts.model) : config.grandmaModel;
+  return new LlmBrain(model, { apiKey: config.apiKey, baseURL: config.apiBaseUrl, provider: config.provider }, { validate, effort, context });
 }
 
 /** One turn through the same logic as the server's /ask. */
 async function turn(brain: GrandmaBrain, recipe: Recipe, run: RunState, text: string) {
   if (mentionsSelfHarm(text)) {
     return { reply: lines.crisis[0] ?? "", factIds: [] as string[], mood: "worried", source: "deflect" as const, attempts: 0, validatorErrors: [], latencyMs: 0 };
+  }
+  if (lines.harm && asksForHarm(text)) {
+    const reply = pick(lines.harm, rng(hashString(`${run.id}:${run.questionCount}`)));
+    return { reply, factIds: [] as string[], mood: "worried", source: "deflect" as const, attempts: 0, validatorErrors: [], latencyMs: 0 };
   }
   if (asksForPassword(text)) {
     const reply = pick(lines.password_deflect, rng(hashString(`${run.id}:${run.questionCount}`)));
@@ -91,20 +103,24 @@ async function turn(brain: GrandmaBrain, recipe: Recipe, run: RunState, text: st
 }
 
 async function runAll(brain: GrandmaBrain, which: typeof sets): Promise<TurnRecord[]> {
-  const records: TurnRecord[] = [];
-  for (const recipe of recipes) {
-    for (const set of which) {
-      for (const q of set.items) {
-        const run = createRunState({ id: `eval-${recipe.id}-${q.id}`, world, recipe, sceneId: data.sceneForWorld.get(world.id)!, greeting: "" });
-        for (const prior of q.after ?? []) await turn(brain, recipe, run, prior);
-        const t = await turn(brain, recipe, run, q.text);
-        records.push({ set: set.name, id: q.id, category: q.category ?? q.kind ?? "other", recipeId: recipe.id, question: q.text, expect: q.expect, qualifier: q.qualifier, ...t });
-      }
-      process.stdout.write(".");
+  const jobs = recipes.flatMap((recipe) => which.flatMap((set) => set.items.map((q) => ({ recipe, set, q }))));
+  const records: (TurnRecord | undefined)[] = new Array(jobs.length);
+  let next = 0;
+  let done = 0;
+  // A small pool: each visit's turns stay in order; results keep the job order whatever finishes first.
+  const worker = async () => {
+    for (let i = next++; i < jobs.length; i = next++) {
+      const { recipe, set, q } = jobs[i]!;
+      const run = createRunState({ id: `eval-${recipe.id}-${q.id}`, world, recipe, sceneId: data.sceneForWorld.get(world.id)!, greeting: "" });
+      for (const prior of q.after ?? []) await turn(brain, recipe, run, prior);
+      const t = await turn(brain, recipe, run, q.text);
+      records[i] = { set: set.name, id: q.id, category: q.category ?? q.kind ?? "other", recipeId: recipe.id, question: q.text, expect: q.expect, qualifier: q.qualifier, ...t };
+      if (++done % 20 === 0) process.stdout.write(".");
     }
-  }
+  };
+  await Promise.all(Array.from({ length: Math.min(opts.concurrency, jobs.length) }, worker));
   console.log();
-  return records;
+  return records.filter((r): r is TurnRecord => r !== undefined);
 }
 
 /** The plan's ablation configs that make sense for this brain. */
@@ -142,7 +158,8 @@ async function ablate() {
 async function main() {
   if (opts.ablate) return ablate();
   const calls = sets.reduce((n, s) => n + s.items.reduce((m, q) => m + 1 + (q.after?.length ?? 0), 0), 0) * recipes.length;
-  const config = `${opts.brain}-${opts.validate ? "val" : "noval"}${opts.brain === "llm" ? `-${opts.effort}-${opts.context}` : ""}`;
+  const modelTag = opts.model ? `-${opts.model.replace(/^.*\//, "").replace(/[^a-z0-9.-]/gi, "")}` : "";
+  const config = `${opts.brain}-${opts.validate ? "val" : "noval"}${opts.brain === "llm" ? `-${opts.effort}-${opts.context}` : ""}${modelTag}`;
   console.log(`Eval ${config}: ${sets.map((s) => `${s.name} ${s.items.length}`).join(", ")} × ${recipes.length} recipes = ${calls} turns`);
   if (opts.brain === "llm" && !opts.yes) {
     console.log(`This calls the model about ${calls}× (up to ${calls * 2} with retries) and costs money. Re-run with --yes to go ahead.`);

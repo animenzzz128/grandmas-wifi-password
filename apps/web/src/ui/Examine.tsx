@@ -5,11 +5,11 @@
  *
  * The close-up is its own small canvas. The room behind stops redrawing while a card is open (GameCanvas).
  */
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Bounds, Center, Html, OrbitControls } from "@react-three/drei";
 import { useGame } from "../store.ts";
-import { t } from "../strings.ts";
+import { t, hasString } from "../strings.ts";
 import { Art } from "../scene/Room.tsx";
 import { RoomNode } from "../scene/House.tsx";
 import { OpenAlbum } from "../scene/props.tsx";
@@ -74,6 +74,18 @@ export function ExamineCard({ objectId }: { objectId: string }) {
   const busy = useGame((s) => s.busy);
   const [view, setView] = useState(0);
   const it = scene?.interactables.find((i) => i.id === objectId);
+  // ← and → turn the album's pages (or the photo over), as the buttons do (review 3, F12).
+  useEffect(() => {
+    if (!it) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (document.activeElement instanceof HTMLInputElement) return;
+      e.preventDefault();
+      setView((v) => stepView(it.node, v, e.key === "ArrowRight" ? 1 : -1));
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [it]);
   if (!it) return null;
   const views = viewsFor(it.node);
   const n = viewCount(it.node);
@@ -108,7 +120,8 @@ export function ExamineCard({ objectId }: { objectId: string }) {
             </button>
           </div>
         )}
-        <p>{it.inspect_text}</p>
+        {/* An album page says what's on that page (review F9); the whole card text goes to the notebook. */}
+        <p>{views?.kind === "pages" && hasString(`examine.pages.${it.id}.${view + 1}`) ? t(`examine.pages.${it.id}.${view + 1}`) : it.inspect_text}</p>
         <div className="examine-actions">
           {it.kind === "glasses" ? (
             <button disabled={run.glasses || !run.note.smudged} onClick={() => void useGame.getState().putOnGlasses()}>

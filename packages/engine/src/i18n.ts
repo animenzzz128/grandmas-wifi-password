@@ -28,6 +28,12 @@ export const GrandmaLines = z.strictObject({
   glasses_not_needed: LineBank,
   /** Topic cards: "When was that?" about something with no date. Must not mention any facts. */
   no_year: LineBank,
+  /** Rude words at her (the rudeness penalty still applies). In character; no facts (iteration 56). */
+  rude: LineBank.optional(),
+  /** Asking how to make something dangerous or hurt someone: a firm no, without the model, naming nobody (iteration 62). */
+  harm: LineBank.optional(),
+  /** Keyboard mash ("asdkj qwe"): free, like a mishearing. No facts (iteration 56). */
+  gibberish: LineBank.optional(),
   /** Topic cards: she tells a memory again. Said before it. */
   repeat: LineBank,
   /** Topic cards: a part of the note still smudged. Free. */

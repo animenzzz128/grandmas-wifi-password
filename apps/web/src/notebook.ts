@@ -10,13 +10,14 @@ import { t } from "./strings.ts";
 
 /** Capitalised words that are not names even mid-sentence. */
 const NOT_NAMES = new Set(
-  "I Oh Now Sweetheart Dear Honey Well Yes No Pardon Next The A An And But Our Your My We He She They It Its That This There Then When Where What Who Why How In On At Of For Every Uncle Aunt Grandpa Grandma Mom Dad Christmas Eve English Polish Wi-Fi TV".split(" "),
+  "I Oh Now Sweetheart Dear Honey Well Yes No Pardon Next The A An And But Our Your My We He She They It Its That This There Then When Where What Who Why How In On At Of For Every Uncle Aunt Grandpa Grandma Mom Dad Christmas Eve English Polish Wi-Fi TV St Summer Winter Spring Autumn Canadian American Italian Irish German French Page Tucked Two Inside Taped Nobody Married".split(" "),
 );
 const MONTHS = "January February March April May June July August September October November December".split(" ");
 const DAYS = "Monday Tuesday Wednesday Thursday Friday Saturday Sunday".split(" ");
 const NOT_CAPS = new Set([...MONTHS, ...DAYS].map((w) => w.toUpperCase()).concat(["APOLLO", "TV", "OK"]));
 const YEAR = /^(1[89]\d\d|20[0-2]\d)$/;
-const PLACE = /\b((?:[A-Z][a-z]+ )?[A-Z][a-z]+) (Street|Avenue|Road|Lane)\b/g;
+const PLACE = /\b((?:[A-Z][a-z]+ )?[A-Z][a-z]+) (Street|Avenue|Road|Lane|St\.?|Ave\.?)(?=[\s,.;:!?'"]|$)/g;
+const LONG_PLACE: Record<string, string> = { "St.": "Street", St: "Street", "Ave.": "Avenue", Ave: "Avenue" };
 
 export function extractNotes(text: string, from: NoteEntry["from"]): NoteEntry[] {
   const out: NoteEntry[] = [];
@@ -29,12 +30,14 @@ export function extractNotes(text: string, from: NoteEntry["from"]): NoteEntry[]
   for (const sentence of text.split(/(?<=[.!?])\s+/)) {
     // Years.
     for (const m of sentence.matchAll(/\b(1[89]\d\d|20[0-2]\d)\b/g)) add("year", m[1]!, sentence);
+    // Short years on labels and in talk: 'Summer '69', 'moved out summer '64' (iteration 56).
+    for (const m of sentence.matchAll(/(?:^|[\s(])['’](\d\d)\b/g)) add("year", `19${m[1]}`, sentence);
 
-    // Places ("Maple Avenue", "Cherry Street"), without a leading article.
+    // Places ("Maple Avenue", "Cherry Street", "Cherry St."), without a leading article.
     const placeWords = new Set<string>();
     for (const m of sentence.matchAll(PLACE)) {
       const name = m[1]!.replace(/^(The|A|An|Our|On|In) /, "");
-      add("place", `${name} ${m[2]}`, sentence);
+      add("place", `${name} ${LONG_PLACE[m[2]!] ?? m[2]}`, sentence);
       name.split(" ").forEach((w) => placeWords.add(w));
     }
 
@@ -44,27 +47,44 @@ export function extractNotes(text: string, from: NoteEntry["from"]): NoteEntry[]
     }
 
     // Names: capitalised words that aren't the first word of the sentence, a contraction, or a stop word.
-    const words = [...sentence.matchAll(/[A-Za-z][A-Za-z'-]*/g)];
-    words.forEach((m, i) => {
-      const w = m[0];
-      if (i === 0 || w.includes("'") || !/^[A-Z][a-z]+$/.test(w)) return;
-      if (NOT_NAMES.has(w) || MONTHS.includes(w) || DAYS.includes(w) || placeWords.has(w)) return;
-      if (/^(Street|Avenue|Road|Lane)$/.test(w)) return;
-      add("name", w, sentence);
-    });
+    // Letters in any alphabet ("Kraków", not "Krak"); neighbouring name words stay one name ("Niagara Falls",
+    // "Marge Novak"; iteration 56).
+    const words = [...sentence.matchAll(/\p{L}[\p{L}'’-]*/gu)];
+    const isName = (w: string, i: number) =>
+      i > 0 &&
+      !w.includes("'") &&
+      !w.includes("’") &&
+      /^\p{Lu}\p{Ll}+$/u.test(w) &&
+      !NOT_NAMES.has(w) &&
+      !MONTHS.includes(w) &&
+      !DAYS.includes(w) &&
+      !placeWords.has(w) &&
+      !/^(Street|Avenue|Road|Lane)$/.test(w);
+    for (let i = 0; i < words.length; i++) {
+      if (!isName(words[i]![0], i)) continue;
+      let name = words[i]![0];
+      // Join the next word when only a space separates them and it's a name word too.
+      while (i + 1 < words.length && isName(words[i + 1]![0], i + 1) && sentence.slice(words[i]!.index! + words[i]![0].length, words[i + 1]!.index!) === " ") {
+        i++;
+        name += ` ${words[i]![0]}`;
+      }
+      add("name", name, sentence);
+    }
     // Quoted nicknames: 'Sparrow'.
     for (const m of sentence.matchAll(/'([A-Z][a-z]+)'/g)) add("name", m[1]!, sentence);
   }
 
   // On objects: painted numbers ("crooked: 412") and single words in capitals ("carved MIKEY").
   if (from === "object") {
-    for (const m of text.matchAll(/:\s*(\d{1,4})\b/g)) if (!YEAR.test(m[1]!)) add("number", m[1]!, text);
+    // Quote only the sentence a clue came from, not the whole card (iteration 56).
+    const sentenceWith = (needle: string) => text.split(/(?<=[.!?])\s+/).find((s) => s.includes(needle)) ?? text;
+    for (const m of text.matchAll(/:\s*(\d{1,4})\b/g)) if (!YEAR.test(m[1]!)) add("number", m[1]!, sentenceWith(m[0]));
     const tokens = text.split(/[\s,.;:·]+/).filter(Boolean);
     tokens.forEach((w, i) => {
       if (!/^[A-Z]{3,}$/.test(w) || NOT_CAPS.has(w)) return;
       const isCaps = (x?: string) => Boolean(x && /^[A-Z]{2,}$/.test(x));
       if (isCaps(tokens[i - 1]) || isCaps(tokens[i + 1])) return; // part of a caps phrase like "HIGH GAME"
-      add("name", w, text);
+      add("name", w, sentenceWith(w));
     });
   }
   return out;

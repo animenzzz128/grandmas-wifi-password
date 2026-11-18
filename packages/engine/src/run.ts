@@ -61,6 +61,10 @@ export interface RunState {
   heardWhen?: string[];
   /** The card of the last question, if it was asked with a card (asking about it again is a follow-up). */
   lastTopic?: string;
+  /** How many lines each canned bank has used this visit (they go round in order; iteration 56). */
+  lineTurns?: Record<string, number>;
+  /** Cards her last reply mentioned: asking one next is a follow-up (iteration 56, review 2 F8). */
+  lastMentioned?: string[];
   /** Calls made to Uncle Michael this visit. */
   calls?: number;
   status: RunStatus;

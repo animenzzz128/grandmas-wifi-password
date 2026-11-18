@@ -3,10 +3,10 @@
  * animation ported from grandma.gd: breathing, blinking, looking at the camera, lip flaps while she talks,
  * a pose per mood, nodding off as her tea runs low, sips, and the tea level in her cup (her stamina).
  */
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, useFrame } from "@react-three/fiber";
 import { Html, useGLTF } from "@react-three/drei";
-import { BufferAttribute, BufferGeometry, Euler, Float32BufferAttribute, PointsMaterial, Quaternion, Vector3 } from "three";
+import { BufferAttribute, BufferGeometry, CanvasTexture, Euler, Float32BufferAttribute, PointsMaterial, Quaternion, Vector3 } from "three";
 import type { Mesh, Object3D } from "three";
 import { useGame } from "../store.ts";
 import { useSettings } from "../settings.ts";
@@ -18,6 +18,12 @@ const LID_CLOSED = 1.45;
 
 /** The game's moods (from the model) as the rig's poses (grandma.gd). */
 const POSE: Record<string, string> = { happy: "proud", teasing: "laugh", nostalgic: "fond", confused: "think", suspicious: "think", worried: "sad", sleepy: "idle" };
+
+/**
+ * A small emote over her head as each line arrives (iteration 56): her poses alone were too subtle to read her
+ * mood with the sound off (both reviews). The words say the same, so this is decoration (aria-hidden).
+ */
+const EMOTE: Record<string, string> = { happy: "😊", teasing: "😏", nostalgic: "💭", confused: "❓", suspicious: "🤨", worried: "😟" };
 
 const PARTS = ["Torso", "Head", "EyelidL", "EyelidR", "MouthOpen", "Brows", "ArmR", "ForearmR", "ArmL", "ForearmL", "TeaLevel", "Teacup"] as const;
 type Part = (typeof PARTS)[number];
@@ -36,7 +42,19 @@ function Steam({ on }: { on: boolean }) {
     g.setAttribute("position", new Float32BufferAttribute(p, 3));
     return g;
   }, []);
-  const mat = useMemo(() => new PointsMaterial({ color: "#ffffff", size: 0.03, transparent: true, opacity: 0.12, depthWrite: false }), []);
+  // Soft round puffs, not the square points WebGL draws by default (iteration 56).
+  const mat = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const g = c.getContext("2d")!;
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(0.45, "rgba(255,255,255,0.45)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    return new PointsMaterial({ color: "#ffffff", map: new CanvasTexture(c), size: 0.05, transparent: true, opacity: 0.16, depthWrite: false });
+  }, []);
   useFrame(({ clock }, dt) => {
     const a = geo.getAttribute("position") as BufferAttribute;
     const arr = a.array as Float32Array;
@@ -63,6 +81,12 @@ export function Rosie({ seat }: { seat: Object3D | null }) {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
     });
+    // A fuller neck, set a little lower, so it fills her collar instead of a thin stalk in a ring (iteration 56).
+    const neck = m.getObjectByName("Neck");
+    if (neck) {
+      neck.scale.set(1.55, 1.15, 1.45);
+      neck.position.y -= 0.02;
+    }
     return m;
   }, [gltf]);
   const parts = useMemo(() => {
@@ -90,6 +114,7 @@ export function Rosie({ seat }: { seat: Object3D | null }) {
   const last = useGame((s) => s.log[lastIndex]);
   const cookies = useGame((s) => s.run?.cookies ?? 1);
 
+  const [emote, setEmote] = useState<{ icon: string; key: number } | null>(null);
   const st = useRef({ t: 0, mood: "idle", moodTime: 0, talking: 0, talkOpen: 0, talkTarget: 0, blink: 0, nextBlink: 2, drowsy: 0, yaw: 0, pitch: 0, sip: -1, nextSip: 18, syl: 0 });
   // A new line from her: talk for about as long as it takes to read, in that line's mood.
   useEffect(() => {
@@ -98,6 +123,11 @@ export function Rosie({ seat }: { seat: Object3D | null }) {
     s.mood = POSE[last.mood ?? ""] ?? "idle";
     s.moodTime = 0;
     s.talking = clamp(last.text.length / 42, 1, 12);
+    const icon = EMOTE[last.mood ?? ""];
+    if (!icon) return;
+    setEmote({ icon, key: last.seq ?? 0 });
+    const id = setTimeout(() => setEmote(null), 2600);
+    return () => clearTimeout(id);
   }, [last?.seq]); // eslint-disable-line react-hooks/exhaustive-deps
   // A cookie: she sips her refilled tea.
   const prevCookies = useRef(cookies);
@@ -251,11 +281,25 @@ export function Rosie({ seat }: { seat: Object3D | null }) {
     <group position={place.p} quaternion={place.q}>
       <primitive object={model} />
       {cup && createPortal(<Steam on={teaFrac > 0.01 && !asleep} />, cup)}
-      <Html position={[0.15, 1.05, 0]} center zIndexRange={[5, 0]} pointerEvents="none">
-        <div ref={zzz} className="zzz" style={{ opacity: 0 }} aria-hidden="true">
-          z z Z
-        </div>
-      </Html>
+      {/* On her head, not the chair: placed by the chair they sat above the frame in her close view (iteration 56). */}
+      {parts.Head &&
+        createPortal(
+          <>
+            {emote && (
+              <Html position={[-0.27, 0.19, 0.06]} center zIndexRange={[5, 0]} pointerEvents="none">
+                <div key={emote.key} className="emote" aria-hidden="true">
+                  {emote.icon}
+                </div>
+              </Html>
+            )}
+            <Html position={[0.22, 0.34, 0]} center zIndexRange={[5, 0]} pointerEvents="none">
+              <div ref={zzz} className="zzz" style={{ opacity: 0 }} aria-hidden="true">
+                z z Z
+              </div>
+            </Html>
+          </>,
+          parts.Head,
+        )}
     </group>
   );
 }

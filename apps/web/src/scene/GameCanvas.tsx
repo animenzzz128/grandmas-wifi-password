@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { ACESFilmicToneMapping, AgXToneMapping, PCFShadowMap } from "three";
-import { ADAPT, adapt, qualityStep } from "./adaptive.ts";
+import { ADAPT, adapt, medianFps, qualityStep, shouldDraw } from "./adaptive.ts";
 import { t } from "../strings.ts";
 import { useSettings } from "../settings.ts";
 import { useGame } from "../store.ts";
@@ -12,7 +12,9 @@ import type { HouseInfo } from "./House.tsx";
 import { Rosie } from "./Rosie.tsx";
 import { ViewRig } from "./ViewRig.tsx";
 import { HighPost } from "./HighPost.tsx";
-import { setRichMaterials } from "./materials.ts";
+import { setMetalEnvironment, setRichMaterials } from "./materials.ts";
+import { PMREMGenerator } from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
 const PARAMS = new URLSearchParams(location.search);
 const POST_PARAM = PARAMS.get("post");
@@ -39,16 +41,17 @@ function DevHooks() {
  * adaptive.ts). Frames longer than a quarter second (a hidden tab, a breakpoint) aren't counted.
  */
 function AdaptiveResolution({ scale, max, onScale }: { scale: number; max: number; onScale: (scale: number) => void }) {
-  const acc = useRef({ time: 0, frames: 0, goodStreak: 0, slowStreak: 0 });
+  const acc = useRef({ time: 0, dts: [] as number[], goodStreak: 0, slowStreak: 0 });
   useFrame((_, dt) => {
     if (dt > 0.25) return;
     const a = acc.current;
     a.time += dt;
-    a.frames++;
+    a.dts.push(dt);
     if (a.time < ADAPT.window) return;
-    const fps = a.frames / a.time;
+    // The median frame, so a few hitches from outside the game (a live wallpaper, another tab) don't count.
+    const fps = medianFps(a.dts);
     const next = adapt({ scale, goodStreak: a.goodStreak }, fps, max);
-    Object.assign(a, { time: 0, frames: 0, goodStreak: next.goodStreak });
+    Object.assign(a, { time: 0, dts: [], goodStreak: next.goodStreak });
     // Still slow: step the quality down too (High → Medium → Low), if the player left it on automatic.
     const q = qualityStep(a.slowStreak, fps);
     a.slowStreak = q.slowStreak;
@@ -61,6 +64,47 @@ function AdaptiveResolution({ scale, max, onScale }: { scale: number; max: numbe
     if (import.meta.env.DEV) ((window as unknown as { __dprLog?: unknown[] }).__dprLog ??= []).push({ t: Math.round(performance.now()), fps: Math.round(fps), scale: next.scale });
     if (next.scale !== scale) onScale(next.scale);
   });
+  return null;
+}
+
+/**
+ * Draws at most about 60 frames a second, on every n-th screen refresh so the frames stay evenly spaced
+ * (iteration 56). On a 144 or 240 Hz laptop screen the game used to draw 90–200 frames a second, which left
+ * an integrated GPU no headroom: anything else using it (a live wallpaper) then showed up as stutter.
+ * The canvas runs on demand, and this asks for each frame.
+ */
+function FrameCap({ paused }: { paused: boolean }) {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    if (paused) return;
+    let id = 0, last = 0, drawn = 0, refresh = 0;
+    const loop = (now: number) => {
+      id = requestAnimationFrame(loop);
+      // The screen's refresh interval: the shortest recent gap, eased (the window may move to another screen).
+      if (last) refresh = refresh ? Math.min(now - last, refresh * 1.01) : now - last;
+      last = now;
+      if (shouldDraw(now - drawn, refresh)) {
+        drawn = now;
+        invalidate();
+      }
+    };
+    id = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(id);
+  }, [invalidate, paused]);
+  return null;
+}
+
+/** A soft studio room for the metals to reflect (iteration 56; see setMetalEnvironment). Made once per renderer. */
+function MetalEnvironment() {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    const pmrem = new PMREMGenerator(gl);
+    const room = new RoomEnvironment();
+    const env = pmrem.fromScene(room, 0.04).texture;
+    setMetalEnvironment(env);
+    room.dispose();
+    pmrem.dispose();
+  }, [gl]);
   return null;
 }
 
@@ -106,12 +150,14 @@ export function GameCanvas({ scene }: { scene: PublicScene }) {
       id="game-canvas"
       dpr={dpr}
       shadows
-      frameloop={examining ? "demand" : "always"}
+      frameloop="demand"
       gl={{ antialias: quality !== "low", powerPreference: "high-performance", toneMapping: quality === "low" ? ACESFilmicToneMapping : AgXToneMapping, toneMappingExposure: 1.1 }}
       camera={{ fov: 55, near: 0.03, far: 60, position: [3, 1.6, -2.5] }}
     >
+      <FrameCap paused={examining} />
       {PINNED === null && <AdaptiveResolution scale={dpr} max={max} onScale={setDpr} />}
       <ShadowSwitch ready={Boolean(info)} />
+      <MetalEnvironment />
       <color attach="background" args={["#120c08"]} />
       <Suspense fallback={null}>
         <House scene={scene} onReady={onReady} />

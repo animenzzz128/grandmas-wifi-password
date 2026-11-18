@@ -60,7 +60,10 @@ Personality: ${dial(p.personality.talkativeness)} talkative, ${dial(p.personalit
 Verbal tics you use now and then (not every reply): ${p.verbal_tics.map((t) => `"${t}"`).join(", ")}.
 
 How you talk:
-- Everything you say about your life must come from the MEMORIES below. Never invent names, places, years, numbers or events. If a question isn't covered by your memories, say you don't recall and drift to a memory you do have.
+- The facts of your life come from the MEMORIES and FAVORITE STORIES below. If a question isn't covered by them, say you don't recall and drift to a memory you do have.
+- You may add colour: now and then one of the LITTLE THINGS, or a small touch of your own (a smell, a sound, a feeling, a tease, something someone still does). Colour makes a reply warmer or funnier; it never answers the question.
+- Never invent: a name, a place, a year, a date, an age, a number, or when something happened ("the winter he was...", "since we..."); a new event; who was with whom; or where anything is kept in this house. Those are clues in this game, and a made-up one sends your grandchild the wrong way.
+- Stay consistent with everything you've said this visit, colour included.
 - If a memory answers the question, include its answer, but wrap it in one or two other true memories (tangents), the way grandmas do.
 - If a question is vague and could match two memories that are easy to mix up, answer with the one you think about more (the higher "salience") and don't volunteer the other one.
 - You remember each memory clearly, but you muddle what happened before or after what. Never connect two memories in time for the grandchild (no "that was when we lived on..."). Talk about the one memory they asked about and let them work out the order themselves.
@@ -132,6 +135,12 @@ export function buildWorldBlock(world: GrandmaWorld, recipe: Recipe, onlyFactIds
       lines.push(`- ${s.title} [${s.fact_ids.join(", ")}]: ${text}`);
     }
   }
+  // Little things go in every turn's block, also in retrieval mode: they are short, and colour is never a clue.
+  const colour = world.colour ?? [];
+  if (colour.length) {
+    lines.push("", "LITTLE THINGS (everyday colour, not clues; use one now and then, never as an answer)");
+    for (const c of colour) lines.push(`- ${c.text}`);
+  }
   const people = world.entities.filter((e) => e.relation_to_player);
   if (people.length) {
     lines.push("", "WHO IS WHO (relative to your grandchild)");
@@ -151,6 +160,15 @@ export interface ChatMessage {
  * §5④): which memories she already talked about and which objects she was shown, plus the game state.
  * Built from the turns' fact ids, so it costs no model call and can't drift from what she actually said.
  */
+/** How many of her older lines the summary keeps, and how long each may be (about 600 tokens at most). */
+const SUMMARY_LINES = 10;
+const SUMMARY_WORDS = 40;
+
+function shorten(text: string, words: number): string {
+  const w = text.replace(/\s+/g, " ").trim().split(" ");
+  return w.length > words ? `${w.slice(0, words).join(" ")}…` : w.join(" ");
+}
+
 export function conversationSummary(history: readonly Turn[], stamina: number, maxTurns = 6): string | undefined {
   const turns = history.slice(1);
   const older = turns.slice(0, Math.max(0, turns.length - maxTurns * 2));
@@ -164,7 +182,14 @@ export function conversationSummary(history: readonly Turn[], stamina: number, m
   const asked = turns.filter((t) => t.role === "player").length;
   const parts = [`Earlier in this visit (before the messages above) you talked about these memories: ${facts.length ? facts.join(", ") : "none of them"}`];
   if (shown.length) parts.push(`they showed you: ${shown.join(", ")}`);
-  return `[${parts.join("; ")}. Stay consistent with what you told them then. Visit so far: ${asked} questions; your tea is at ${Math.round(stamina)} of 100.]`;
+  // Her own earlier words (iteration 64): the memory ids above don't carry the colour she added, so a long visit
+  // could contradict it ("Pickles hated everybody" … "Pickles loved everyone"). The last few, shortened.
+  const said = older
+    .filter((t) => t.role === "grandma" && t.text)
+    .slice(-SUMMARY_LINES)
+    .map((t) => `"${shorten(t.text, SUMMARY_WORDS)}"`);
+  const earlier = said.length ? ` Some of what you said then (don't repeat it, don't contradict it): ${said.join(" ")}` : "";
+  return `[${parts.join("; ")}. Stay consistent with what you told them then.${earlier} Visit so far: ${asked} questions; your tea is at ${Math.round(stamina)} of 100.]`;
 }
 
 export function buildMessages(history: readonly Turn[], input: TurnInput, stamina: number, maxTurns = 6): ChatMessage[] {

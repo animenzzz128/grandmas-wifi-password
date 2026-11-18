@@ -13,8 +13,34 @@ export const ADAPT = {
   goodFps: 55,
   goodWindows: 3,
   step: 0.05,
-  min: 0.35,
+  /** Below about 0.6 the room turns to mush, and on a busy GPU it barely helps (iteration 56): Low quality does more. */
+  min: 0.6,
 };
+
+/**
+ * Frame rate of a window from its median frame time, not its average (iteration 56): a few long frames caused by
+ * something else on the machine (a live wallpaper, another tab) shouldn't make the game cut its own resolution.
+ */
+export function medianFps(frameSeconds: number[]): number {
+  if (!frameSeconds.length) return 0;
+  const s = [...frameSeconds].sort((a, b) => a - b);
+  const m = s[Math.floor(s.length / 2)]!;
+  return m > 0 ? 1 / m : 0;
+}
+
+/** Frames per second the game draws at most. Faster screens (120, 144, 240 Hz) only spend the GPU on frames nobody needs. */
+export const FPS_CAP = 60;
+
+/**
+ * Whether to draw on this screen refresh (iteration 56): when at least one cap interval has passed since the
+ * last drawn frame, less half a refresh, so it lands on the nearest refresh instead of the one after.
+ * 60 Hz → every refresh; 120 Hz → every 2nd (60 fps); 144 Hz → every 2nd (72); 240 Hz → every 4th (60).
+ * Measured by time, not by counting refreshes: a refresh the browser skips while drawing doesn't push it to 48.
+ */
+export function shouldDraw(sinceLastMs: number, refreshMs: number, cap = FPS_CAP): boolean {
+  const r = refreshMs > 0 ? Math.min(refreshMs, 1000 / cap) : 0;
+  return sinceLastMs >= 1000 / cap - r / 2;
+}
 
 export interface AdaptState {
   scale: number;

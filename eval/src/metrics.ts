@@ -19,7 +19,7 @@ export interface TurnRecord {
   attempts: number;
   validatorErrors: string[];
   latencyMs: number;
-  usage?: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  usage?: { input: number; output: number; cacheRead: number; cacheWrite: number; costUsd?: number };
   expect?: string[];
   qualifier?: string;
 }

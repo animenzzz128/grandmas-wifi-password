@@ -26,6 +26,11 @@ function seenLessons(store: KeyValueStore): string[] {
   }
 }
 
+/** Forget a lesson, so it comes up again (the title's "Show me how" replays the guided tutorial). */
+export function forgetLesson(lesson: string, store: KeyValueStore = defaultStorage): void {
+  store.setItem(LESSONS, JSON.stringify(seenLessons(store).filter((l) => l !== lesson)));
+}
+
 /** True the first time a lesson comes up (and remembers it), false ever after. */
 export function firstTime(lesson: string, store: KeyValueStore = defaultStorage): boolean {
   const seen = seenLessons(store);

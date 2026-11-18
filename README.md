@@ -74,7 +74,7 @@ It works with a mouse, a trackpad or a touch screen, and on phones. Settings has
 
 **Grandma's brain**
 - **Mock mode (no key):** a keyword matcher that answers from her facts. Good for building the room, UI and controls. `npm run dev:mock` forces it even when a key is set.
-- **LLM mode:** copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` (use the course key). Grandma then runs on Claude Haiku 5.5. **Never commit `.env`.**
+- **LLM mode:** copy `.env.example` to `.env` and set `OPENROUTER_API_KEY` (the course key; an Anthropic key works too). Grandma then runs on Claude Haiku 5.5; `GRANDMA_MODEL` picks another model, and `docs/13-model-choice.md` says why this one. **Never commit `.env`.**
 - Only the key in this repo's `.env` is used. A key that other tools put in your shell environment is ignored on purpose, so the game never spends money on the wrong account. (For a deployment, set `GRANDMA_MODE=llm` plus the key as a secret.)
 
 **Grandma's voice**
@@ -103,7 +103,7 @@ It works with a mouse, a trackpad or a touch screen, and on phones. Settings has
 | `npm run schema` | Exports the API contract and scene format as JSON Schema to `data/schema/` |
 | `npm run build` then `npm start` | Production: the server also serves the built client on :8787 |
 
-**Deploying (Fly.io, not done yet):** `Dockerfile` and `fly.toml` are ready. The steps are at the top of `fly.toml`: create the app and a volume, set `ANTHROPIC_API_KEY` and `GRANDMA_MODE=llm` as Fly secrets, then `fly deploy --ha=false`. The key never goes into the image. Run exactly one machine (`fly scale show` should say 1): rate limits and the daily budget live in the server process, so a second machine would double them. The image hasn't been built yet (no Docker on the machine it was written on); its steps were run by hand on a clean copy and pass. To show the game in an itch.io embed, set `EMBED_ORIGINS="https://itch.io https://*.itch.zone"`. The demo script, store-page draft and launch checklist are in `docs/09-demo-and-launch-kit.md`.
+**Deploying (Fly.io, not done yet):** `Dockerfile` and `fly.toml` are ready. The steps are at the top of `fly.toml`: create the app and a volume, set `OPENROUTER_API_KEY` and `GRANDMA_MODE=llm` as Fly secrets, then `fly deploy --ha=false`. The key never goes into the image. Run exactly one machine (`fly scale show` should say 1): rate limits and the daily budget live in the server process, so a second machine would double them. The image hasn't been built yet (no Docker on the machine it was written on); its steps were run by hand on a clean copy and pass. To show the game in an itch.io embed, set `EMBED_ORIGINS="https://itch.io https://*.itch.zone"`. The demo script, store-page draft and launch checklist are in `docs/09-demo-and-launch-kit.md`.
 
 **Cost guard:** the real Grandma stops for the day once today's model spend reaches `GRANDMA_DAILY_BUDGET_USD` (default $5, UTC day, counted from the turn logs so restarts don't reset it). Creating the file `var/KILL` (`/data/KILL` on Fly) switches her off at once, without a redeploy. Either way players keep playing with the offline Grandma, and the title screen says why. The server prints today's spend at startup; per-turn cost is in `var/logs/turns-*.jsonl`, and `npm run stats` sums it up with latency, retries and solve rates (aggregates only).
 

@@ -87,9 +87,18 @@ const ALWAYS_OK_WORDS = new Set(
     "I I'm I'd I'll I've Grandma Grandpa Granny Nana Sweetheart Sweetie Honey Dear Mom Dad Mother Father " +
     "God Lord Heavens Christmas Eve Easter Thanksgiving Sunday Monday Tuesday Wednesday Thursday Friday Saturday " +
     "January February March April May June July August September October November December " +
-    "Wi-Fi WiFi Internet TV OK Oh Mr Mrs Miss"
+    "Wi-Fi WiFi Internet TV OK Oh Mr Mrs Miss PIN ID"
   ).split(" "),
 );
+
+/**
+ * A capitalised word as a name: no possessive, no quote marks around it. Quotes mattered: the wedding song is
+ * written 'Unchained Melody' in her memories, which made the name "Melody'" and rejected every reply that said
+ * "Melody" (58 of GPT-6 Luna's retries in the first OpenRouter eval, iteration 62).
+ */
+function bareName(w: string): string {
+  return w.replace(/^'+/, "").replace(/'+$/, "").replace(/'s$/, "");
+}
 
 const MAX_REPLY_CHARS = 700;
 
@@ -114,7 +123,7 @@ export function worldVocabulary(world: GrandmaWorld): { numbers: Set<number>; na
   numbers.add(world.profile.birth_year);
   for (const t of texts) {
     for (const n of t.match(/\d+/g) ?? []) numbers.add(Number(n));
-    for (const w of t.match(/[A-Z][a-zA-Z'-]+/g) ?? []) names.add(w.replace(/'s$/, ""));
+    for (const w of t.match(/[A-Z][a-zA-Z'-]+/g) ?? []) names.add(bareName(w));
   }
   return { numbers, names };
 }
@@ -166,9 +175,12 @@ export function validateReply(world: GrandmaWorld, out: GrandmaOutput, ctx: Vali
   for (const sentence of sentences) {
     const words = sentence.match(/[A-Za-z][A-Za-z'-]*/g) ?? [];
     words.slice(1).forEach((w) => {
-      const bare = w.replace(/'s$/, "");
+      const bare = bareName(w);
       if (!/^[A-Z]/.test(bare)) return;
       if (ALWAYS_OK_WORDS.has(bare) || vocab.names.has(bare)) return;
+      // "Tuesdays", "the Bakers": the plural of a known name or day is still that name (iteration 62).
+      const singular = bare.replace(/s$/, "");
+      if (singular !== bare && (ALWAYS_OK_WORDS.has(singular) || vocab.names.has(singular))) return;
       unknown.add(bare);
     });
   }
