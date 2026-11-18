@@ -1,4 +1,4 @@
-# Fly.io config (technical design: deploy target). Not deployed yet.
+# Fly.io config (technical design: deploy target). Live at https://grandmas-wifi-password.fly.dev since 2026-11-18.
 # First time:
 #   fly launch --no-deploy --copy-config        (pick an app name; update `app` below)
 #   fly volumes create grandma_data --size 1
