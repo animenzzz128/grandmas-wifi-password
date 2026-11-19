@@ -14,6 +14,7 @@ import { REPO_ROOT, loadEnv, readConfig } from "../../apps/server/src/config.ts"
 import { loadGameData } from "../../apps/server/src/data.ts";
 import { LlmBrain } from "../../apps/server/src/grandma.ts";
 import { openRouterClient } from "../../apps/server/src/openrouter.ts";
+import { capped } from "./spend.ts";
 
 const config = readConfig({}, loadEnv());
 if (config.provider !== "openrouter" || !config.apiKey) throw new Error("This probe needs an OpenRouter key in .env.");
@@ -39,7 +40,7 @@ if (!process.argv.includes("--yes")) {
       const { reasoning: _old, ...body } = JSON.parse(String(init.body)) as Record<string, unknown>;
       return fetch(url, { ...init, body: JSON.stringify(reasoning ? { ...body, reasoning } : body) });
     }) as typeof fetch;
-    const client = openRouterClient({ apiKey: config.apiKey, timeoutMs: 20_000, fetch: withSetting }) as unknown as Anthropic;
+    const client = capped(openRouterClient({ apiKey: config.apiKey, timeoutMs: 20_000, fetch: withSetting })) as unknown as Anthropic;
     const brain = new LlmBrain(model, { client });
     const rows = await Promise.all(
       qs.map((text, i) => brain.reply({ world, recipe, run: createRunState({ id: `p-${name}-${i}`, world, recipe, sceneId: "s", greeting: "" }), input: { kind: "ask", text }, lines: data.strings.grandma })),

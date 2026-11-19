@@ -9,6 +9,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import { loadEnv, readConfig } from "../../apps/server/src/config.ts";
 import { openRouterClient } from "../../apps/server/src/openrouter.ts";
+import { capped } from "./spend.ts";
 
 export interface Usage {
   input: number;
@@ -40,12 +41,25 @@ export const MODELS = {
   qgen: envModels.WORLDGEN_MODEL || "claude-opus-5-5",
 };
 
-export function realClient(): ParseClient {
+/**
+ * The paid client for every eval tool, behind the process spend cap (spend.ts: --max-usd, default $1).
+ * Grandma's brain in eval runs gets one too (`{ client: realClient({ timeoutMs: LLM_TIMEOUT_MS, maxRetries: 0 }) }`),
+ * so no tool builds an uncapped client of its own.
+ */
+export function realClient(opts: { timeoutMs?: number; maxRetries?: number } = {}): ParseClient {
   const config = readConfig({}, loadEnv());
   if (!config.apiKey) throw new Error("No OPENROUTER_API_KEY or ANTHROPIC_API_KEY in the repo's .env. These eval tools need the course key there.");
   // An OpenRouter key: same calls, model ids mapped ("claude-opus-5-5" → "anthropic/claude-opus-5.5"; others as given).
-  if (config.provider === "openrouter") return openRouterClient({ apiKey: config.apiKey, baseURL: config.apiBaseUrl, timeoutMs: 120_000 }) as unknown as ParseClient;
-  return new Anthropic({ apiKey: config.apiKey, authToken: null, baseURL: config.apiBaseUrl }) as unknown as ParseClient;
+  if (config.provider === "openrouter") return capped(openRouterClient({ apiKey: config.apiKey, baseURL: config.apiBaseUrl, timeoutMs: opts.timeoutMs ?? 120_000 }) as unknown as ParseClient);
+  return capped(
+    new Anthropic({
+      apiKey: config.apiKey,
+      authToken: null,
+      baseURL: config.apiBaseUrl,
+      ...(opts.timeoutMs !== undefined ? { timeout: opts.timeoutMs } : {}),
+      ...(opts.maxRetries !== undefined ? { maxRetries: opts.maxRetries } : {}),
+    }) as unknown as ParseClient,
+  );
 }
 
 /** One structured call. Returns null output on refusal or a parse failure, plus token usage. */

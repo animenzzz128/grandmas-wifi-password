@@ -1,0 +1,37 @@
+name: Playtest gate
+
+# A PR that changes the game can't merge until a person has played it. The PR description carries one line:
+#   Playtest: done — <device, how long, what you saw>  |  Playtest: n/a — <why>  |  Playtest: needs-playtest
+# Rules and self-test: .github/scripts/playtest-gate.mjs. Required on main by branch protection.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: playtest-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  playtest-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Self-test the gate
+        run: node --test .github/scripts/playtest-gate.test.mjs
+      - name: Check the Playtest line
+        run: node .github/scripts/playtest-gate.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # Game files: a change here needs "Playtest: done". Tests are excluded.
+          GAMEPLAY_PATHS: '^(apps/web/src/|apps/web/public/|apps/web/index\.html$|apps/web/vite\.config\.ts$|apps/server/src/|packages/engine/src/|data/)'
+          NON_GAMEPLAY_PATHS: '(\.test\.tsx?$|/test/)'

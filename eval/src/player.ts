@@ -14,7 +14,8 @@ import { AskResponse, GuessResponse, PublicScene, RunView } from "@gwp/engine";
 import { createApp } from "../../apps/server/src/app.ts";
 import { REPO_ROOT, loadEnv, readConfig } from "../../apps/server/src/config.ts";
 import { loadGameData } from "../../apps/server/src/data.ts";
-import { LlmBrain, MockBrain } from "../../apps/server/src/grandma.ts";
+import { LLM_TIMEOUT_MS, LlmBrain, MockBrain } from "../../apps/server/src/grandma.ts";
+import type Anthropic from "@anthropic-ai/sdk";
 import type { GrandmaBrain } from "../../apps/server/src/grandma.ts";
 import { RunStore } from "../../apps/server/src/store.ts";
 import { percentile } from "./metrics.ts";
@@ -139,7 +140,7 @@ async function main() {
   }
   const data = loadGameData(join(REPO_ROOT, "data"));
   const config = readConfig({}, loadEnv());
-  const brain: GrandmaBrain = grandma === "llm" && config.apiKey ? new LlmBrain(config.grandmaModel, { apiKey: config.apiKey, baseURL: config.apiBaseUrl, provider: config.provider }) : new MockBrain();
+  const brain: GrandmaBrain = grandma === "llm" && config.apiKey ? new LlmBrain(config.grandmaModel, { client: realClient({ timeoutMs: LLM_TIMEOUT_MS, maxRetries: 0 }) as unknown as Anthropic }) : new MockBrain();
   const client = realClient();
   const results: PlayResult[] = [];
   for (const d of difficulties) {
