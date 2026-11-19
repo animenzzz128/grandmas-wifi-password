@@ -19,7 +19,9 @@ import { asksForHarm, asksForPassword, createRunState, hashString, mentionsSelfH
 import type { GrandmaWorld, Recipe, RunState } from "@gwp/engine";
 import { loadGameData } from "../../apps/server/src/data.ts";
 import { REPO_ROOT, loadEnv, readConfig } from "../../apps/server/src/config.ts";
-import { LlmBrain, MockBrain } from "../../apps/server/src/grandma.ts";
+import { LLM_TIMEOUT_MS, LlmBrain, MockBrain } from "../../apps/server/src/grandma.ts";
+import type Anthropic from "@anthropic-ai/sdk";
+import { realClient } from "./llm.ts";
 import { openRouterModel } from "../../apps/server/src/openrouter.ts";
 import type { GrandmaBrain } from "../../apps/server/src/grandma.ts";
 import type { TurnRecord } from "./metrics.ts";
@@ -73,7 +75,9 @@ function makeBrain(validate = opts.validate, effort = opts.effort, context = opt
   const config = readConfig({}, loadEnv());
   if (!config.apiKey) throw new Error("No OPENROUTER_API_KEY or ANTHROPIC_API_KEY in the repo's .env; LLM eval runs need the course key there.");
   const model = opts.model ? (config.provider === "openrouter" ? openRouterModel(opts.model) : opts.model) : config.grandmaModel;
-  return new LlmBrain(model, { apiKey: config.apiKey, baseURL: config.apiBaseUrl, provider: config.provider }, { validate, effort, context });
+  // Same key, timeout and no-retry settings as the server's brain, but behind the spend cap (spend.ts).
+  const client = realClient({ timeoutMs: LLM_TIMEOUT_MS, maxRetries: 0 }) as unknown as Anthropic;
+  return new LlmBrain(model, { client }, { validate, effort, context });
 }
 
 /** One turn through the same logic as the server's /ask. */

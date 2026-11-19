@@ -1,0 +1,37 @@
+name: CI
+
+# Every check that used to run only when someone remembered to. Required on main by branch protection.
+# No secrets: tests, golden replays and validation all run on the offline Grandma.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # same as the Dockerfile that runs on Fly
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Puzzle data
+        run: npm run validate
+      - name: Golden transcripts
+        run: npm run eval:golden
+      - name: Build
+        run: npm run build

@@ -17,6 +17,7 @@ import { loadGameData } from "../../apps/server/src/data.ts";
 import { REPO_ROOT } from "../../apps/server/src/config.ts";
 import type { TurnRecord } from "./metrics.ts";
 import { MODELS, arg, realClient, stamp, structured } from "./llm.ts";
+import { SpendCapError } from "./spend.ts";
 import type { ParseClient, Usage } from "./llm.ts";
 
 /**
@@ -140,6 +141,7 @@ async function main() {
     for (let i = next++; i < records.length; i = next++) {
       const r = records[i]!;
       const { judgment, usage: u } = await judgeOne(client, world, r).catch((e: unknown) => {
+        if (e instanceof SpendCapError) throw e;
         console.error(`\n[judge] ${r.recipeId}:${r.id}: ${e instanceof Error ? e.message : e}`);
         return { judgment: null, usage: { input: 0, output: 0 } as Usage };
       });
