@@ -110,6 +110,10 @@ export class MockBrain implements GrandmaBrain {
         seed: `${args.run.id}:${args.run.questionCount}`,
         recentFactIds: args.run.lastFactIds,
         heardFactIds: args.run.heard ?? [],
+        saidText: args.run.history
+          .filter((t) => t.role === "grandma")
+          .map((t) => t.text)
+          .join(" "),
       }),
     }), this.options.validate ?? true);
   }
@@ -144,7 +148,7 @@ export class LlmBrain implements GrandmaBrain {
 
   private async generate(args: ReplyArgs, priorErrors: string[]) {
     const year = new Date().getFullYear();
-    const messages: Anthropic.MessageParam[] = buildMessages(args.run.history, args.input, args.run.stamina);
+    const messages: Anthropic.MessageParam[] = buildMessages(args.run.history, args.input, args.run.stamina, 6, args.world.profile.verbal_tics);
     if (priorErrors.length) {
       // Mid-conversation operator note (supported on Haiku 5.5): explain what was wrong, ask for a rewrite.
       messages.push({

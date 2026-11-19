@@ -736,3 +736,19 @@ Details are in `docs/13-model-choice.md`, section "Colour instead of retrieval".
   - current status and keys;
   - deploy notes;
   - the team table is left as it was for now.
+
+## Iteration 66 (2026-11-18): playability phase 1 (docs/14)
+
+At Jacky's request, phase 1 of the playability review: no puzzle data changed.
+- **Catchphrases (P6):** in the eval, 78% of the model's replies opened with "Oh, for heaven's sake" and 64% said "sweetheart".
+  - **Prompt:** a tic in at most one reply in four, never the same one twice in a row; most replies start straight in; pet names now and then.
+  - **Per turn:** the tics she used in her last three lines are named in the turn ("Don't say it in this reply"), from code (`styleNote`, `packages/engine/src/variety.ts`).
+  - **Guarantee:** a reply that opens with a tic she just used loses that opener after validation (`varyOpener`, in `app.ts`, for the model and the offline Grandma).
+- **Shorter replies:** usually 2 or 3 sentences, about 25–45 words, up to about 60 for a favorite story or a shown object; one tangent instead of "one or two". The eval's median was 49 words.
+- **Offline asides (P10):** they never use a link of the note's chain (the Hard aside "Michael came along in 1966" skipped a hop). About four in ten are now a little thing from `colour` (never one she already said), the rest another memory. She opens with a tic three times in ten, not five.
+- **Tutorial (P7):** three steps, the whole loop once: read the note, ask about a line (the spotlight moves from the card to its ask button), the router. Her tea, follow-ups, the trail of NEW cards, the notebook and looking for proof are one-time lessons in the chat, the first time each comes up.
+- **Checks:** 289 tests (new: `variety.test.ts`; the tutorial tests rewritten), typecheck, data validation, golden transcripts; the probe is unchanged (28/28 routes, 2/8 notes still fall to direct questions, a phase 2 item). In the browser: the three steps and the new lessons in a real visit.
+- **Measured** (`eval/reports/2026-11-19-00-11-llm-val-low-full.md`, Haiku 5.5, 736 turns, $0.13, approved by Jacky), against 2026-11-18-07-38:
+  - **Opening with "Oh, for heaven's sake":** 81% → 56%; "sweetheart": 66% → 50%. The eval asks every question in a fresh visit, so this is the prompt alone; in a visit, `varyOpener` also keeps any one tic to at most one line in four.
+  - **Reply length:** median 49 → 40 words, 90th percentile 65 → 54.
+  - **Unchanged or better:** 0 leaks, 0 hidden years, 0 joined links, recall 98.9% → 100%, retries 8.1% → 5.0%, fallbacks 3.3% → 0.2%, latency p50 1.29 → 1.29 s, p95 2.57 → 2.33 s. Confusable fairness 81% → 80% (within the interval).

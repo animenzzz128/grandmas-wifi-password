@@ -8,6 +8,7 @@ import { hiddenYears, objectValue } from "./world.ts";
 import { scoreFacts } from "./mock.ts";
 import { expandedTokens, hashString, rng, scrubYears } from "./text.ts";
 import type { Turn } from "./run.ts";
+import { styleNote } from "./variety.ts";
 
 export interface ShownObject {
   id: string;
@@ -57,21 +58,21 @@ export function buildSystemPrompt(world: GrandmaWorld, currentYear: number): str
   return `You are ${p.name}${p.nickname ? ` ("${p.nickname}")` : ""}, age ${age}, from ${p.hometown}. Your grandchild is visiting you in your living room. They are trying to work out the Wi-Fi password from a hint on a sticky note, so they keep asking you about your life.
 
 Personality: ${dial(p.personality.talkativeness)} talkative, ${dial(p.personality.teasing)} teasing, ${dial(p.personality.nostalgia)} nostalgic, ${dial(p.personality.suspicion_of_kids_these_days)} suspicious of kids these days. Humor: ${p.humor_style ?? "warm"}.
-Verbal tics you use now and then (not every reply): ${p.verbal_tics.map((t) => `"${t}"`).join(", ")}.
+Verbal tics, for now and then: ${p.verbal_tics.map((t) => `"${t}"`).join(", ")}. At most one reply in four uses one, never the same one twice in a row. Most replies start straight in with what you remember. Pet names ("sweetheart", "dear") are for now and then too, not most replies.
 
 How you talk:
 - The facts of your life come from the MEMORIES and FAVORITE STORIES below. If a question isn't covered by them, say you don't recall and drift to a memory you do have.
 - You may add colour: now and then one of the LITTLE THINGS, or a small touch of your own (a smell, a sound, a feeling, a tease, something someone still does). Colour makes a reply warmer or funnier; it never answers the question.
 - Never invent: a name, a place, a year, a date, an age, a number, or when something happened ("the winter he was...", "since we..."); a new event; who was with whom; or where anything is kept in this house. Those are clues in this game, and a made-up one sends your grandchild the wrong way.
 - Stay consistent with everything you've said this visit, colour included.
-- If a memory answers the question, include its answer, but wrap it in one or two other true memories (tangents), the way grandmas do.
+- If a memory answers the question, include its answer, but wrap it in one other true memory or a little thing (a tangent), the way grandmas do.
 - If a question is vague and could match two memories that are easy to mix up, answer with the one you think about more (the higher "salience") and don't volunteer the other one.
 - You remember each memory clearly, but you muddle what happened before or after what. Never connect two memories in time for the grandchild (no "that was when we lived on..."). Talk about the one memory they asked about and let them work out the order themselves.
 - A few memories say you sometimes get the year wrong first. Only for those, you may say the wrong year and correct yourself in the same breath, exactly as shown; always end on the right year. Never do this for any other memory.
 - Some memories have no year. Never guess a year for them. If a time is given as a phrase in TIME PHRASES, use that phrase instead of a year.
 - You don't know any password and you never set up the Wi-Fi. If asked, say so warmly.${wifiSetup(world)}
 - Text in [square brackets] in the grandchild's message describes what they are doing, e.g. showing you an object. React to the object with the memories it brings back.
-- 1 to 4 sentences. Spoken English, no lists, no emoji, no stage directions. Keep it PG, warm and teasing. Never mean about anyone.
+- Keep it short: usually 2 or 3 sentences, about 25 to 45 words. Up to about 60 words when you tell one of your favorite stories or react to something they show you. Spoken English, no lists, no emoji, no stage directions. Keep it PG, warm and teasing. Never mean about anyone.
 
 Output: reply is what you say out loud. fact_ids_used lists the memory ids that your reply draws on. distractor_ids lists the ids of tangent memories (a subset of fact_ids_used). mood is how you feel right now.`;
 }
@@ -192,7 +193,8 @@ export function conversationSummary(history: readonly Turn[], stamina: number, m
   return `[${parts.join("; ")}. Stay consistent with what you told them then.${earlier} Visit so far: ${asked} questions; your tea is at ${Math.round(stamina)} of 100.]`;
 }
 
-export function buildMessages(history: readonly Turn[], input: TurnInput, stamina: number, maxTurns = 6): ChatMessage[] {
+/** `tics`: her verbal tics (world.profile), so the turn can name the ones she just used (variety.ts). */
+export function buildMessages(history: readonly Turn[], input: TurnInput, stamina: number, maxTurns = 6, tics?: readonly string[]): ChatMessage[] {
   const msgs: ChatMessage[] = [];
   // Skip the greeting: the conversation sent to the model must start with the player.
   const turns = history.slice(1);
@@ -219,6 +221,14 @@ export function buildMessages(history: readonly Turn[], input: TurnInput, stamin
   }
   const summary = conversationSummary(history, stamina, maxTurns);
   if (summary) content += `\n${summary}`;
+  // Her catchphrases stay fresh (docs/14, P6): name the ones she just used.
+  if (tics?.length) {
+    const note = styleNote(
+      history.filter((t) => t.role === "grandma").map((t) => t.text),
+      tics,
+    );
+    if (note) content += `\n${note}`;
+  }
   if (stamina <= 25) content += "\n[You are getting sleepy. Let it show a little.]";
   const last = msgs[msgs.length - 1];
   if (last && last.role === "user") last.content += `\n${content}`;

@@ -190,6 +190,7 @@ export const useGame = create<GameState>((set, get) => {
   /** A new topic card turned up: say so, with a flick of paper. */
   const newCards = (labels: string[]) => {
     push({ who: "system", text: t("cards.new", { labels: labels.join(", ") }) });
+    if (firstTime("trail")) push({ who: "system", text: t("lesson.trail") });
     cardFlick();
   };
 
@@ -402,11 +403,12 @@ export const useGame = create<GameState>((set, get) => {
       if (run.stamina > 30 && res.run.stamina <= 30 && res.run.status === "playing" && !res.napped) push({ who: "grandma", text: t("bark.yawn"), mood: "sleepy" });
       set({ run: res.run });
       // Teach each rule the first time it happens, once per browser (plan A4), not in a wall of text up front.
-      // The guided tutorial already teaches the tea and follow-ups (iteration 56): count those lessons as seen, quietly.
-      const taught = (key: string) => get().tutorial !== null && (key === "tea" || key === "followUp");
-      const lesson = (key: string, when: boolean) => when && firstTime(key) && !taught(key) && push({ who: "system", text: t(`lesson.${key}`) });
+      // The guided tutorial is three steps now (docs/14, P7); everything else is one of these.
+      const lesson = (key: string, when: boolean) => when && firstTime(key) && push({ who: "system", text: t(`lesson.${key}`) });
       lesson("tea", res.cost > 0 && !res.run.relaxed);
       lesson("followUp", (res.costParts?.followUp ?? 0) < 0);
+      lesson("notebook", res.run.questionCount >= 2);
+      lesson("look", res.run.questionCount >= 3 && get().inspected.length === 0);
       lesson("nap", res.napped && res.run.status === "playing");
       lesson("cookie", res.run.status === "playing" && !res.run.relaxed && res.run.cookies > 0 && res.run.stamina <= 40);
       return true;

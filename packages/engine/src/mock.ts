@@ -70,6 +70,8 @@ export function mockGrandmaReply(args: {
   recentFactIds: readonly string[];
   /** Everything she has told this visit: asides prefer memories she hasn't (review 2, F4: one filler told 3 times). */
   heardFactIds?: readonly string[];
+  /** Her earlier lines this visit, so a little thing (world.colour) isn't said twice. */
+  saidText?: string;
 }): GrandmaOutput {
   const { world, input } = args;
   const rand = rng(hashString(args.seed));
@@ -146,8 +148,9 @@ export function mockGrandmaReply(args: {
   if (focus && (focus.mode === "when" || focus.repeat)) {
     return { reply: say(main), fact_ids_used: [main.id], distractor_ids: [], mood: MOOD_BY_TAG[(main.tags ?? []).find((t) => t in MOOD_BY_TAG) ?? ""] ?? "happy" };
   }
-  const chained = (args.recipe.separate ?? []).filter((g) => g.includes(main!.id)).flat();
-  const avoid = new Set([main.id, ...(main.confusable_with ?? []), ...args.recentFactIds, ...chained]);
+  // Nor any link of this note's chain: an aside handing over the next hop unasked ("Michael came along in 1966"
+  // under a question about the bird, on the snowstorm note) skips the deduction (docs/14, P10).
+  const avoid = new Set([main.id, ...(main.confusable_with ?? []), ...args.recentFactIds, ...chainFacts(world, args.recipe)]);
   // Nor anything easily mixed up with a memory like this one: "our first home, Cherry Street" next to "our house
   // number is 412" reads as one place (review 2, F9).
   for (const f of world.facts)
@@ -160,12 +163,22 @@ export function mockGrandmaReply(args: {
   const fresh = pool.filter((f) => !heard.has(f.id));
   if (fresh.length) pool.splice(0, pool.length, ...fresh);
   const related = pool.filter((f) => (f.tags ?? []).some((t) => tags.has(t)));
-  const tangent = related.length && rand() < 0.7 ? pick(related, rand) : pool.length ? pick(pool, rand) : undefined;
+  // Some asides are little things (world.colour) instead of another memory: charm that is never a clue (checkColour
+  // keeps numbers, answers and time words out of them). One about someone in this memory first, never one she said.
+  const said = (args.saidText ?? "").toLowerCase();
+  const colours = (world.colour ?? []).filter((c) => !said.includes(c.text.toLowerCase()));
+  const people = new Set([main.subject, typeof main.object === "string" ? main.object : ""]);
+  const nearColour = colours.filter((c) => c.about.some((id) => people.has(id)));
+  const useColour = colours.length > 0 && (rand() < 0.4 || !pool.length);
+  const colour = useColour ? pick(nearColour.length ? nearColour : colours, rand) : undefined;
+  const tangent = colour ? undefined : related.length && rand() < 0.7 ? pick(related, rand) : pool.length ? pick(pool, rand) : undefined;
 
   // A tic that comments on what she just said ("Don't tell your grandfather I said that") can't open a reply.
+  // Three replies in ten open with one (the model's 78% wore thin; docs/14, P6).
   const openers = world.profile.verbal_tics.filter((x) => !/said that/i.test(x));
-  const opener = rand() < 0.5 && openers.length ? `${pick(openers, rand)}. ` : "";
-  const reply = tangent ? `${opener}${say(main)} ${say(tangent)}` : `${opener}${say(main)}`;
+  const opener = rand() < 0.3 && openers.length ? `${pick(openers, rand)}. ` : "";
+  const aside = colour ? colour.text : tangent ? say(tangent) : "";
+  const reply = aside ? `${opener}${say(main)} ${aside}` : `${opener}${say(main)}`;
   const mood = MOOD_BY_TAG[(main.tags ?? []).find((t) => t in MOOD_BY_TAG) ?? ""] ?? "happy";
   return {
     reply,

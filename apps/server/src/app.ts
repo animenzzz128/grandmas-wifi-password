@@ -25,6 +25,7 @@ import {
   notEnglish,
   checkGuessParts,
   stallNudge,
+  varyOpener,
   checkGuess,
   createRunState,
   endAtQuestionCap,
@@ -500,7 +501,12 @@ export function createApp(deps: AppDeps) {
         free = true;
         run.freeFallbacks = (run.freeFallbacks ?? 0) + 1;
       }
-      reply = result.output.reply;
+      // A catchphrase she just used doesn't open this reply too (docs/14, P6). Cutting a leading phrase adds nothing.
+      reply = varyOpener(
+        result.output.reply,
+        run.history.filter((t) => t.role === "grandma").map((t) => t.text),
+        world.profile.verbal_tics,
+      );
       mood = result.output.mood;
       factIds = result.output.fact_ids_used;
       // The mock says "I told you that one already" itself only through the prompt; say it here for both.

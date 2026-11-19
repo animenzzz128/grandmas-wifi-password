@@ -6,7 +6,7 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { t } from "../strings.ts";
 import { useGame } from "../store.ts";
-import { TUTORIAL_STEPS, tutorialStep } from "../tutorial.ts";
+import { TUTORIAL_STEPS, stepTarget, tutorialStep } from "../tutorial.ts";
 import type { TutorialView } from "../tutorial.ts";
 
 interface Box {
@@ -91,8 +91,8 @@ export function Tutorial() {
 
   const step = next !== null && next < TUTORIAL_STEPS.length ? TUTORIAL_STEPS[next] : undefined;
   // Wait while a card covers the room (a close-up, the notebook), except the note step, which points into it.
-  const hidden = !playing || !step || (panel !== null && step.id !== "read");
-  const box = useTargetBox(hidden ? undefined : step?.target);
+  const hidden = !playing || !step || panel !== null;
+  const box = useTargetBox(hidden || !step || !view ? undefined : stepTarget(step, view));
   if (hidden || !step || next === null || (!quiet && step.id !== "note")) return null;
 
   const vw = window.innerWidth;
