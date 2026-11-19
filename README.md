@@ -4,7 +4,7 @@
 > Grandma is 86 and remembers everything. She just can't tell which memory you need.
 > You have until her teacup is empty.
 
-**▶ Play it in your browser: https://grandmas-wifi-password.fly.dev** (desktop or phone, no install; the first load after a quiet spell takes a few seconds while the server wakes up)
+**▶ Play it in your browser: [grandmas-wifi-password.fly.dev](https://grandmas-wifi-password.fly.dev/?ref=github)** (desktop or phone, no install; the first load after a quiet spell takes a few seconds while the server wakes up)
 
 A conversational needle-in-a-haystack puzzle game. Grandma, powered by an LLM, is the haystack. The password is the needle. You talk to her in your own words, look around her 3D living room for evidence, and work the answer out from what she says and what you find.
 
@@ -129,7 +129,8 @@ It works with a mouse, a trackpad or a touch screen, and on phones. Settings has
 **Play stats:**
 - **`/admin`** shows how many people play and how far they get: visits and solves per day, per difficulty, the play funnel (read the note → asked → looked at an object → … → solved → shared), which clues get found, every note's outcomes, the daily, and the real Grandma's cost and latency. It reads the server's own turn logs (on the Fly volume), so no outside service sees play data, and it shows aggregates only, never what anyone typed or what Grandma said. `/api/admin/stats?days=30` gives the same as JSON.
 - **To turn it on**, set a password of 16 characters or more: `ADMIN_TOKEN=...` in `.env` locally, or `fly secrets set ADMIN_TOKEN=...` on Fly. Then open `/admin` and sign in with any user name and that password. Without it, `/admin` doesn't exist.
-- **Page views (optional, GoatCounter):** for visitors who never start a visit, where players come from, browsers and countries. Make a free account at goatcounter.com, pick a code (for `https://<code>.goatcounter.com`), and set `GOATCOUNTER_CODE=<code>` (in `fly.toml` `[env]` or as a secret). GoatCounter sets no cookies and keeps no personal data; the game also counts a few moments there as events (a visit started, a note solved, with the difficulty). Without the code nothing is loaded from GoatCounter.
+- **Page views (GoatCounter, on for the live site: `jackyyao-grandma`):** links can say where they were shared with `?ref=` (`?ref=resume`, `?ref=portfolio`, `?ref=linkedin`; this README uses `?ref=github`); GoatCounter shows it as the source.
+- **To turn page views on elsewhere:** for visitors who never start a visit, where players come from, browsers and countries. Make a free account at goatcounter.com, pick a code (for `https://<code>.goatcounter.com`), and set `GOATCOUNTER_CODE=<code>` (in `fly.toml` `[env]` or as a secret). GoatCounter sets no cookies and keeps no personal data; the game also counts a few moments there as events (a visit started, a note solved, with the difficulty). Without the code nothing is loaded from GoatCounter.
 - `npm run stats` prints the same aggregates as Markdown from a log folder (`fly ssh console -C "npm run stats"` on Fly).
 
 Notes: the server reads `data/` at startup, so restart `npm run dev` after editing a world or scene. Runs and turn logs go to `var/` (git-ignored).

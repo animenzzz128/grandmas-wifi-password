@@ -20,6 +20,8 @@ primary_region = "ewr"
   VAR_DIR = "/data"
   RATE_LIMIT_ASKS_PER_MIN = "30"
   GRANDMA_DAILY_BUDGET_USD = "5"
+  # Page views at https://jackyyao-grandma.goatcounter.com (README, "Play stats").
+  GOATCOUNTER_CODE = "jackyyao-grandma"
 
 [http_service]
   internal_port = 8787

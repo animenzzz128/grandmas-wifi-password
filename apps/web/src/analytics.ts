@@ -15,6 +15,9 @@ export function startPageViews(countUrl: string | undefined): void {
   if (loaded || !countUrl || typeof document === "undefined") return;
   if (!/^https:\/\/[a-z0-9-]+\.goatcounter\.com\/count$/.test(countUrl)) return;
   loaded = true;
+  // Count the page by its path alone: "/?ref=resume" is the home page, and GoatCounter still reads ?ref= (or
+  // utm_source) as where the visitor came from, so links in a résumé or portfolio show up as sources.
+  (window as unknown as { goatcounter?: Record<string, unknown> }).goatcounter = { path: () => location.pathname || "/" };
   const s = document.createElement("script");
   s.async = true;
   s.src = "https://gc.zgo.at/count.js";
