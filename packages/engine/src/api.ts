@@ -205,6 +205,8 @@ export const HealthResponse = z.strictObject({
   degraded: z.enum(["budget", "kill"]).optional(),
   /** Grandma's spoken voice: ElevenLabs through the server, or the player's browser voice. */
   voice: z.enum(["elevenlabs", "browser"]).optional(),
+  /** GoatCounter's count URL, when the operator turned page-view counting on (README, "Play stats"). */
+  goatcounter: z.string().url().optional(),
 });
 
 /**

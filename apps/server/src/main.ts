@@ -24,7 +24,7 @@ const brain =
     : new MockBrain();
 const store = new RunStore(config.varDir);
 const voice = config.voice ? new GrandmaVoice({ ...config.voice, cacheDir: join(config.varDir, "voice") }) : undefined;
-const app = createApp({ data, brain, store, voice, asksPerMinute: config.asksPerMinute, embedOrigins: config.embedOrigins });
+const app = createApp({ data, brain, store, voice, asksPerMinute: config.asksPerMinute, embedOrigins: config.embedOrigins, adminToken: config.adminToken, goatcounter: config.goatcounter });
 
 // In production the server also serves the built web client (npm run build first).
 if (existsSync(config.webDist)) {
@@ -38,6 +38,7 @@ serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`Grandma's server on http://localhost:${info.port}  ·  Grandma: ${mode}`);
   if (brain instanceof BudgetBrain) console.log(`Daily model budget: ${config.dailyBudgetUsd.toFixed(2)} (spent today: ${brain.spentToday.toFixed(4)}). Kill switch: create ${join(config.varDir, "KILL")}`);
   console.log(voice ? `Grandma's voice: ElevenLabs (${config.voice!.model}), up to ${config.voice!.dailyChars} characters a day; lines cached in ${join(config.varDir, "voice")}` : "Grandma's voice: the browser's own (set ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID in .env for hers)");
+  console.log(`Play stats: ${config.adminToken ? `/admin (ADMIN_TOKEN set)` : "set ADMIN_TOKEN (16+ characters) to open /admin"} · page views: ${config.goatcounter ? "GoatCounter" : "off (GOATCOUNTER_CODE)"}`);
   console.log(`Loaded ${data.worlds.size} Grandma(s), ${data.scenes.size} scene(s). Runs and logs in ${config.varDir}`);
   // On Windows another program can hold the same port on 127.0.0.1 while this server gets [::]; then the dev
   // proxy reaches that program and the game sees "Not found." (iteration 53). Say so instead of failing quietly.

@@ -3,10 +3,11 @@
  * and an append-only JSONL log of every turn (the raw material for eval and balancing).
  * Uses Node's built-in node:sqlite, so there is no native dependency to install.
  */
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { RunState } from "@gwp/engine";
+import { parseLog } from "@gwp/engine";
+import type { LogEntry, RunState } from "@gwp/engine";
 
 export interface TurnLog {
   ts: string;
@@ -126,5 +127,15 @@ export class RunStore {
     if (!this.logDir) return;
     const day = entry.ts.slice(0, 10);
     appendFileSync(join(this.logDir, `turns-${day}.jsonl`), JSON.stringify(entry) + "\n");
+  }
+
+  /** The turn logs from a UTC day on (YYYY-MM-DD), for the /admin play stats. Empty without a log folder. */
+  readLogs(since?: string): LogEntry[] {
+    const dir = this.logDir;
+    if (!dir || !existsSync(dir)) return [];
+    return readdirSync(dir)
+      .filter((f) => /^turns-\d{4}-\d{2}-\d{2}\.jsonl$/.test(f) && (!since || f.slice(6, 16) >= since))
+      .sort()
+      .flatMap((f) => parseLog(readFileSync(join(dir, f), "utf8")));
   }
 }

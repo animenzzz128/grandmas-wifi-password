@@ -126,6 +126,12 @@ It works with a mouse, a trackpad or a touch screen, and on phones. Settings has
 
 **Cost guard:** the real Grandma stops for the day once today's model spend reaches `GRANDMA_DAILY_BUDGET_USD` (default $5, UTC day, counted from the turn logs so restarts don't reset it). Creating the file `var/KILL` (`/data/KILL` on Fly) switches her off at once, without a redeploy. Either way players keep playing with the offline Grandma, and the title screen says why. The server prints today's spend at startup; per-turn cost is in `var/logs/turns-*.jsonl`, and `npm run stats` sums it up with latency, retries and solve rates (aggregates only).
 
+**Play stats:**
+- **`/admin`** shows how many people play and how far they get: visits and solves per day, per difficulty, the play funnel (read the note → asked → looked at an object → … → solved → shared), which clues get found, every note's outcomes, the daily, and the real Grandma's cost and latency. It reads the server's own turn logs (on the Fly volume), so no outside service sees play data, and it shows aggregates only, never what anyone typed or what Grandma said. `/api/admin/stats?days=30` gives the same as JSON.
+- **To turn it on**, set a password of 16 characters or more: `ADMIN_TOKEN=...` in `.env` locally, or `fly secrets set ADMIN_TOKEN=...` on Fly. Then open `/admin` and sign in with any user name and that password. Without it, `/admin` doesn't exist.
+- **Page views (optional, GoatCounter):** for visitors who never start a visit, where players come from, browsers and countries. Make a free account at goatcounter.com, pick a code (for `https://<code>.goatcounter.com`), and set `GOATCOUNTER_CODE=<code>` (in `fly.toml` `[env]` or as a secret). GoatCounter sets no cookies and keeps no personal data; the game also counts a few moments there as events (a visit started, a note solved, with the difficulty). Without the code nothing is loaded from GoatCounter.
+- `npm run stats` prints the same aggregates as Markdown from a log folder (`fly ssh console -C "npm run stats"` on Fly).
+
 Notes: the server reads `data/` at startup, so restart `npm run dev` after editing a world or scene. Runs and turn logs go to `var/` (git-ignored).
 
 ## Team

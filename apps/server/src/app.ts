@@ -26,6 +26,7 @@ import {
   checkGuessParts,
   stallNudge,
   varyOpener,
+  playStats,
   TIERS,
   forgetful,
   checkGuess,
@@ -60,6 +61,7 @@ import type { GameData } from "./data.ts";
 import type { GrandmaBrain } from "./grandma.ts";
 import type { RunStore } from "./store.ts";
 import { VoiceUnavailable } from "./voice.ts";
+import { adminAuthorized, renderDashboard } from "./admin.ts";
 
 export interface AppDeps {
   data: GameData;
@@ -82,6 +84,10 @@ export interface AppDeps {
   voicePerMinute?: number;
   /** Clock for the Daily Grandma (tests). */
   now?: () => Date;
+  /** ADMIN_TOKEN: unlocks /admin (play stats). Without it the page doesn't exist. */
+  adminToken?: string;
+  /** GoatCounter's count URL (https://<code>.goatcounter.com/count): page views, if the operator turned it on. */
+  goatcounter?: string;
 }
 
 /** Largest request body accepted. The biggest real one is a 280-character question. */
@@ -184,6 +190,7 @@ export function createApp(deps: AppDeps) {
     }
   }
   const app = new Hono();
+  const goatOrigin = deps.goatcounter ? new URL(deps.goatcounter).origin : undefined;
   // Security headers on every response, the built web client included (security review P3). The game loads
   // nothing from other sites; three.js turns embedded textures into blob: URLs, and React sets inline styles.
   // The model loader decodes meshes with WebAssembly, which needs 'wasm-unsafe-eval' (it doesn't allow JS eval).
@@ -192,10 +199,11 @@ export function createApp(deps: AppDeps) {
     secureHeaders({
       contentSecurityPolicy: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
+        // GoatCounter (only when the operator set GOATCOUNTER_CODE): its script, and the site it counts on.
+        scriptSrc: ["'self'", "'wasm-unsafe-eval'", ...(goatOrigin ? ["https://gc.zgo.at"] : [])],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "blob:"],
-        connectSrc: ["'self'", "data:", "blob:"],
+        imgSrc: ["'self'", "data:", "blob:", ...(goatOrigin ? [goatOrigin] : [])],
+        connectSrc: ["'self'", "data:", "blob:", ...(goatOrigin ? [goatOrigin] : [])],
         mediaSrc: ["'self'", "data:", "blob:"],
         workerSrc: ["'self'", "blob:"],
         objectSrc: ["'none'"],
@@ -248,7 +256,32 @@ export function createApp(deps: AppDeps) {
 
   app.get("/api/health", (c) => {
     const degraded = (brain as { degraded?: "budget" | "kill" }).degraded;
-    return c.json({ ok: true, grandmaMode: brain.mode, model: brain.model, ...(degraded ? { degraded } : {}), voice: deps.voice ? "elevenlabs" : "browser" });
+    return c.json({ ok: true, grandmaMode: brain.mode, model: brain.model, ...(degraded ? { degraded } : {}), voice: deps.voice ? "elevenlabs" : "browser", ...(deps.goatcounter ? { goatcounter: deps.goatcounter } : {}) });
+  });
+
+  // Play stats for the operator (README, "Play stats"): aggregates of the turn logs, behind ADMIN_TOKEN.
+  const limitAdmin = rateLimiter(20, "Too many tries. Wait a minute.");
+  const adminGate = (c: Context): Response | undefined => {
+    if (!deps.adminToken) return c.text("Not found.", 404);
+    limitAdmin(clientIp(c));
+    if (!adminAuthorized(c.req.header("authorization"), deps.adminToken)) {
+      return c.text("Sign in with any user name and the ADMIN_TOKEN as the password.", 401, { "WWW-Authenticate": 'Basic realm="Grandma play stats", charset="UTF-8"' });
+    }
+    c.header("Cache-Control", "no-store");
+    c.header("X-Robots-Tag", "noindex");
+    return undefined;
+  };
+  const statsFor = (c: Context) => {
+    const days = Math.min(365, Math.max(1, Math.floor(Number(c.req.query("days") ?? 30)) || 30));
+    const since = new Date(now().getTime() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
+    return { days, since, stats: playStats(store.readLogs(since)) };
+  };
+  app.get("/api/admin/stats", (c) => adminGate(c) ?? c.json(statsFor(c)));
+  app.get("/admin", (c) => {
+    const denied = adminGate(c);
+    if (denied) return denied;
+    const { days, since, stats } = statsFor(c);
+    return c.html(renderDashboard(stats, { days, since, now: now(), goatcounter: deps.goatcounter }));
   });
 
   // Grandma's lines, spoken (iteration 53). Only lines she said in this visit, or her canned reactions.

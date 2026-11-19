@@ -6,6 +6,8 @@
 #   fly deploy --ha=false                        (exactly one machine, see below)
 #   fly scale show                               (check: count 1)
 # The key only ever lives in Fly secrets; GRANDMA_MODE=llm is what lets the server use an env key.
+# Play stats: fly secrets set ADMIN_TOKEN=<16+ characters>, then open /admin (any user name, that password).
+# Page views (optional): GOATCOUNTER_CODE = "<code>" under [env], after making a goatcounter.com site.
 # One machine only: rate limits, the one-request-per-visit lock, live visits and the daily budget are kept in
 # the server process and its volume, so a second machine would have its own limits and its own budget.
 app = "grandmas-wifi-password"

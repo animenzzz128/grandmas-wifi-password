@@ -766,3 +766,12 @@ At Jacky's request: no more fixed list of notes. A world now has **parts** (one 
 - **Eval:** `npm run eval` runs the eight old notes by default (same cost, comparable reports); `--notes all` runs every generated note.
 - **Checks:** 329 tests, typecheck, validate, golden (one handwritten turn gained the new room-only verdict), probe, build; in the browser, the tier picker and a Medium visit.
 - **Next:** Medium has one room-only part, so 7 notes; more room parts are content for the team (docs/15, last section).
+
+## Iteration 68 (2026-11-18): play stats on the live site
+
+At Jacky's request: a way to see how much the game is played and how far people get.
+- **What was there:** the server already logged every visit start, question, guess and funnel event to `var/logs/turns-*.jsonl` (the Fly volume), and `npm run stats` summed them up, but only from a shell on the machine, and title-screen visits that never start a game weren't counted.
+- **`/admin`** (`apps/server/src/admin.ts`): a dashboard of the same logs: visits, solves and questions per day, per difficulty, the funnel, clues found, every note's outcomes, the daily, model spend and latency. JSON at `/api/admin/stats?days=N`. Locked with `ADMIN_TOKEN` (HTTP Basic, any user name, 16+ characters, constant-time check, 20 tries a minute per IP); without the token the routes don't exist. `no-store`, `noindex`. Aggregates only: a test plays a visit with a distinctive question and checks the page never shows it.
+- **Shared code:** the aggregation moved from `eval/src/playstats.ts` to `packages/engine/src/playstats.ts` (pure), with new per-day and per-tier views; `npm run stats` reads the files and uses it.
+- **GoatCounter (optional):** with `GOATCOUNTER_CODE` set, `/api/health` names the count URL, the client loads `https://gc.zgo.at/count.js`, and the CSP allows that script and the counting site; a visit start and a solve are counted as events with the difficulty only. Off by default: nothing is loaded and the CSP is unchanged. Chosen over a hosted database (Neon): the play data is already on the Fly volume, so a second store would add cost and a place for data to leak without adding numbers; GoatCounter adds what the logs can't see (page views, referrers, countries).
+- **Checks:** 335 tests (new: `admin.test.ts`, `noteStars.test.ts`), typecheck, build; the dashboard on a local server with this machine's logs (172 visits).

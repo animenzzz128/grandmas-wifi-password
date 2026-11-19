@@ -30,6 +30,13 @@ export interface Config {
   dailyBudgetUsd: number;
   /** EMBED_ORIGINS: space-separated sites allowed to frame the game (an itch.io embed). Empty: none. */
   embedOrigins: string[];
+  /**
+   * ADMIN_TOKEN: the password for the /admin play-stats page (any user name). Off unless set, and at least 16
+   * characters, so a short guessable one can't open it.
+   */
+  adminToken: string | undefined;
+  /** GOATCOUNTER_CODE: page-view counting with GoatCounter (https://<code>.goatcounter.com). Off unless set. */
+  goatcounter: string | undefined;
   /** Grandma's spoken voice (ElevenLabs). Off unless both a key and a voice id are set. */
   voice: { apiKey: string; voiceId: string; model: string; dailyChars: number } | undefined;
   dataDir: string;
@@ -65,6 +72,8 @@ export function readConfig(env: Env = process.env, dotenv: Env = {}, argv: reado
     asksPerMinute: Number(get("RATE_LIMIT_ASKS_PER_MIN") || 30),
     dailyBudgetUsd: Number(get("GRANDMA_DAILY_BUDGET_USD") || 5),
     embedOrigins: (get("EMBED_ORIGINS") ?? "").split(/\s+/).filter((o) => /^https:\/\/[a-z0-9.*-]+(:\d+)?$/i.test(o)),
+    adminToken: (get("ADMIN_TOKEN") ?? "").length >= 16 ? get("ADMIN_TOKEN") : undefined,
+    goatcounter: /^[a-z0-9-]{1,40}$/.test(get("GOATCOUNTER_CODE") ?? "") ? `https://${get("GOATCOUNTER_CODE")}.goatcounter.com/count` : undefined,
     // Same rule as the Anthropic key: the repo's .env, or the environment only when deploying on purpose.
     voice: (() => {
       const key = dotenv.ELEVENLABS_API_KEY || (get("GRANDMA_VOICE") === "elevenlabs" ? env.ELEVENLABS_API_KEY : undefined);

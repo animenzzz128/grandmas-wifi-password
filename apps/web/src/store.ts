@@ -9,6 +9,7 @@ import { hasString, t } from "./strings.ts";
 import { addPin, costWhy, extractNotes } from "./notebook.ts";
 import { useSettings } from "./settings.ts";
 import { firstTime, markVisited } from "./firsts.ts";
+import { countEvent, startPageViews } from "./analytics.ts";
 import { storage } from "./storage.ts";
 import { cardFlick, fridgeDoor } from "./audio.ts";
 import type { AskResponse, TierChoice } from "@gwp/engine";
@@ -207,6 +208,7 @@ export const useGame = create<GameState>((set, get) => {
 
   /** Enter a freshly created visit. */
   const enter = async (run: RunView) => {
+    countEvent(`visit-${run.difficulty}${run.daily ? "-daily" : ""}`);
     const scene = get().scene?.id === run.sceneId ? get().scene : await api.scene(run.sceneId);
     barked.clear();
     // The guided tutorial runs on a player's first visit (or when they asked for it again from the title).
@@ -267,7 +269,9 @@ export const useGame = create<GameState>((set, get) => {
           () => storage.setItem(RUN_KEY, ""),
         );
       try {
-        set({ health: await api.health() });
+        const health = await api.health();
+        set({ health });
+        startPageViews(health.goatcounter);
       } catch (e) {
         set({ error: (e as Error).message });
       }
@@ -440,6 +444,7 @@ export const useGame = create<GameState>((set, get) => {
         push({ who: "system", text: `${tried}${count}` });
       }
       push({ who: "grandma", text: res.line, mood: res.correct ? "happy" : "confused" });
+      if (res.correct) countEvent(`solved-${res.run.difficulty}`);
       // Solved: cut to Grandma, so her reaction is seen wherever the router was (review 3, F17).
       set({ run: res.run, panel: res.run.status === "playing" ? get().panel : null, ...(res.correct ? { view: "grandma", focusId: null } : {}) });
       return { correct: res.correct, partsCorrect: res.partsCorrect, partsTotal: res.partsTotal, partsRight: res.partsRight };
