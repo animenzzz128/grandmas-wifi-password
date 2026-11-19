@@ -3,7 +3,7 @@
  *
  * - reach: routes the chain maps promise ("When were you born?" → 1940). Each must work in every run;
  *   Vitest checks them, so a retrieval change can't quietly break a nudge or an object route again.
- * - obvious: the ten most direct questions per puzzle. The report says, per answer part, how often a single
+ * - obvious: the most direct questions per note part (docs/15: a note is probed with both its parts' questions). The report says, per answer part, how often a single
  *   reply hands it over whole, and whether the puzzle falls to direct questions alone (rubric dimension 1).
  *
  * `npm run eval:probe` (optional: `-- --runs 24`) prints the report as Markdown.
@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SceneManifest, mockGrandmaReply, parseWorld, recipeById, slotParts, validateReply, validationContext } from "@gwp/engine";
+import { SceneManifest, mockGrandmaReply, parseWorld, partsOf, recipeById, slotParts, validateReply, validationContext } from "@gwp/engine";
 import type { GrandmaWorld, Recipe, TurnInput } from "@gwp/engine";
 
 export interface ReachProbe {
@@ -29,6 +29,7 @@ export interface ProbeFile {
   version: string;
   notes: string;
   reach: ReachProbe[];
+  /** Direct questions per part id (or per fixed recipe id, for a world without parts). */
   obvious: Record<string, string[]>;
 }
 
@@ -68,6 +69,7 @@ export interface WorldPatch {
   /** New wording; misremembers: null drops a self-correction (a hidden year can't have one). */
   facts?: Record<string, { text?: string; misremembers?: number | null }>;
   anchors_add?: Record<string, unknown>[];
+  /** Keyed by note id; with a part bank, an old note id (alias) changes the parts it is made of. */
   recipes?: Record<string, { anchor_slots?: Record<string, string>; separate_add?: string[][] }>;
   reach_add?: ReachProbe[];
   reach_remove?: { recipe: string; ask?: string; show?: string }[];
@@ -93,7 +95,15 @@ export function applyPatch(worldJson: Record<string, unknown>, probes: ProbeFile
 
 /** The world file's JSON with a patch applied (a copy; used to measure a proposal, and to adopt one). */
 export function patchWorldJson(worldJson: Record<string, unknown>, patch: WorldPatch): Record<string, unknown> {
-  const json = structuredClone(worldJson) as { facts: { id: string; text: string; misremembers?: number }[]; anchors?: unknown[]; recipes: { id: string; slots: { requires_anchor?: string }[]; separate?: string[][] }[] };
+  type Slotted = { slots: { requires_anchor?: string }[]; separate?: string[][] };
+  type PartJson = { id: string; slot: { requires_anchor?: string }; separate?: string[][] };
+  const json = structuredClone(worldJson) as {
+    facts: { id: string; text: string; misremembers?: number }[];
+    anchors?: unknown[];
+    recipes?: ({ id: string } & Slotted)[];
+    parts?: PartJson[];
+    aliases?: Record<string, { parts: [string, string] }>;
+  };
   for (const [id, change] of Object.entries(patch.facts ?? {})) {
     const fact = json.facts.find((f) => f.id === id);
     if (!fact) throw new Error(`patch ${patch.id}: no fact ${id}`);
@@ -103,10 +113,16 @@ export function patchWorldJson(worldJson: Record<string, unknown>, patch: WorldP
   }
   json.anchors = [...(json.anchors ?? []), ...(patch.anchors_add ?? [])];
   for (const [id, change] of Object.entries(patch.recipes ?? {})) {
-    const recipe = json.recipes.find((r) => r.id === id);
-    if (!recipe) throw new Error(`patch ${patch.id}: no recipe ${id}`);
-    for (const [i, anchor] of Object.entries(change.anchor_slots ?? {})) recipe.slots[Number(i)]!.requires_anchor = anchor;
-    if (change.separate_add) recipe.separate = [...(recipe.separate ?? []), ...change.separate_add];
+    const recipe = json.recipes?.find((r) => r.id === id);
+    const parts = json.aliases?.[id]?.parts.map((p) => json.parts?.find((x) => x.id === p));
+    if (recipe) {
+      for (const [i, anchor] of Object.entries(change.anchor_slots ?? {})) recipe.slots[Number(i)]!.requires_anchor = anchor;
+      if (change.separate_add) recipe.separate = [...(recipe.separate ?? []), ...change.separate_add];
+    } else if (parts?.every(Boolean)) {
+      // A part bank: the note's slot i is its part i.
+      for (const [i, anchor] of Object.entries(change.anchor_slots ?? {})) parts[Number(i)]!.slot.requires_anchor = anchor;
+      if (change.separate_add) parts[0]!.separate = [...(parts[0]!.separate ?? []), ...change.separate_add];
+    } else throw new Error(`patch ${patch.id}: no recipe ${id}`);
   }
   return json;
 }
@@ -149,9 +165,18 @@ export function runReach(world: GrandmaWorld, scene: SceneManifest, probes: read
 
 const wholeWord = (needle: string) => new RegExp(`\\b${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
 
-export function runObvious(world: GrandmaWorld, obvious: Record<string, string[]>, runs = 12): ObviousResult[] {
-  return Object.entries(obvious).map(([id, questions]) => {
-    const recipe = recipeOf(world, id);
+/** The direct questions for a note: its parts' questions together, or its own list for a fixed recipe. */
+export function questionsFor(world: GrandmaWorld, obvious: Record<string, string[]>, recipeId: string): string[] {
+  const parts = partsOf(world, recipeId);
+  if (!parts) return obvious[recipeId] ?? [];
+  return [...new Set(parts.flatMap((p) => obvious[p] ?? []))];
+}
+
+/** How the notes (default: every note the world has) stand up to direct questions. */
+export function runObvious(world: GrandmaWorld, obvious: Record<string, string[]>, runs = 12, recipes: readonly Recipe[] = world.recipes): ObviousResult[] {
+  return recipes.map((recipe) => {
+    const id = recipe.id;
+    const questions = questionsFor(world, obvious, id);
     const answers = slotParts(world, recipe);
     let rejected = 0;
     const parts: PartResult[] = answers.map((answer) => ({ answer }));
@@ -179,6 +204,8 @@ export function renderReport(reach: ReachResult[], obvious: ObviousResult[]): st
   for (const r of reach) lines.push(`| ${r.recipe} | ${r.ask ? `"${r.ask}"` : `show ${r.show}`} | ${r.expect} | ${r.hits}/${r.runs}${r.hits < r.runs ? " ✗" : ""} |`);
   const falls = obvious.filter((o) => o.fallsToDirectQuestions);
   lines.push("", `## Direct questions: ${falls.length}/${obvious.length} puzzles fall to them alone`, "");
+  const tiers = [...new Set(obvious.map((o) => o.recipe.split(":")[0]!))];
+  if (tiers.length > 1) lines.push(tiers.map((t) => `${t}: ${falls.filter((o) => o.recipe.startsWith(`${t}:`)).length}/${obvious.filter((o) => o.recipe.startsWith(`${t}:`)).length}`).join(" · "), "");
   lines.push("A part \"falls\" when one direct question hands it over whole in at least half the runs. Easy may allow one such part; every part falling means no deduction.", "");
   lines.push("| Puzzle | Password | Part | Best direct question | Runs | Falls? |", "|---|---|---|---|---|---|");
   for (const o of obvious) {

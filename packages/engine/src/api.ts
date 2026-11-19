@@ -122,13 +122,13 @@ export const RunView = z.strictObject({
 });
 
 /** One sticky note to choose from on the title screen (no answers: the note is what the player reads anyway). */
-export const NoteChoice = z.strictObject({
-  id: z.string(),
+/** A difficulty tier on the title's picker (docs/15): each visit draws a new note of it from the part bank. */
+export const TierChoice = z.strictObject({
   difficulty: Difficulty,
-  /** As the player first sees it (smudged parts show as █). */
-  text: z.string(),
+  /** How many different notes the tier has. */
+  notes: z.number().int(),
 });
-export const NotesResponse = z.strictObject({ notes: z.array(NoteChoice) });
+export const NotesResponse = z.strictObject({ tiers: z.array(TierChoice) });
 
 /** A visit still in progress, to pick it up again after a reload (iteration 56): the run and what was said. */
 export const ResumeResponse = z.strictObject({
@@ -232,7 +232,7 @@ export type HealthResponse = z.infer<typeof HealthResponse>;
 export type VoiceRequest = z.infer<typeof VoiceRequest>;
 export type DailyInfo = z.infer<typeof DailyInfo>;
 export type TopicView = z.infer<typeof TopicView>;
-export type NoteChoice = z.infer<typeof NoteChoice>;
+export type TierChoice = z.infer<typeof TierChoice>;
 export type LookResponse = z.infer<typeof LookResponse>;
 
 export function toRunView(state: RunState, world: GrandmaWorld, recipe: Recipe, opts: { hidePassword?: boolean } = {}): RunView {

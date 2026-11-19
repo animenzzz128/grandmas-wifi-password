@@ -752,3 +752,17 @@ At Jacky's request, phase 1 of the playability review: no puzzle data changed.
   - **Opening with "Oh, for heaven's sake":** 81% → 56%; "sweetheart": 66% → 50%. The eval asks every question in a fresh visit, so this is the prompt alone; in a visit, `varyOpener` also keeps any one tic to at most one line in four.
   - **Reply length:** median 49 → 40 words, 90th percentile 65 → 54.
   - **Unchanged or better:** 0 leaks, 0 hidden years, 0 joined links, recall 98.9% → 100%, retries 8.1% → 5.0%, fallbacks 3.3% → 0.2%, latency p50 1.29 → 1.29 s, p95 2.57 → 2.33 s. Confusable fairness 81% → 80% (within the interval).
+
+## Iteration 67 (2026-11-18): notes from a part bank (docs/15)
+
+At Jacky's request: no more fixed list of notes. A world now has **parts** (one note line each, with its answer slot, card memories, chain links, nudges, decoys and measured hops) and **tiers**; the generator (`packages/engine/src/compose.ts`) pairs every word part with every number part that fits a tier, and each pair is a normal Recipe, so the validator, the offline Grandma, cards and the chain tests work unchanged.
+- **Data:** the eight notes became 15 parts in `rosie.json`; their old ids are aliases, rebuilt from parts (saved visits, logs, golden transcripts and probes keep working; passwords unchanged).
+- **Tiers:** Easy (talk only, each part at most one hop), Medium (at least one answer only the room holds), Hard (a year three hops deep, a smudge, a "!" on the end). 45 notes: 26 / 7 / 12.
+- **Conflict rules, computed:** a pair is left out when one part's line, nudges, anchor or card memories say the other's answer, when one memory or story says the whole password, or when it hides a year she may misremember (4 pairs, listed by `npm run validate -- --notes`). Every memory that says one answer is kept apart from every memory that says the other.
+- **Answers only the room holds (`Slot.hidden`):** on `painted_number` notes she doesn't remember 412: her brain (model and offline) works from `forgetful(world, recipe)`, cards pick from it, and the validator rejects a reply that says it (without repeating the number to the model). Asked, she points at the hall sign and the porch photo; asked for "the house number" she may give the apartment's 27, the look-alike.
+- **Hops are measured:** the probe now runs every generated note with its parts' direct questions; a test fails if a part with a hop falls to a direct question anywhere. Result: **0/45 notes fall to direct questions** (was 2/8).
+- **Fairness bot:** all 45 notes solve with cards and the room; a hidden answer is never said, and an object is about it.
+- **Client:** "Choose a sticky note" (eight notes) is now "How hard today?" (three tiers, how many riddles each, best stars per tier; stars saved per old note count for their tier). `GET /api/notes` returns the tiers, never note text.
+- **Eval:** `npm run eval` runs the eight old notes by default (same cost, comparable reports); `--notes all` runs every generated note.
+- **Checks:** 329 tests, typecheck, validate, golden (one handwritten turn gained the new room-only verdict), probe, build; in the browser, the tier picker and a Medium visit.
+- **Next:** Medium has one room-only part, so 7 notes; more room parts are content for the team (docs/15, last section).

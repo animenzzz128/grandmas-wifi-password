@@ -1,6 +1,6 @@
 {
   "version": "probes.v1",
-  "notes": "Question probes against the offline Grandma (review 44, docs/10-design-rescore.md). 'reach': a route the chain maps promise must work (checked by Vitest). 'obvious': the ten most direct questions per puzzle, asked by someone who has only read the note (and knows their own family), so no question already contains a hop's answer; the report says how often one reply hands over a whole answer part (deduction depth, rubric dimension 1). Questions from the independent review of 2026-11-16.",
+  "notes": "Question probes against the offline Grandma (review 44, docs/10-design-rescore.md). 'reach': a route the chain maps promise must work (checked by Vitest). 'obvious': the ten most direct questions per puzzle, asked by someone who has only read the note (and knows their own family), so no question already contains a hop's answer; the report says how often one reply hands over a whole answer part (deduction depth, rubric dimension 1). Questions from the independent review of 2026-11-16. Since the note generator (docs/15), 'obvious' is per part: a note is probed with the questions of both its parts (union of the lists the eight old notes had).",
   "reach": [
     {
       "recipe": "r_easy_3",
@@ -38,7 +38,7 @@
       "expect": "1966"
     },
     {
-      "recipe": "r_medium",
+      "recipe": "r_medium_3",
       "ask": "What's your house number?",
       "expect": "412"
     },
@@ -83,7 +83,7 @@
       "expect": "Marge"
     },
     {
-      "recipe": "r_medium",
+      "recipe": "r_medium_3",
       "show": "house_number",
       "expect": "412"
     },
@@ -147,7 +147,27 @@
     }
   ],
   "obvious": {
-    "r_easy": [
+    "sock_thief": [
+      "Who was the sock thief?",
+      "Which dog stole socks?",
+      "What year did you get married?",
+      "When did you say 'I do'?",
+      "Tell me about your wedding",
+      "What was your first dog?",
+      "Tell me about your dogs",
+      "When did you marry grandpa?",
+      "What year was your wedding?",
+      "Who stole the socks?",
+      "What year did the sock thief come home?",
+      "When did Biscuit come home?",
+      "When were you born?",
+      "How old were you when you got Biscuit?",
+      "Tell me about Biscuit",
+      "What year did you get your first dog?",
+      "Tell me about your childhood",
+      "What year was Biscuit born?"
+    ],
+    "wedding_year": [
       "Who was the sock thief?",
       "Which dog stole socks?",
       "What year did you get married?",
@@ -159,7 +179,7 @@
       "What year was your wedding?",
       "Who stole the socks?"
     ],
-    "r_medium": [
+    "street_tv": [
       "What street did you live on when you got the color TV?",
       "When did you get the color TV?",
       "What street do you live on?",
@@ -171,7 +191,19 @@
       "What is your address?",
       "Where did you live?"
     ],
-    "r_hard": [
+    "painted_number": [
+      "What street did you live on when you got the color TV?",
+      "When did you get the color TV?",
+      "What street do you live on?",
+      "Where did you live when you got the color TV?",
+      "What number did grandpa paint crooked?",
+      "What's your house number?",
+      "What number is on the mailbox?",
+      "Tell me about your house",
+      "What is your address?",
+      "Where did you live?"
+    ],
+    "bird_name": [
       "What bird did grandpa name you after?",
       "What does grandpa call you?",
       "What year was the big snowstorm?",
@@ -183,7 +215,19 @@
       "How old was Michael when he broke his arm?",
       "Tell me about the sled"
     ],
-    "r_easy_2": [
+    "snowstorm_year": [
+      "What bird did grandpa name you after?",
+      "What does grandpa call you?",
+      "What year was the big snowstorm?",
+      "Tell me about the big snowstorm",
+      "When did Michael break his arm?",
+      "When was Michael born?",
+      "What's your nickname?",
+      "What year was the blizzard?",
+      "How old was Michael when he broke his arm?",
+      "Tell me about the sled"
+    ],
+    "honeymoon": [
       "Where did you spend your honeymoon?",
       "What year was my mom born?",
       "When was Linda born?",
@@ -195,7 +239,19 @@
       "Where was your honeymoon?",
       "Tell me about your wedding"
     ],
-    "r_easy_3": [
+    "mom_born_year": [
+      "Where did you spend your honeymoon?",
+      "What year was my mom born?",
+      "When was Linda born?",
+      "Tell me about your honeymoon",
+      "Where did you go after the wedding?",
+      "When was mom born?",
+      "Tell me about my mom",
+      "What year did you have your first baby?",
+      "Where was your honeymoon?",
+      "Tell me about your wedding"
+    ],
+    "favorite_dog": [
       "What was your favorite dog?",
       "What year did you win the blue ribbon?",
       "Tell me about the blue ribbon",
@@ -207,7 +263,19 @@
       "What dogs did you have?",
       "When did you win at the fair?"
     ],
-    "r_medium_2": [
+    "ribbon_year": [
+      "What was your favorite dog?",
+      "What year did you win the blue ribbon?",
+      "Tell me about the blue ribbon",
+      "Which dog did you love most?",
+      "Tell me about your dogs",
+      "When did you win the pie contest?",
+      "What did you win the blue ribbon for?",
+      "Tell me about your pie",
+      "What dogs did you have?",
+      "When did you win at the fair?"
+    ],
+    "tuesday_friend": [
       "Who do you bowl with on Tuesdays?",
       "When did grandpa lose three dollars at the fair?",
       "Who is your best friend?",
@@ -219,7 +287,19 @@
       "How did you meet grandpa?",
       "Tell me about Tuesday"
     ],
-    "r_medium_3": [
+    "fair_year": [
+      "Who do you bowl with on Tuesdays?",
+      "When did grandpa lose three dollars at the fair?",
+      "Who is your best friend?",
+      "Tell me about bowling",
+      "When did you meet grandpa?",
+      "Tell me about the fair",
+      "What year did grandpa lose money at the fair?",
+      "Who's in your bowling league?",
+      "How did you meet grandpa?",
+      "Tell me about Tuesday"
+    ],
+    "dog_before_moon": [
       "What dog did you get the year before the moon landing?",
       "What dog did you get before the moon landing?",
       "When was the moon landing?",
@@ -231,7 +311,19 @@
       "What was your first address?",
       "What was the apartment number?"
     ],
-    "r_hard_2": [
+    "first_door": [
+      "What dog did you get the year before the moon landing?",
+      "What dog did you get before the moon landing?",
+      "When was the moon landing?",
+      "What was the number on the door of your first home?",
+      "What was your first home?",
+      "What number was on your first door?",
+      "Tell me about your dogs",
+      "Tell me about your first apartment",
+      "What was your first address?",
+      "What was the apartment number?"
+    ],
+    "first_dog_year": [
       "Who was the sock thief?",
       "What year did the sock thief come home?",
       "When did Biscuit come home?",

@@ -12,3 +12,4 @@ export * from "./mishear.ts";
 export * from "./daily.ts";
 export * from "./topics.ts";
 export * from "./variety.ts";
+export * from "./compose.ts";

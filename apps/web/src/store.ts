@@ -11,7 +11,7 @@ import { useSettings } from "./settings.ts";
 import { firstTime, markVisited } from "./firsts.ts";
 import { storage } from "./storage.ts";
 import { cardFlick, fridgeDoor } from "./audio.ts";
-import type { AskResponse, NoteChoice } from "@gwp/engine";
+import type { AskResponse, TierChoice } from "@gwp/engine";
 import { topicQuestion } from "@gwp/engine";
 
 export type Panel = { type: "inspect"; objectId: string } | { type: "note" } | { type: "router" } | { type: "notebook" } | { type: "settings" } | null;
@@ -76,7 +76,8 @@ interface GameState {
   /** The camera view: a view id from the scene ("grandma", "table", …) or "focus:<object id>". */
   view: string;
   /** The sticky notes to choose from on the title screen (null until loaded). */
-  notes: NoteChoice[] | null;
+  /** The difficulty tiers on the title's picker (docs/15). */
+  notes: TierChoice[] | null;
   /** The topic card picked in the card strip (its two ask buttons show). */
   pickedTopic: string | null;
   /** The card of the last question (asking it again is a cheaper follow-up), as the server counts it. */
@@ -245,7 +246,7 @@ export const useGame = create<GameState>((set, get) => {
 
     async init() {
       void api.notes().then(
-        (r) => set({ notes: r.notes }),
+        (r) => set({ notes: r.tiers }),
         () => set({ notes: [] }),
       );
       // The room shows behind the title screen, so fetch it now.

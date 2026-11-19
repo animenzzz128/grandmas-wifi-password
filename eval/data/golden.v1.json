@@ -1354,6 +1354,7 @@
             "mood": "nostalgic"
           },
           "errors": [
+            "said a part of the answer she can't remember on this note; only the room shows it",
             "used f_house and f_house_number together; tell just one of these memories per reply and let the grandchild ask a follow-up",
             "reply contains every part of the password; give one memory at a time"
           ],

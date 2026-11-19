@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { AskResponse as AskResponseT } from "@gwp/engine";
-import { AskResponse, DailyInfo, GuessResponse, ItemResponse, PublicScene, RULES, RunView } from "@gwp/engine";
+import { AskResponse, DailyInfo, GuessResponse, ItemResponse, PublicScene, RULES, RunView, dailyPick, recipeById, slotParts } from "@gwp/engine";
 import { MAX_BODY_BYTES, createApp, limitKey } from "../src/app.ts";
 import { readConfig } from "../src/config.ts";
 import { loadGameData } from "../src/data.ts";
@@ -209,7 +209,7 @@ describe("API", () => {
 
 describe("solvability walkthroughs (data/grandmas/rosie.chains.md, mock Grandma)", () => {
   // Each step: what the player asks, and what the reply must contain for the chain to hold.
-  const walkthroughs: Record<string, { steps: [string, RegExp][]; parts: string[] }> = {
+  const walkthroughs: Record<string, { steps: [string, RegExp][]; parts: string[]; room?: [string, RegExp][] }> = {
     easy: {
       steps: [
         ["Who stole all the socks?", /Biscuit/],
@@ -224,7 +224,13 @@ describe("solvability walkthroughs (data/grandmas/rosie.chains.md, mock Grandma)
         ["When did you get the color TV?", /1969|'69/],
         // She may slip first: "In 1965… no, '64 we bought the house" (GDD §3.2; moved here in iteration 47).
         ["When did you buy the house on Maple Avenue?", /(1964|'64).*Maple Avenue/],
-        ["What number did Grandpa paint on the mailbox?", /412/],
+        // Since the note generator (docs/15) the painted number needs the room: she doesn't remember it...
+        ["What number did Grandpa paint on the mailbox?", /^(?![\s\S]*412)/],
+      ],
+      // ...the sign in the hall and the porch photo in the album show it between them.
+      room: [
+        ["house_number", /first digit is a 4 and the last is a 2/],
+        ["photo_album", /mailbox reading 41/],
       ],
       parts: ["Maple", "412"],
     },
@@ -242,8 +248,13 @@ describe("solvability walkthroughs (data/grandmas/rosie.chains.md, mock Grandma)
   for (const [difficulty, w] of Object.entries(walkthroughs)) {
     it(`${difficulty}: the documented chain reaches the answer`, async () => {
       const app = newApp();
-      const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty })).text));
+      // The old note of this difficulty, rebuilt from the part bank (docs/15).
+      const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { recipeId: `r_${difficulty}` })).text));
       expect(run.slots).toBe(w.parts.length);
+      if (w.room) {
+        const scene = PublicScene.parse(await (await app.request(`/api/scenes/${run.sceneId}`)).json());
+        for (const [id, must] of w.room) expect(scene.interactables.find((o) => o.id === id)?.inspect_text, id).toMatch(must);
+      }
       for (const [q, must] of w.steps) {
         const res = AskResponse.parse(JSON.parse((await post(app, `/api/runs/${run.runId}/ask`, { text: q })).text));
         expect(res.reply, q).toMatch(must);
@@ -260,7 +271,7 @@ describe("solvability walkthroughs (data/grandmas/rosie.chains.md, mock Grandma)
 
   it("nudges toward the first hop when the player is stuck", async () => {
     const app = newApp();
-    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { difficulty: "hard" })).text));
+    const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { recipeId: "r_hard" })).text));
     // Off-chain questions. Grandma's random tangents can touch the chain (that counts as progress and resets
     // the count), so allow up to 12 turns: in a 1,000-visit probe a nudge always came by then, but 7% of visits
     // still had none after 6 (the old window, which made this test flaky). It must point at the first hop.
@@ -273,7 +284,7 @@ describe("solvability walkthroughs (data/grandmas/rosie.chains.md, mock Grandma)
       if (nudge) break;
     }
     expect(asked).toBeGreaterThanOrEqual(3);
-    expect(nudge).toMatch(/sled|bird/);
+    expect(nudge).toMatch(/sled|calls me/);
   });
 
 });
@@ -303,8 +314,9 @@ describe("Daily Grandma (GDD §5)", () => {
   it("shares how everyone is doing on today's daily, once a few visits have finished", async () => {
     const app = dailyApp("2026-11-20T09:00:00Z");
     const daily = async () => DailyInfo.parse(await (await app.request("/api/daily")).json());
-    const answers: Record<string, string[]> = { easy: ["biscuit", "1961"], medium: ["Maple", "412"], hard: ["sparrow", "1977"] };
-    const answer = answers[(await daily()).difficulty]!;
+    // Today's note comes from the part bank (docs/15): its answer, from the data.
+    const world = [...data.worlds.values()][0]!;
+    const answer = slotParts(world, recipeById(world, dailyPick(data.worlds.values(), new Date("2026-11-20T09:00:00Z"))!.recipeId)!);
     const visit = async (questions: number, solve: boolean) => {
       const run = RunView.parse(JSON.parse((await post(app, "/api/runs", { daily: true })).text));
       for (let i = 0; i < questions; i++) await post(app, `/api/runs/${run.runId}/ask`, { text: "Tell me about your garden" });
@@ -629,7 +641,8 @@ describe("more puzzles per difficulty (design plan D, iteration 43)", () => {
       RunView.parse(await (await app.request("/api/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) })).json());
     const notes = new Set<string>();
     for (let i = 0; i < 30; i++) notes.add((await start({ difficulty: "easy" })).note.text);
-    expect(notes.size).toBe(3);
+    // Drawn from the part bank's Easy notes (docs/15): many different ones in 30 visits.
+    expect(notes.size).toBeGreaterThan(10);
     for (let i = 0; i < 10; i++) {
       const first = await start({ difficulty: "medium" });
       const again = await start({ difficulty: "medium", after: first.runId });

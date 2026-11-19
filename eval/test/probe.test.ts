@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { partsOf, recipeById } from "@gwp/engine";
 import { loadProbes, loadScene, loadWorld, renderReport, runObvious, runReach } from "../src/probe.ts";
 
 const world = loadWorld();
@@ -10,10 +11,10 @@ describe("question probes (review 44)", () => {
     expect(failed.map((r) => `${r.recipe} ${r.ask ?? `show ${r.show}`}: ${r.hits}/${r.runs} "${r.sample.slice(0, 80)}"`)).toEqual([]);
   });
 
-  it("has ten direct questions for every puzzle and reports each answer part", () => {
-    expect(Object.keys(probes.obvious).sort()).toEqual(world.recipes.map((r) => r.id).sort());
-    for (const qs of Object.values(probes.obvious)) expect(qs).toHaveLength(10);
-    const obvious = runObvious(world, { r_hard: probes.obvious.r_hard! }, 4);
+  it("has ten or more direct questions for every part, and reports each answer part", () => {
+    expect(Object.keys(probes.obvious).sort()).toEqual((world.parts ?? []).map((p) => p.id).sort());
+    for (const qs of Object.values(probes.obvious)) expect(qs.length).toBeGreaterThanOrEqual(10);
+    const obvious = runObvious(world, probes.obvious, 4, [recipeById(world, "r_hard")!]);
     // Hard hides its year from Grandma: no direct question gives it.
     expect(obvious[0]!.parts.find((p) => p.answer === "1977")!.best).toBeUndefined();
     expect(obvious[0]!.fallsToDirectQuestions).toBe(false);
@@ -21,11 +22,24 @@ describe("question probes (review 44)", () => {
   });
 });
 
-describe("deduction depth (review 44, F2; adopted in iteration 47)", () => {
-  it("only the two Mediums still fall to direct questions alone", () => {
-    // f2-year-hops made the year one hop in Easy, Easy 2, Easy 3 and Medium 2. Don't let a change undo it.
-    const falls = runObvious(world, probes.obvious, 4).filter((o) => o.fallsToDirectQuestions).map((o) => o.recipe);
-    expect(falls.sort()).toEqual(["r_medium", "r_medium_3"]);
+describe("deduction depth (review 44 F2; the note generator, docs/15)", () => {
+  const results = runObvious(world, probes.obvious, 4);
+
+  it("no generated note falls to direct questions alone", () => {
+    expect(results.filter((o) => o.fallsToDirectQuestions).map((o) => o.recipe)).toEqual([]);
+  });
+
+  it("a part's hops are honest: one with a hop never falls to a direct question, in any note", () => {
+    const byId = new Map((world.parts ?? []).map((p) => [p.id, p]));
+    const dishonest: string[] = [];
+    for (const o of results) {
+      const ids = partsOf(world, o.recipe)!;
+      o.parts.forEach((p, i) => {
+        const part = byId.get(ids[i]!)!;
+        if (part.hops > 0 && (p.best?.hits ?? 0) * 2 >= o.runs) dishonest.push(`${part.id} (hops ${part.hops}) in ${o.recipe}: "${p.best!.question}"`);
+      });
+    }
+    expect(dishonest).toEqual([]);
   });
 });
 

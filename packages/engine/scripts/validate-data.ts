@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GrandmaWorld, SceneManifest, Strings, checkScene, checkWorld, computePassword } from "../src/index.ts";
+import { GrandmaWorld, SceneManifest, Strings, TIERS, checkParts, checkScene, checkWorld, computePassword, expandWorld, generateRecipes } from "../src/index.ts";
 
 const dataDir = join(dirname(fileURLToPath(import.meta.url)), "../../../data");
 const readJson = (p: string) => JSON.parse(readFileSync(p, "utf8")) as unknown;
@@ -19,12 +19,24 @@ for (const file of readdirSync(join(dataDir, "grandmas")).filter((f) => f.endsWi
     fail(`grandmas/${file}: ${parsed.error.message}`);
     continue;
   }
-  const problems = checkWorld(parsed.data);
+  const world = expandWorld(parsed.data);
+  const problems = [...checkWorld(world), ...checkParts(world)];
+  if (!world.recipes.length) problems.push("no notes: give the world recipes, or parts and tiers");
   problems.forEach((p) => fail(`grandmas/${file}: ${p}`));
-  worlds.set(parsed.data.id, parsed.data);
+  worlds.set(world.id, world);
   if (!problems.length) {
-    const recipes = parsed.data.recipes.map((r) => `${r.id}=${computePassword(parsed.data, r)}`).join(", ");
-    console.log(`✓ grandmas/${file} (${parsed.data.facts.length} facts; ${recipes})`);
+    if (world.parts?.length) {
+      // The generator (docs/15): how many notes each tier gets, and which pairs were left out and why.
+      const count = TIERS.map((t) => `${t} ${world.recipes.filter((r) => r.difficulty === t).length}`).join(", ");
+      console.log(`✓ grandmas/${file} (${world.facts.length} facts; ${world.parts.length} parts → ${world.recipes.length} notes: ${count})`);
+      if (process.argv.includes("--notes")) {
+        for (const r of world.recipes) console.log(`    ${r.id} = ${computePassword(world, r)} · ${r.note_text}`);
+        for (const r of generateRecipes(parsed.data).rejected) console.log(`    left out ${r.id}: ${r.why.join("; ")}`);
+      }
+    } else {
+      const recipes = world.recipes.map((r) => `${r.id}=${computePassword(world, r)}`).join(", ");
+      console.log(`✓ grandmas/${file} (${world.facts.length} facts; ${recipes})`);
+    }
   }
 }
 

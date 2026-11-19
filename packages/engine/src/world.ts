@@ -80,6 +80,12 @@ const Slot = z.strictObject({
   field: z.enum(["object", "year"]),
   transform: Transform.optional(),
   requires_anchor: z.string().optional(),
+  /**
+   * Grandma doesn't remember this answer on this note: only the room shows it (a part that needs the room,
+   * docs/15). Her memories that say it are left out of her mind for the note (forgetful), and the validator
+   * rejects a reply that says it.
+   */
+  hidden: z.boolean().optional(),
 });
 
 const Recipe = z.strictObject({
@@ -114,6 +120,60 @@ const Recipe = z.strictObject({
 });
 
 /**
+ * A part of a password: one line of the sticky note with everything the puzzle needs for it (docs/15). The
+ * generator (compose.ts) puts a word part and a number part together into a Recipe, for each difficulty tier
+ * whose rules the pair meets, so every visit draws its note from the bank instead of from a fixed list.
+ */
+const Part = z.strictObject({
+  id: z.string().regex(/^[a-z0-9_]+$/),
+  /** word: a name, place or nickname; number: a year or a house number. A note has one of each. */
+  kind: z.enum(["word", "number"]),
+  /** The note's line for this part. */
+  line: z.string(),
+  /** The line with a smudge only the reading glasses read (used by tiers with `smudge`). */
+  smudged: z.string().optional(),
+  slot: Slot,
+  /** Inference steps from the line to the answer (0: one direct question gives it; probe data). */
+  hops: z.number().int().min(0).max(5),
+  /** A step only an object in the room gives (counts one more point). */
+  needs_room: z.boolean().optional(),
+  /** Facts with a look-alike answer the player has to rule out (for review and the chain maps). */
+  decoys: z.array(z.string()).optional(),
+  /** What her topic card for this line tells (see Recipe.note_facts). Default: the slot's fact. */
+  note_facts: z.array(z.string()).optional(),
+  /** Consecutive links of this part's chain (see Recipe.separate). */
+  separate: z.array(z.array(z.string()).min(2)).optional(),
+  /** What she says when the player is stuck on this part. */
+  nudges: z.array(z.string()).min(1),
+  /** Extra rules printed on the note ("no 'Avenue'"). */
+  rules: z.array(z.string()).optional(),
+});
+
+/** How a tier is put together, in points: a part's hops, plus one if it needs the room (docs/15). */
+const Tier = z.strictObject({
+  /** Total points of the two parts, inclusive. */
+  points: z.tuple([z.number().int(), z.number().int()]),
+  /** No part may have more points than this. */
+  max_part: z.number().int().optional(),
+  /** At least one part must have this many points. */
+  min_top_part: z.number().int().optional(),
+  /** Lines with a smudged version show it (the reading glasses read it). */
+  smudge: z.boolean().optional(),
+  /** Parts that need the room: "none" (talk only), "required" (at least one), or any (default). */
+  room: z.enum(["none", "required", "any"]).optional(),
+  /** A symbol on the end of the password, picked per note. */
+  suffixes: z.array(z.string()).optional(),
+  par: z.number().int().optional(),
+});
+
+/** A retired note id (saved visits, logs, tests) and the parts it is made of now. */
+const Alias = z.strictObject({
+  tier: Difficulty,
+  parts: z.tuple([z.string(), z.string()]),
+  suffix: z.string().optional(),
+});
+
+/**
  * A topic card the player can ask about (topics.ts). It appears once Grandma says one of its `match` phrases or
  * a clue mentions one; asking about it tells its memories in order.
  */
@@ -126,6 +186,7 @@ const Topic = z.strictObject({
   facts: z.array(z.string()).min(1),
 });
 
+/** A Grandma world as written in data/grandmas/*.json. parseWorld() adds the generated recipes (compose.ts). */
 export const GrandmaWorld = z.strictObject({
   $schema: z.string().optional(),
   id: z.string().regex(/^[a-z0-9-]+$/),
@@ -139,7 +200,13 @@ export const GrandmaWorld = z.strictObject({
   stories: z.array(Story).optional(),
   /** Little things: colour, not clues (iteration 64). */
   colour: z.array(Colour).optional(),
-  recipes: z.array(Recipe).min(1),
+  /** Fixed notes, if any. A world with parts gets its notes from the generator instead. */
+  recipes: z.array(Recipe).optional(),
+  /** The part bank (docs/15). */
+  parts: z.array(Part).optional(),
+  tiers: z.strictObject({ easy: Tier, medium: Tier, hard: Tier }).optional(),
+  /** Retired note ids, rebuilt from parts (they need not meet a tier's rules). */
+  aliases: z.record(z.string(), Alias).optional(),
   /** Topic cards. Without them, cards are made from the entities (topics.ts). */
   topics: z.array(Topic).optional(),
   /** Cards the player has from the start (besides the note's own parts). */
@@ -147,7 +214,15 @@ export const GrandmaWorld = z.strictObject({
 });
 
 export type Topic = z.infer<typeof Topic>;
-export type GrandmaWorld = z.infer<typeof GrandmaWorld>;
+export type GrandmaWorldData = z.infer<typeof GrandmaWorld>;
+/** A loaded world: the data plus every note the generator made from its parts (parseWorld). */
+export type GrandmaWorld = Omit<GrandmaWorldData, "recipes"> & {
+  recipes: Recipe[];
+  /** Notes behind retired ids (aliases): found by recipeById, never drawn for a new visit. */
+  retired?: Recipe[];
+};
+export type Part = z.infer<typeof Part>;
+export type Tier = z.infer<typeof Tier>;
 export type Fact = z.infer<typeof Fact>;
 export type Entity = z.infer<typeof Entity>;
 export type Recipe = z.infer<typeof Recipe>;
@@ -162,7 +237,7 @@ export function entityById(world: GrandmaWorld, id: string): Entity | undefined 
 }
 
 export function recipeById(world: GrandmaWorld, id: string): Recipe | undefined {
-  return world.recipes.find((r) => r.id === id);
+  return world.recipes.find((r) => r.id === id) ?? world.retired?.find((r) => r.id === id);
 }
 
 /** Resolve a fact's object to a display string: an entity's name, or the literal value. */
@@ -254,6 +329,39 @@ export function progressFacts(world: GrandmaWorld, recipe: Recipe): Set<string> 
   }
   for (const f of world.facts) if (answers.has(f.subject) || (typeof f.object === "string" && answers.has(f.object))) ids.add(f.id);
   return ids;
+}
+
+/** Answers Grandma doesn't remember on this note (Slot.hidden): only the room shows them. */
+export function hiddenAnswers(world: GrandmaWorld, recipe: Recipe): string[] {
+  if (!recipe.slots.some((s) => s.hidden)) return [];
+  const parts = slotParts(world, recipe);
+  return recipe.slots.flatMap((s, i) => (s.hidden ? [parts[i]!] : []));
+}
+
+/** Whole-word, case-blind "does `text` say `value`". */
+export function saysValue(text: string, value: string): boolean {
+  const v = value.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${v}([^a-z0-9]|$)`, "i").test(text);
+}
+
+/**
+ * The world as Grandma remembers it on this note: without the memories and stories that say an answer she doesn't
+ * remember (Slot.hidden). Her brain (model or offline) and her topic cards use this; the checks use the whole world.
+ */
+export function forgetful(world: GrandmaWorld, recipe: Recipe): GrandmaWorld {
+  const hidden = hiddenAnswers(world, recipe);
+  if (!hidden.length) return world;
+  const ids = new Set(recipe.slots.filter((s) => s.hidden).map((s) => s.fact_id));
+  const says = (t: string) => hidden.some((a) => saysValue(t, a));
+  // The line's pointer memory ("the sign in the hall is no better… a photo of the porch in the album") is what she
+  // says when asked about it in any words, not only through its card: it sends the player to the room.
+  const pointers = new Set(recipe.slots.flatMap((s, i) => (s.hidden ? (recipe.note_facts?.[i] ?? []) : [])));
+  const unpoint = (f: Fact): Fact => (pointers.has(f.id) && f.tags?.includes("pointer") ? { ...f, tags: f.tags.filter((t) => t !== "pointer") } : f);
+  return {
+    ...world,
+    facts: world.facts.filter((f) => !ids.has(f.id) && !says(f.text)).map(unpoint),
+    stories: world.stories?.filter((s) => !says(s.text)),
+  };
 }
 
 /**
@@ -413,11 +521,4 @@ export function checkWorld(world: GrandmaWorld): string[] {
     }
   }
   return problems;
-}
-
-export function parseWorld(json: unknown): GrandmaWorld {
-  const world = GrandmaWorld.parse(json);
-  const problems = checkWorld(world);
-  if (problems.length) throw new Error(`world ${world.id} is invalid:\n- ${problems.join("\n- ")}`);
-  return world;
 }

@@ -21,6 +21,8 @@ import {
   noteParts,
   noteTopics,
   parseWorld,
+  forgetful,
+  recipeById,
   pickTopicFact,
   slotParts,
   startingTopics,
@@ -54,7 +56,7 @@ describe("topic cards", () => {
   });
 
   it("starts with the note's parts, then the world's starting cards", () => {
-    const easy = world.recipes.find((r) => r.id === "r_easy")!;
+    const easy = recipeById(world, "r_easy")!;
     const start = startingTopics(world, easy);
     expect(start.slice(0, 2)).toEqual(["note_0", "note_1"]);
     expect(start).toContain("walt");
@@ -62,7 +64,7 @@ describe("topic cards", () => {
   });
 
   it("a smudged note part can't be asked about until the glasses go on", () => {
-    const medium = world.recipes.find((r) => r.id === "r_medium")!;
+    const medium = recipeById(world, "r_medium")!;
     const smudged = noteTopics(medium, medium.smudged_text!);
     expect(smudged.some((t) => !topicReadable(t))).toBe(true);
     expect(noteTopics(medium, medium.note_text).every(topicReadable)).toBe(true);
@@ -121,6 +123,8 @@ describe("topic cards", () => {
 /** Every card, both buttons, until nothing new; plus every object. Returns what the player saw. */
 function playWithCards(recipeId: string) {
   const recipe = world.recipes.find((r) => r.id === recipeId)!;
+  // As the server does: cards pick from what she remembers on this note (an answer only the room shows is not in it).
+  const mind = forgetful(world, recipe);
   const state = createRunState({ id: `bot-${recipeId}`, world, recipe, sceneId: scene.id, greeting: "Hello, dear." });
   const known = [...(state.topics ?? [])];
   const heard: string[] = [];
@@ -141,7 +145,7 @@ function playWithCards(recipeId: string) {
       const topic = topicById(world, recipe, recipe.note_text, id)!;
       for (const mode of ["about", "when"] as const) {
         for (let i = 0; i < topic.facts.length; i++) {
-          const pick = pickTopicFact(world, topic, mode, heard, heardWhen);
+          const pick = pickTopicFact(mind, topic, mode, heard, heardWhen);
           if (pick.kind !== "fact" || pick.repeat) break;
           const out = mockGrandmaReply({ world, recipe, input: { kind: "ask", text: topicQuestion(topic.label, mode, topic.kind), focus: { factId: pick.factId, mode } }, seed: `${id}:${mode}:${i}`, recentFactIds: [] });
           expect(out.fact_ids_used[0]).toBe(pick.factId);
@@ -157,7 +161,7 @@ function playWithCards(recipeId: string) {
   return { recipe, known, said, looked, rounds, heard };
 }
 
-describe("fairness: every puzzle can be solved with cards alone", () => {
+describe("fairness: every puzzle can be solved with cards and the room", () => {
   for (const recipe of world.recipes) {
     it(`${recipe.id} (${recipe.note_text})`, () => {
       const { said, looked, known, heard } = playWithCards(recipe.id);
@@ -175,6 +179,10 @@ describe("fairness: every puzzle can be solved with cards alone", () => {
             const f = world.facts.find((x) => x.id === id)!;
             if (f.year !== undefined && !hidden.has(f.year)) expect(all, `${recipe.id}: year of ${id}`).toContain(String(f.year));
           }
+        } else if (slot.hidden) {
+          // An answer only the room shows (docs/15): no card ever says it, and an object in the room is about it.
+          for (const line of said) expect(line.toLowerCase(), `${recipe.id}: she said part ${i + 1}`).not.toContain(parts[i]!.toLowerCase());
+          expect(scene.interactables.some((o) => (o.fact_ids ?? []).includes(slot.fact_id)), `${recipe.id}: a room route to part ${i + 1}`).toBe(true);
         } else {
           expect(all.toLowerCase(), `${recipe.id}: part ${i + 1}`).toContain(parts[i]!.toLowerCase());
         }

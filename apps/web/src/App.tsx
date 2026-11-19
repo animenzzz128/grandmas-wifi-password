@@ -7,7 +7,6 @@ import { t } from "./strings.ts";
 import { dailyStreak, formatCountdown, loadDailyRecords } from "./daily.ts";
 import { forgetLesson, hasVisited } from "./firsts.ts";
 import { loadNoteStars } from "./noteStars.ts";
-import { Smudged } from "./ui/Smudged.tsx";
 import { startMusic } from "./audio.ts";
 
 /** The 3D room and HUD are their own chunk; the title screen shows while it loads. */
@@ -66,10 +65,13 @@ function Stars({ n, of = 3 }: { n: number; of?: number }) {
   );
 }
 
-/** "Which sticky note today?" Every note, Easy first, with your best stars (ported from the Godot edition). */
+/**
+ * "How hard today?" The three tiers with your best stars (docs/15). Each visit draws a new note of the tier from
+ * Grandma's part bank, so there is no list of notes to pick from any more.
+ */
 function NotePicker({ onBack }: { onBack: () => void }) {
-  const notes = useGame((s) => s.notes);
-  const startNote = useGame((s) => s.startNote);
+  const tiers = useGame((s) => s.notes);
+  const start = useGame((s) => s.start);
   const busy = useGame((s) => s.busy);
   const [stars] = useState(loadNoteStars);
   return (
@@ -84,23 +86,17 @@ function NotePicker({ onBack }: { onBack: () => void }) {
         </button>
       </div>
       <div className="note-grid">
-        {(notes ?? []).map((n, i) => (
-          <button key={n.id} className={`note-choice ${n.difficulty}`} disabled={busy} autoFocus={i === 0} onClick={() => void startNote(n.id)} style={{ ["--tilt" as string]: `${((i * 37) % 5) - 2}deg` }}>
+        {(tiers ?? []).map((n, i) => (
+          <button key={n.difficulty} className={`note-choice ${n.difficulty}`} disabled={busy} autoFocus={i === 0} onClick={() => void start(n.difficulty as "easy" | "medium" | "hard")} style={{ ["--tilt" as string]: `${((i * 37) % 5) - 2}deg` }}>
             <span className="note-meta">
               <span>{t(`difficulty.${n.difficulty}`)}</span>
-              <Stars n={stars[n.id] ?? 0} />
+              <Stars n={stars[n.difficulty] ?? 0} />
             </span>
-            <span className="note-text">
-              {n.text.split("+").map((p, k) => (
-                <span key={k}>
-                  {k > 0 && "+ "}
-                  <Smudged text={p.trim()} />
-                </span>
-              ))}
-            </span>
+            <span className="note-text">{t(`tier.${n.difficulty}`)}</span>
+            <span className="note-count">{t("tier.count", { n: n.notes })}</span>
           </button>
         ))}
-        {notes === null && <p>{t("loading.door")}</p>}
+        {tiers === null && <p>{t("loading.door")}</p>}
       </div>
       <DailyBox />
     </div>

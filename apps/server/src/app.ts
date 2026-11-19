@@ -26,6 +26,8 @@ import {
   checkGuessParts,
   stallNudge,
   varyOpener,
+  TIERS,
+  forgetful,
   checkGuess,
   createRunState,
   endAtQuestionCap,
@@ -272,11 +274,9 @@ export function createApp(deps: AppDeps) {
   app.get("/api/notes", (c) => {
     const world = data.worlds.get("rosie") ?? [...data.worlds.values()][0];
     if (!world) throw new HttpError(404, "No Grandmas available.");
-    const order = { easy: 0, medium: 1, hard: 2, expert: 3 } as const;
-    const notes = [...world.recipes]
-      .sort((a, b) => order[a.difficulty] - order[b.difficulty])
-      .map((r) => ({ id: r.id, difficulty: r.difficulty, text: r.smudged_text ?? r.note_text }));
-    return c.json({ notes });
+    // The three tiers and how many notes each has (docs/15). Never a note's text: a visit draws its own.
+    const tiers = TIERS.map((difficulty) => ({ difficulty, notes: world.recipes.filter((r) => r.difficulty === difficulty).length })).filter((t) => t.notes > 0);
+    return c.json({ tiers });
   });
 
   app.get("/api/scenes/:id", (c) => {
@@ -429,7 +429,8 @@ export function createApp(deps: AppDeps) {
       cost.total = Math.max(1, cost.base + cost.long + cost.rude + cost.followUp);
       if (!topicReadable(topic)) cardLine = { reply: lineFor(run, lines.smudged_card, "smudged"), mood: "confused", free: true };
       else {
-        const picked = pickTopicFact(world, topic, card.mode, run.heard ?? [], run.heardWhen ?? []);
+        // From what she remembers on this note: a card never tells an answer only the room shows (docs/15).
+        const picked = pickTopicFact(forgetful(world, recipe), topic, card.mode, run.heard ?? [], run.heardWhen ?? []);
         if (picked.kind === "no_year") {
           cardLine = { reply: lineFor(run, lines.no_year, "noyear"), mood: "confused" };
           Object.assign(cost, { base: RULES.noYearCost, followUp: 0, total: RULES.noYearCost });

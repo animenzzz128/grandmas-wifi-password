@@ -4,7 +4,7 @@
  * ("how much does the LLM add over a keyword matcher?").
  */
 import type { Fact, GrandmaWorld, Recipe } from "./world.ts";
-import { chainFacts, containsAllSlots, entityById, factById, hiddenYears, slotAnswers } from "./world.ts";
+import { chainFacts, containsAllSlots, entityById, factById, forgetful, hiddenYears, slotAnswers } from "./world.ts";
 import type { TurnInput } from "./prompt.ts";
 import type { GrandmaOutput } from "./validator.ts";
 import { expandedTokens, factKeywords, hashString, pick, rng, scrubYears, tokens } from "./text.ts";
@@ -76,6 +76,9 @@ export function mockGrandmaReply(args: {
   const { world, input } = args;
   const rand = rng(hashString(args.seed));
   const hidden = hiddenYears(world, args.recipe);
+  // What she remembers on this note: an answer only the room shows is not in it (docs/15). The checks below that
+  // need the whole answer (slot values, the chain) still use the whole world.
+  const mind = forgetful(world, args.recipe);
 
   // The password's own parts never come up as a random aside: a tangent that says "our house number is 412"
   // to a question about nothing hands over half of Medium (iteration 56). Asked for, they're fine.
@@ -97,25 +100,25 @@ export function mockGrandmaReply(args: {
   const focus = input.kind === "ask" ? input.focus : undefined;
   if (focus) {
     // A topic card picked the memory already (topics.ts).
-    main = factById(world, focus.factId);
+    main = factById(mind, focus.factId);
   } else if (input.kind === "show") {
     // The scene lists an object's facts most-relevant first, so Grandma reacts to *that* object, and to the
     // memory of it that matters for this note when there is one: the one the note asks about, else another
     // link of its chain (the album means Linda's birth on Easy 2, not the Maple house; F6). A part behind
     // an anchor is the riddle itself, so there the object gives a link instead (the sled: Michael's arm).
-    const linked = input.object.factIds.map((id) => factById(world, id)).filter((f): f is Fact => Boolean(f));
+    const linked = input.object.factIds.map((id) => factById(mind, id)).filter((f): f is Fact => Boolean(f));
     const query = expandedTokens(input.text ?? "");
     const chain = chainFacts(world, args.recipe);
     const asked = new Set(args.recipe.slots.filter((s) => !s.requires_anchor).map((s) => s.fact_id));
     main =
-      (input.text && scoreFacts(world, query, input.text).find((s) => linked.includes(s.fact))?.fact) ||
+      (input.text && scoreFacts(mind, query, input.text).find((s) => linked.includes(s.fact))?.fact) ||
       linked.find((f) => asked.has(f.id)) ||
       linked.find((f) => chain.has(f.id)) ||
       linked[0];
   } else {
     // She doesn't tell the same memory twice in a row when another fits almost as well: asking about the
     // job her last answer mentioned ("two summers after I started cooking at Lincoln Elementary") gets the job.
-    const ranked = scoreFacts(world, expandedTokens(input.text), input.text);
+    const ranked = scoreFacts(mind, expandedTokens(input.text), input.text);
     const top = ranked[0];
     main = top && args.recentFactIds.includes(top.fact.id) ? (ranked.find((s) => !args.recentFactIds.includes(s.fact.id) && s.score >= top.score - 1) ?? top).fact : top?.fact;
   }
@@ -158,7 +161,7 @@ export function mockGrandmaReply(args: {
   const tags = new Set(main.tags ?? []);
   // Nor an aside that repeats a number she just said ("My best score was 212. My best bowling score ever was 212").
   const saidNumbers = new Set(main.text.match(/\d{2,}/g) ?? []);
-  const pool = world.facts.filter((f) => !avoid.has(f.id) && !slotIds.has(f.id) && f.salience >= 2 && !(f.text.match(/\d{2,}/g) ?? []).some((n) => saidNumbers.has(n)) && !containsAllSlots(world, args.recipe, `${main!.text} ${f.text}`));
+  const pool = mind.facts.filter((f) => !avoid.has(f.id) && !slotIds.has(f.id) && f.salience >= 2 && !(f.text.match(/\d{2,}/g) ?? []).some((n) => saidNumbers.has(n)) && !containsAllSlots(world, args.recipe, `${main!.text} ${f.text}`));
   const heard = new Set(args.heardFactIds ?? []);
   const fresh = pool.filter((f) => !heard.has(f.id));
   if (fresh.length) pool.splice(0, pool.length, ...fresh);

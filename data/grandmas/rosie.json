@@ -1169,82 +1169,114 @@
       "text": "I bring my own bowling shoes. I'm not putting my feet where a hundred strangers have been."
     }
   ],
-  "recipes": [
+  "parts": [
     {
-      "id": "r_easy",
-      "difficulty": "easy",
-      "note_text": "the sock thief + the year we said 'I do'",
-      "slots": [
-        {
-          "fact_id": "f_dog1",
-          "field": "object",
-          "transform": "capitalize"
-        },
-        {
-          "fact_id": "f_wedding",
-          "field": "year",
-          "transform": "none",
-          "requires_anchor": "a_wedding"
-        }
-      ],
-      "format": {
-        "join": "",
-        "rules_shown_on_note": [
-          "no spaces",
-          "first letter capital"
-        ]
+      "id": "sock_thief",
+      "kind": "word",
+      "line": "the sock thief",
+      "slot": {
+        "fact_id": "f_dog1",
+        "field": "object",
+        "transform": "capitalize"
       },
-      "password": "Biscuit1961",
-      "par": null,
-      "separate": [
-        [
-          "f_dog1",
-          "f_wedding"
-        ],
-        [
-          "f_wedding",
-          "f_engaged"
-        ]
-      ],
-      "nudges": [
-        "You know, I keep meaning to put names under those dog pictures in my album. It's on the coffee table, dear.",
-        "Did I ever show you my wedding picture on the sideboard? Turn it over sometime."
+      "hops": 0,
+      "decoys": [
+        "f_dog2"
       ],
       "note_facts": [
-        [
-          "f_sockthief_ptr"
-        ],
-        [
-          "f_wedding"
-        ]
+        "f_sockthief_ptr"
+      ],
+      "nudges": [
+        "You know, I keep meaning to put names under those dog pictures in my album. It's on the coffee table, dear."
       ]
     },
     {
-      "id": "r_medium",
-      "difficulty": "medium",
-      "note_text": "the street we lived on the year we got the color TV + the number Grandpa painted crooked",
-      "smudged_text": "the street we lived on the year we got the color TV + the number Grandpa ███████ ███████",
-      "slots": [
-        {
-          "fact_id": "f_house",
-          "field": "object",
-          "transform": "first_word"
-        },
-        {
-          "fact_id": "f_house_number",
-          "field": "object",
-          "transform": "none"
-        }
-      ],
-      "format": {
-        "join": "",
-        "rules_shown_on_note": [
-          "one word, no 'Avenue'",
-          "first letter capital"
-        ]
+      "id": "honeymoon",
+      "kind": "word",
+      "line": "where we spent our honeymoon",
+      "slot": {
+        "fact_id": "f_honeymoon",
+        "field": "object",
+        "transform": "first_word"
       },
-      "password": "Maple412",
-      "par": null,
+      "hops": 0,
+      "note_facts": [
+        "f_honeymoon_ptr"
+      ],
+      "nudges": [
+        "Your grandpa got soaked on our honeymoon, did I ever tell you? That wedding picture brings it all back."
+      ]
+    },
+    {
+      "id": "favorite_dog",
+      "kind": "word",
+      "line": "my favorite dog",
+      "slot": {
+        "fact_id": "f_dog2",
+        "field": "object",
+        "transform": "capitalize"
+      },
+      "hops": 0,
+      "decoys": [
+        "f_dog1"
+      ],
+      "note_facts": [
+        "f_dog2_ptr"
+      ],
+      "nudges": [
+        "Did you see the spaniel in my album? Oh, she was my favorite. Ask me her name."
+      ]
+    },
+    {
+      "id": "tuesday_friend",
+      "kind": "word",
+      "line": "the friend I bowl with every Tuesday",
+      "slot": {
+        "fact_id": "f_marge",
+        "field": "object",
+        "transform": "first_word"
+      },
+      "hops": 0,
+      "note_facts": [
+        "f_bowling_ptr"
+      ],
+      "nudges": [
+        "That bowling trophy is from the Tuesday league. I haven't missed a Tuesday in forty years."
+      ]
+    },
+    {
+      "id": "bird_name",
+      "kind": "word",
+      "line": "the bird Grandpa named me after",
+      "slot": {
+        "fact_id": "f_nickname",
+        "field": "object",
+        "transform": "capitalize"
+      },
+      "hops": 0,
+      "note_facts": [
+        "f_nickname_ptr"
+      ],
+      "nudges": [
+        "Ask me what your grandpa calls me, dear. He's had a pet name for me since the day we met."
+      ]
+    },
+    {
+      "id": "street_tv",
+      "kind": "word",
+      "line": "the street we lived on the year we got the color TV",
+      "slot": {
+        "fact_id": "f_house",
+        "field": "object",
+        "transform": "first_word"
+      },
+      "hops": 0,
+      "decoys": [
+        "f_apt"
+      ],
+      "note_facts": [
+        "f_tv"
+      ],
       "separate": [
         [
           "f_tv",
@@ -1253,52 +1285,220 @@
         [
           "f_moon",
           "f_house"
+        ]
+      ],
+      "rules": [
+        "no 'Avenue'"
+      ],
+      "nudges": [
+        "That moon-landing plate by the TV, your grandpa bought it the same summer as the TV itself. Have a look.",
+        "We've lived in a couple of places, you know. Ask me about the homes we had."
+      ]
+    },
+    {
+      "id": "dog_before_moon",
+      "kind": "word",
+      "line": "the dog we got the year before the men walked on the moon",
+      "slot": {
+        "fact_id": "f_dog2",
+        "field": "object",
+        "transform": "capitalize"
+      },
+      "hops": 0,
+      "decoys": [
+        "f_dog1"
+      ],
+      "note_facts": [
+        "f_moon"
+      ],
+      "separate": [
+        [
+          "f_dog2",
+          "f_moon"
         ],
+        [
+          "f_dog2",
+          "f_tv"
+        ]
+      ],
+      "nudges": [
+        "We got our first color TV just for the moon landing. Our dog loved lying in front of it."
+      ]
+    },
+    {
+      "id": "wedding_year",
+      "kind": "number",
+      "line": "the year we said 'I do'",
+      "slot": {
+        "fact_id": "f_wedding",
+        "field": "year",
+        "transform": "none",
+        "requires_anchor": "a_wedding"
+      },
+      "hops": 1,
+      "decoys": [
+        "f_engaged"
+      ],
+      "note_facts": [
+        "f_wedding"
+      ],
+      "separate": [
+        [
+          "f_wedding",
+          "f_engaged"
+        ]
+      ],
+      "nudges": [
+        "Did I ever show you my wedding picture on the sideboard? Turn it over sometime."
+      ]
+    },
+    {
+      "id": "mom_born_year",
+      "kind": "number",
+      "line": "the year your mom was born",
+      "slot": {
+        "fact_id": "f_linda_born",
+        "field": "year",
+        "transform": "none",
+        "requires_anchor": "a_linda_moved"
+      },
+      "hops": 1,
+      "decoys": [
+        "f_house",
+        "f_michael_born"
+      ],
+      "note_facts": [
+        "f_linda_born"
+      ],
+      "separate": [
+        [
+          "f_linda_born",
+          "f_house"
+        ]
+      ],
+      "nudges": [
+        "Your mom was my very first baby, you know. Ask me when she came along, sweetheart."
+      ]
+    },
+    {
+      "id": "ribbon_year",
+      "kind": "number",
+      "line": "the year I won the blue ribbon",
+      "slot": {
+        "fact_id": "f_pie",
+        "field": "year",
+        "transform": "none",
+        "requires_anchor": "a_pie"
+      },
+      "hops": 1,
+      "decoys": [
+        "f_met_walt",
+        "f_job2"
+      ],
+      "note_facts": [
+        "f_pie"
+      ],
+      "separate": [
+        [
+          "f_pie",
+          "f_job2"
+        ]
+      ],
+      "nudges": [
+        "That blue ribbon on the wall is my proudest moment, sweetheart. Ask me about it."
+      ]
+    },
+    {
+      "id": "fair_year",
+      "kind": "number",
+      "line": "the year your grandpa lost three dollars at the fair",
+      "slot": {
+        "fact_id": "f_met_walt",
+        "field": "year",
+        "transform": "none",
+        "requires_anchor": "a_met"
+      },
+      "hops": 1,
+      "decoys": [
+        "f_pie"
+      ],
+      "note_facts": [
+        "f_met_walt"
+      ],
+      "separate": [
+        [
+          "f_met_walt",
+          "f_birth"
+        ]
+      ],
+      "nudges": [
+        "Two of my best days were at the county fair, you know. Ask me about the fair, sweetheart."
+      ]
+    },
+    {
+      "id": "painted_number",
+      "kind": "number",
+      "line": "the number Grandpa painted crooked",
+      "smudged": "the number Grandpa ███████ ███████",
+      "slot": {
+        "fact_id": "f_house_number",
+        "field": "object",
+        "transform": "none",
+        "hidden": true
+      },
+      "hops": 1,
+      "decoys": [
+        "f_apt_number"
+      ],
+      "note_facts": [
+        "f_number_ptr"
+      ],
+      "separate": [
         [
           "f_house",
           "f_house_number"
         ]
       ],
       "nudges": [
-        "That moon-landing plate by the TV, your grandpa bought it the same summer as the TV itself. Have a look.",
-        "We've lived in a couple of places, you know. Ask me about the homes we had."
+        "Your grandpa painted that number himself, and I never could read his numbers. That old sign in the hall is missing a digit, but there's a porch picture in the album too."
+      ],
+      "needs_room": true
+    },
+    {
+      "id": "first_door",
+      "kind": "number",
+      "line": "the number on the door of our first home",
+      "slot": {
+        "fact_id": "f_apt_number",
+        "field": "object",
+        "transform": "none"
+      },
+      "hops": 0,
+      "decoys": [
+        "f_house_number"
       ],
       "note_facts": [
-        [
-          "f_tv"
-        ],
-        [
-          "f_number_ptr"
-        ]
+        "f_apt"
+      ],
+      "nudges": [
+        "Our first little apartment had stairs that squeaked something awful. Ask me about it."
       ]
     },
     {
-      "id": "r_hard",
-      "difficulty": "hard",
-      "note_text": "the bird Grandpa named me after + year of the big snowstorm + !",
-      "slots": [
-        {
-          "fact_id": "f_nickname",
-          "field": "object",
-          "transform": "capitalize"
-        },
-        {
-          "fact_id": "f_snowstorm",
-          "field": "year",
-          "transform": "none",
-          "requires_anchor": "a_snowstorm"
-        }
-      ],
-      "literal_suffix": "!",
-      "format": {
-        "join": "",
-        "rules_shown_on_note": [
-          "no spaces",
-          "first letter capital"
-        ]
+      "id": "snowstorm_year",
+      "kind": "number",
+      "line": "year of the big snowstorm",
+      "smudged": "year of the big █████████",
+      "slot": {
+        "fact_id": "f_snowstorm",
+        "field": "year",
+        "transform": "none",
+        "requires_anchor": "a_snowstorm"
       },
-      "password": "Sparrow1977!",
-      "par": null,
+      "hops": 3,
+      "note_facts": [
+        "f_snowstorm"
+      ],
       "separate": [
         [
           "f_snowstorm",
@@ -1310,245 +1510,23 @@
         ]
       ],
       "nudges": [
-        "Michael's old sled is still by the door. That boy and that sled, I tell you.",
-        "Ask me what your grandpa calls me, dear. He's had a pet name for me since the day we met."
-      ],
-      "smudged_text": "the bird Grandpa named me after + year of the big █████████ + !",
-      "note_facts": [
-        [
-          "f_nickname_ptr"
-        ],
-        [
-          "f_snowstorm"
-        ]
+        "Michael's old sled is still by the door. That boy and that sled, I tell you."
       ]
     },
     {
-      "id": "r_easy_2",
-      "difficulty": "easy",
-      "note_text": "where we spent our honeymoon + the year your mom was born",
-      "slots": [
-        {
-          "fact_id": "f_honeymoon",
-          "field": "object",
-          "transform": "first_word"
-        },
-        {
-          "fact_id": "f_linda_born",
-          "field": "year",
-          "transform": "none",
-          "requires_anchor": "a_linda_moved"
-        }
-      ],
-      "format": {
-        "join": "",
-        "rules_shown_on_note": [
-          "no spaces",
-          "first letter capital"
-        ]
+      "id": "first_dog_year",
+      "kind": "number",
+      "line": "the year my first dog came home",
+      "slot": {
+        "fact_id": "f_dog1",
+        "field": "year",
+        "transform": "none",
+        "requires_anchor": "a_biscuit"
       },
-      "password": "Niagara1963",
-      "par": null,
-      "separate": [
-        [
-          "f_honeymoon",
-          "f_linda_born"
-        ],
-        [
-          "f_linda_born",
-          "f_house"
-        ]
-      ],
-      "nudges": [
-        "Your grandpa got soaked on our honeymoon, did I ever tell you? That wedding picture brings it all back.",
-        "Your mom was my very first baby, you know. Ask me when she came along, sweetheart."
-      ],
+      "hops": 3,
       "note_facts": [
-        [
-          "f_honeymoon_ptr"
-        ],
-        [
-          "f_linda_born"
-        ]
-      ]
-    },
-    {
-      "id": "r_easy_3",
-      "difficulty": "easy",
-      "note_text": "my favorite dog + the year I won the blue ribbon",
-      "slots": [
-        {
-          "fact_id": "f_dog2",
-          "field": "object",
-          "transform": "capitalize"
-        },
-        {
-          "fact_id": "f_pie",
-          "field": "year",
-          "transform": "none",
-          "requires_anchor": "a_pie"
-        }
+        "f_dog1"
       ],
-      "format": {
-        "join": "",
-        "rules_shown_on_note": [
-          "no spaces",
-          "first letter capital"
-        ]
-      },
-      "password": "Buttons1972",
-      "par": null,
-      "separate": [
-        [
-          "f_dog2",
-          "f_pie"
-        ],
-        [
-          "f_pie",
-          "f_job2"
-        ]
-      ],
-      "nudges": [
-        "Did you see the spaniel in my album? Oh, she was my favorite. Ask me her name.",
-        "That blue ribbon on the wall is my proudest moment, sweetheart. Ask me about it."
-      ],
-      "note_facts": [
-        [
-          "f_dog2_ptr"
-        ],
-        [
-          "f_pie"
-        ]
-      ]
-    },
-    {
-      "id": "r_medium_2",
-      "difficulty": "medium",
-      "note_text": "the friend I bowl with every Tuesday + the year your grandpa lost three dollars at the fair",
-      "slots": [
-        {
-          "fact_id": "f_marge",
-          "field": "object",
-          "transform": "first_word"
-        },
-        {
-          "fact_id": "f_met_walt",
-          "field": "year",
-          "transform": "none",
-          "requires_anchor": "a_met"
-        }
-      ],
-      "format": {
-        "join": "",
-        "rules_shown_on_note": [
-          "no spaces",
-          "first letter capital"
-        ]
-      },
-      "password": "Marge1958",
-      "par": null,
-      "separate": [
-        [
-          "f_marge",
-          "f_met_walt"
-        ],
-        [
-          "f_bowling",
-          "f_met_walt"
-        ],
-        [
-          "f_met_walt",
-          "f_birth"
-        ]
-      ],
-      "nudges": [
-        "That bowling trophy is from the Tuesday league. I haven't missed a Tuesday in forty years.",
-        "Two of my best days were at the county fair, you know. Ask me about the fair, sweetheart."
-      ],
-      "note_facts": [
-        [
-          "f_bowling_ptr"
-        ],
-        [
-          "f_met_walt"
-        ]
-      ]
-    },
-    {
-      "id": "r_medium_3",
-      "difficulty": "medium",
-      "note_text": "the dog we got the year before the men walked on the moon + the number on the door of our first home",
-      "slots": [
-        {
-          "fact_id": "f_dog2",
-          "field": "object",
-          "transform": "capitalize"
-        },
-        {
-          "fact_id": "f_apt_number",
-          "field": "object",
-          "transform": "none"
-        }
-      ],
-      "format": {
-        "join": "",
-        "rules_shown_on_note": [
-          "no spaces",
-          "first letter capital"
-        ]
-      },
-      "password": "Buttons27",
-      "par": null,
-      "separate": [
-        [
-          "f_dog2",
-          "f_moon"
-        ],
-        [
-          "f_dog2",
-          "f_tv"
-        ]
-      ],
-      "nudges": [
-        "We got our first color TV just for the moon landing. Our dog loved lying in front of it.",
-        "Our first little apartment had stairs that squeaked something awful. Ask me about it."
-      ],
-      "note_facts": [
-        [
-          "f_moon"
-        ],
-        [
-          "f_apt"
-        ]
-      ]
-    },
-    {
-      "id": "r_hard_2",
-      "difficulty": "hard",
-      "note_text": "the sock thief + the year the sock thief came home + !",
-      "slots": [
-        {
-          "fact_id": "f_dog1",
-          "field": "object",
-          "transform": "capitalize"
-        },
-        {
-          "fact_id": "f_dog1",
-          "field": "year",
-          "transform": "none",
-          "requires_anchor": "a_biscuit"
-        }
-      ],
-      "literal_suffix": "!",
-      "format": {
-        "join": "",
-        "rules_shown_on_note": [
-          "no spaces",
-          "first letter capital"
-        ]
-      },
-      "password": "Biscuit1949!",
-      "par": null,
       "separate": [
         [
           "f_dog1",
@@ -1558,17 +1536,98 @@
       "nudges": [
         "Biscuit came home when I was just a little girl, you know. Ask me how old I was.",
         "I'm an Erie girl, born and raised. Ask me when I was born, sweetheart."
-      ],
-      "note_facts": [
-        [
-          "f_sockthief_ptr"
-        ],
-        [
-          "f_dog1"
-        ]
       ]
     }
   ],
+  "tiers": {
+    "easy": {
+      "points": [
+        1,
+        2
+      ],
+      "max_part": 1,
+      "room": "none"
+    },
+    "medium": {
+      "points": [
+        2,
+        4
+      ],
+      "room": "required",
+      "smudge": true
+    },
+    "hard": {
+      "points": [
+        3,
+        99
+      ],
+      "min_top_part": 3,
+      "smudge": true,
+      "suffixes": [
+        "!"
+      ]
+    }
+  },
+  "aliases": {
+    "r_easy": {
+      "tier": "easy",
+      "parts": [
+        "sock_thief",
+        "wedding_year"
+      ]
+    },
+    "r_medium": {
+      "tier": "medium",
+      "parts": [
+        "street_tv",
+        "painted_number"
+      ]
+    },
+    "r_hard": {
+      "tier": "hard",
+      "parts": [
+        "bird_name",
+        "snowstorm_year"
+      ],
+      "suffix": "!"
+    },
+    "r_easy_2": {
+      "tier": "easy",
+      "parts": [
+        "honeymoon",
+        "mom_born_year"
+      ]
+    },
+    "r_easy_3": {
+      "tier": "easy",
+      "parts": [
+        "favorite_dog",
+        "ribbon_year"
+      ]
+    },
+    "r_medium_2": {
+      "tier": "medium",
+      "parts": [
+        "tuesday_friend",
+        "fair_year"
+      ]
+    },
+    "r_medium_3": {
+      "tier": "medium",
+      "parts": [
+        "dog_before_moon",
+        "first_door"
+      ]
+    },
+    "r_hard_2": {
+      "tier": "hard",
+      "parts": [
+        "sock_thief",
+        "first_dog_year"
+      ],
+      "suffix": "!"
+    }
+  },
   "topics": [
     {
       "id": "grandma",

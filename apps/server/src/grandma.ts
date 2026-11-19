@@ -18,6 +18,7 @@ import {
   hashString,
   validateReply,
   validationContext,
+  forgetful,
 } from "@gwp/engine";
 import type { GrandmaOutput, GrandmaWorld, Recipe, RunState, TurnInput, GrandmaLines } from "@gwp/engine";
 
@@ -72,8 +73,11 @@ async function withValidation(args: ReplyArgs, generate: Generate, validate = tr
   const allErrors: string[] = [];
   let errors: string[] = [];
   const usage: NonNullable<BrainResult["usage"]> = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  // Her brain works from what she remembers on this note (an answer only the room shows is not in it); the checks
+  // use the whole world.
+  const mind: ReplyArgs = { ...args, world: forgetful(args.world, args.recipe) };
   for (let attempt = 1; attempt <= (validate ? MAX_ATTEMPTS : 1); attempt++) {
-    const { output, usage: u } = await generate(args, errors);
+    const { output, usage: u } = await generate(mind, errors);
     if (u) {
       usage.input += u.input;
       usage.output += u.output;

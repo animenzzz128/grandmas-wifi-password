@@ -3,7 +3,7 @@
  * from both the LLM Grandma and the mock Grandma.
  */
 import type { GrandmaWorld, Recipe } from "./world.ts";
-import { containsAllSlots, factById, hiddenYears, objectValue } from "./world.ts";
+import { containsAllSlots, factById, hiddenAnswers, hiddenYears, objectValue, saysValue } from "./world.ts";
 import { factKeywords, foreignChars, hasSelfCorrection, leakForms, normalizeForMatch, plainText, resolveSelfCorrections, spacedDigitRuns, tokens } from "./text.ts";
 
 export interface GrandmaOutput {
@@ -22,6 +22,8 @@ export interface ValidationContext {
   separate?: readonly (readonly string[])[];
   /** The recipe itself, for the "every part of the password" leak check. */
   recipe?: Recipe;
+  /** Answers she doesn't remember on this note (Slot.hidden): only the room shows them. */
+  hiddenAnswers?: readonly string[];
 }
 
 /**
@@ -50,7 +52,7 @@ export function contradictions(world: GrandmaWorld, t: { reply: string; factIds:
 
 /** The validation context for a run of this recipe. */
 export function validationContext(world: GrandmaWorld, recipe: Recipe, currentYear = new Date().getFullYear()): ValidationContext {
-  return { password: recipe.password, hiddenYears: hiddenYears(world, recipe), currentYear, separate: recipe.separate ?? [], recipe };
+  return { password: recipe.password, hiddenYears: hiddenYears(world, recipe), currentYear, separate: recipe.separate ?? [], recipe, hiddenAnswers: hiddenAnswers(world, recipe) };
 }
 
 /** Everyday words that say nothing about which memory a sentence is about (stems, as `tokens` makes them). */
@@ -164,6 +166,8 @@ export function validateReply(world: GrandmaWorld, out: GrandmaOutput, ctx: Vali
       errors.push(`number ${n} is not in Grandma's facts`);
     }
   }
+  // An answer only the room shows (docs/15). The message doesn't repeat it: it goes back to the model on a retry.
+  if ((ctx.hiddenAnswers ?? []).some((a) => saysValue(reply, a))) errors.push("said a part of the answer she can't remember on this note; only the room shows it");
   if (ctx.hiddenYears.size > 0 && SPELLED_YEAR.test(reply)) {
     // Spelled-out years could dodge the digit check in hard mode.
     errors.push("spelled-out year in hard mode; give years in digits, or by anchor phrase when hidden");

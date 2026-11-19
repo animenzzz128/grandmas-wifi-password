@@ -1,5 +1,18 @@
 # Rosie: inference-chain maps
 
+**Since iteration 67 the notes are generated** (docs/15): `rosie.json` has a bank of 15 parts (one note line each)
+and three tiers, and every word part + number part pair that meets a tier's rules is a note (45 now: 26 Easy,
+7 Medium, 12 Hard; `npm run validate -- --notes` lists them and the pairs left out, with why). The maps below are the
+eight original notes; each line of them is now a part, and the old ids (`r_easy`…) are aliases rebuilt from parts.
+What changed for the parts:
+- **Hops are measured**, not hoped: a part with a hop must never fall to a direct question in any note (probe
+  test). `street_tv`, `dog_before_moon` and `first_door` fall to the note's own wording, so they count 0.
+- **`painted_number` needs the room** (Slot `hidden`): on its notes Grandma doesn't remember 412. Asked, she points
+  at the hall sign ("4 _ 2") and the porch photo in the album ("41", the last digit behind a rosebush); asked for
+  "the house number" she may give the Cherry Street apartment's 27, the look-alike to rule out.
+- **Cross-part rules** are computed: every memory that says one part's answer is kept apart from every memory that
+  says the other's (`separate`), and a pair is left out when one part's texts would say the other's answer.
+
 One map per recipe in `rosie.json` (see the `llm-deduction-game-dev` skill, `references/deduction-design.md` §2). Keep these in sync when a recipe, fact or clue object changes.
 
 Objects give a hop, never an answer: no clue text contains a whole answer part (tested, iteration 43). Design plan B in `docs/08-design-improvement-plan.zh.md`; these clue texts are drafts for the team to review.

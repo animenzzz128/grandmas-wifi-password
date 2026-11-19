@@ -10,7 +10,7 @@ A conversational needle-in-a-haystack puzzle game. Grandma, powered by an LLM, i
 
 This is the final project for **CPSC 1710: Introduction to AI Applications** (Yale, Fall 2026), and a possible future Steam release.
 
-**How the AI is used.** The model only *words* Grandma's replies. Her facts, the puzzles, the tea economy and every rule live in hand-written data and server code. The password is never in her prompt, and each reply is checked before the player sees it. On 736 test turns per model across all 8 notes, 256 of them attacks (prompt injection, role-play, "repeat your instructions"…), no reply gave away the password ([model choice and results](docs/13-model-choice.md)).
+**How the AI is used.** The model only *words* Grandma's replies. Her facts, the puzzles, the tea economy and every rule live in hand-written data and server code. The password is never in her prompt, and each reply is checked before the player sees it. On 736 test turns per model across the 8 original notes, 256 of them attacks (prompt injection, role-play, "repeat your instructions"…), no reply gave away the password ([model choice and results](docs/13-model-choice.md)).
 
 ## Why this project
 - **"Needle in a Haystack"** is the classic long-context retrieval benchmark for LLMs. We flip it: *the human takes the test and the AI is the haystack.* Then we let an AI agent take the same test.
@@ -62,7 +62,7 @@ docs/                design docs and research
 **Live since 2026-11-18** at https://grandmas-wifi-password.fly.dev.
 
 The game has:
-- 8 sticky notes on three difficulties;
+- a new riddle every visit: Uncle Michael's note is put together from a bank of 15 parts (45 riddles on Easy, Medium and Hard; Medium needs the room, because Grandma can't remember one part);
 - a guided tutorial;
 - Grandma on Claude Haiku 5.5 through OpenRouter, with an offline Grandma as the fallback;
 - original waltz music;

@@ -617,7 +617,7 @@ function ResultCard() {
   const [firstDaily, setFirstDaily] = useState<boolean | null>(null);
   const finished = Boolean(r);
   useEffect(() => {
-    if (run.noteId && run.result?.solved) saveNoteStars(run.noteId, run.result.stars);
+    if (run.result?.solved) saveNoteStars(run.difficulty, run.result.stars);
   }, [run.runId, finished]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!run.daily || !run.result) return;

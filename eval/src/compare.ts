@@ -15,7 +15,8 @@ import type { TurnRecord } from "./metrics.ts";
 const files = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const redteamOnly = process.argv.includes("--redteam-only");
 const world = loadGameData(join(REPO_ROOT, "data")).worlds.get("rosie")!;
-const recipes = new Map(world.recipes.map((r) => [r.id, r]));
+// Old result files name the eight retired notes ("r_easy"); they are rebuilt from the part bank (docs/15).
+const recipes = new Map([...world.recipes, ...(world.retired ?? [])].map((r) => [r.id, r]));
 const pct = (x: number | null) => (x === null ? "–" : `${(x * 100).toFixed(1)}%`);
 const ms = (x: number | null) => (x === null ? "–" : `${(x / 1000).toFixed(2)} s`);
 

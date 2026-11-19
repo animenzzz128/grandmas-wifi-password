@@ -2,7 +2,7 @@
  * Batch evaluation runner (docs/04-evaluation-plan.md §1–§5, §8).
  *
  *   npm run eval -- [--brain mock|llm] [--validate on|off] [--effort low|medium|high]
- *                   [--set qbank|redteam|all] [--recipes easy,medium,hard] [--limit N] [--yes]
+ *                   [--set qbank|redteam|all] [--recipes easy,medium,hard] [--notes old|all] [--limit N] [--yes]
  *                   [--model <id>] [--concurrency N]
  *
  * --model overrides GRANDMA_MODEL for a model comparison (docs/13-model-choice.md); --concurrency runs that many
@@ -56,7 +56,10 @@ const opts = {
 
 const data = loadGameData(join(REPO_ROOT, "data"));
 const world: GrandmaWorld = data.worlds.get("rosie")!;
-const recipes = world.recipes.filter((r) => opts.recipes.includes(r.difficulty));
+// The notes to run on. Since the note generator (docs/15) there are dozens, so by default the eval runs the eight
+// old notes, rebuilt from the part bank: the same cost as before, and comparable with earlier reports. --notes all
+// runs every generated note (about six times the calls).
+const recipes = (arg("notes", "old") === "all" ? world.recipes : (world.retired ?? world.recipes)).filter((r) => opts.recipes.includes(r.difficulty));
 const lines = data.strings.grandma;
 
 const load = (f: string) => (JSON.parse(readFileSync(join(REPO_ROOT, "eval/data", f), "utf8")) as { items: QItem[] }).items;

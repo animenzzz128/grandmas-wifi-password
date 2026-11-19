@@ -103,13 +103,15 @@ describe("topic cards (API)", () => {
     for (const r of [first, second, third]) expect(r.line).not.toMatch(/Sparrow|1977/);
   });
 
-  it("lists the notes to choose from without any answers", async () => {
+  it("lists the three tiers to choose from, with no note text or answers (docs/15)", async () => {
     const app = newApp();
     const res = await app.request("/api/notes");
     const text = await res.text();
-    const notes = NotesResponse.parse(JSON.parse(text)).notes;
-    expect(notes).toHaveLength(8);
-    expect(notes[0]!.difficulty).toBe("easy");
+    const tiers = NotesResponse.parse(JSON.parse(text)).tiers;
+    expect(tiers.map((t) => t.difficulty)).toEqual(["easy", "medium", "hard"]);
+    const world = [...data.worlds.values()][0]!;
+    expect(tiers.reduce((n, t) => n + t.notes, 0)).toBe(world.recipes.length);
+    expect(text).not.toMatch(/sock thief|honeymoon/);
     for (const pw of ["Biscuit1961", "Maple412", "Sparrow1977", "Marge1958", "1963", "1972"]) expect(text).not.toContain(pw);
     expect(text).not.toMatch(/f_[a-z]/);
   });
